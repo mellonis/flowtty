@@ -31,6 +31,7 @@ export class Buffer {
     this.cells[y * this.width + x] = { char, style };
   }
 
+  // Out-of-bounds reads return a fresh blank cell (mirrors set()'s no-op).
   get(x: number, y: number): Cell {
     return this.cells[y * this.width + x] ?? { char: ' ', style: {} };
   }

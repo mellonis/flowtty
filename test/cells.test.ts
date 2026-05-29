@@ -26,3 +26,14 @@ test('toString trims trailing ASCII spaces but preserves NBSP', () => {
   b.set(1, 0, ' '); // NBSP must survive
   expect(b.toString()).toBe('a ');
 });
+
+test('get reads back what set wrote', () => {
+  const b = new Buffer(3, 2);
+  b.set(1, 0, 'x', { bold: true });
+  expect(b.get(1, 0)).toEqual({ char: 'x', style: { bold: true } });
+});
+
+test('get on out-of-bounds returns a blank cell without throwing', () => {
+  const b = new Buffer(2, 1);
+  expect(b.get(10, 10)).toEqual({ char: ' ', style: {} });
+});
