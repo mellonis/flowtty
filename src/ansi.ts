@@ -7,6 +7,11 @@ const FG: Record<string, number> = {
   blue: 34, magenta: 35, cyan: 36, white: 37,
 };
 
+const BG: Record<string, number> = {
+  black: 40, red: 41, green: 42, yellow: 43,
+  blue: 44, magenta: 45, cyan: 46, white: 47,
+};
+
 export function sgr(style: Style): string {
   const codes: number[] = [];
   if (style.bold) codes.push(1);
@@ -14,6 +19,7 @@ export function sgr(style: Style): string {
   if (style.underline) codes.push(4);
   if (style.inverse) codes.push(7);
   if (style.fg && FG[style.fg] !== undefined) codes.push(FG[style.fg]!);
+  if (style.bg && BG[style.bg] !== undefined) codes.push(BG[style.bg]!);
   return codes.length ? `\x1b[${codes.join(';')}m` : '';
 }
 
