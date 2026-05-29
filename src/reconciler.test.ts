@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import { createElement } from 'react';
-import { getYoga } from '../src/yoga.js';
-import { createRoot } from '../src/reconciler.js';
+import { getYoga } from './yoga.js';
+import { createRoot } from './reconciler.js';
 
 test('mounting <flowtty-box> builds a host tree under the container', async () => {
   const Yoga = await getYoga();

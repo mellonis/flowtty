@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { getYoga } from '../src/yoga.js';
+import { getYoga } from './yoga.js';
 
 test('getYoga loads once and computes a simple layout', async () => {
   const Yoga = await getYoga();

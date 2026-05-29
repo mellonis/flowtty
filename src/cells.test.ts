@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { Buffer } from '../src/cells.js';
+import { Buffer } from './cells.js';
 
 test('blank buffer renders empty lines', () => {
   const b = new Buffer(3, 2);

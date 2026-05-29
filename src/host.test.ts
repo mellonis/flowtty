@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
-import { getYoga } from '../src/yoga.js';
-import { createInstance, createTextInstance, appendChild, removeChild } from '../src/host.js';
+import { getYoga } from './yoga.js';
+import { createInstance, createTextInstance, appendChild, removeChild } from './host.js';
 
 test('box instance owns a yoga node; text instance carries text', async () => {
   const Yoga = await getYoga();
