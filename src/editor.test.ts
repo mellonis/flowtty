@@ -77,3 +77,36 @@ test('Ctrl-K kills from cursor to end', () => {
 test('Ctrl-U kills from cursor to start', () => {
   expect(reduce(s('hello world', 6), key({ name: 'u', ctrl: true }))).toEqual({ kind: 'edit', state: s('world', 0) });
 });
+
+test('printable character inserts at cursor and advances it', () => {
+  expect(reduce(s('hllo', 1), key({ name: 'e', sequence: 'e' }))).toEqual({ kind: 'edit', state: s('hello', 2) });
+  expect(reduce(s('', 0), key({ name: 'X', sequence: 'X' }))).toEqual({ kind: 'edit', state: s('X', 1) });
+});
+
+test('printable character with ctrl/meta is NOT inserted (those are bindings)', () => {
+  // Ctrl-A is the home binding (cursor to 0), not an insert of 'a'.
+  expect(reduce(s('hi', 2), key({ name: 'a', ctrl: true }))).toMatchObject({ kind: 'edit', state: s('hi', 0) });
+  // Ctrl-Q is unbound → noop, NOT insert.
+  expect(reduce(s('hi', 2), key({ name: 'q', ctrl: true }))).toEqual({ kind: 'noop' });
+});
+
+test('NBSP (U+00A0) inserts byte-exact (the value contains U+00A0, not space)', () => {
+  const action = reduce(s('a', 1), key({ name: ' ', sequence: ' ' }));
+  expect(action).toEqual({ kind: 'edit', state: s('a ', 2) });
+  if (action.kind === 'edit') {
+    expect(action.state.value.charCodeAt(1)).toBe(0x00A0);
+  }
+});
+
+test('Enter / return → submit', () => {
+  expect(reduce(s('hello', 5), key({ name: 'return' }))).toEqual({ kind: 'submit' });
+  expect(reduce(s('hello', 5), key({ name: 'enter' }))).toEqual({ kind: 'submit' });
+});
+
+test('Escape → cancel', () => {
+  expect(reduce(s('hello', 5), key({ name: 'escape' }))).toEqual({ kind: 'cancel' });
+});
+
+test('unbound key returns noop', () => {
+  expect(reduce(s('hello', 5), key({ name: 'f5' }))).toEqual({ kind: 'noop' });
+});

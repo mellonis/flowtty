@@ -85,5 +85,17 @@ export function reduce(state: EditorState, key: Key): EditorAction {
     return { kind: 'edit', state: { value: value.slice(0, cursor) + value.slice(cursor + 1), cursor } };
   }
 
+  // Submit / cancel
+  if (key.name === 'return' || key.name === 'enter') return { kind: 'submit' };
+  if (key.name === 'escape') return { kind: 'cancel' };
+
+  // Printable insertion — single-character name only, no modifiers.
+  // (ctrl/meta combinations that didn't match an earlier specific branch are noops,
+  // NOT insertions — so Ctrl-Q does nothing rather than typing 'q'.)
+  if (!key.ctrl && !key.meta && key.name.length === 1) {
+    const ch = key.name;
+    return { kind: 'edit', state: { value: value.slice(0, cursor) + ch + value.slice(cursor), cursor: cursor + 1 } };
+  }
+
   return { kind: 'noop' };
 }
