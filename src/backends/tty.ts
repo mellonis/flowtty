@@ -26,6 +26,11 @@ export class TtyBackend implements Backend {
   };
   private inputAttached = false;
   private terminalEntered = false;
+  private readonly resizeSubscribers = new Set<() => void>();
+  private readonly resizeNotify = (): void => {
+    for (const h of [...this.resizeSubscribers]) h();
+  };
+  private resizeAttached = false;
 
   constructor(
     private readonly out: NodeJS.WriteStream = process.stdout,
@@ -63,6 +68,17 @@ export class TtyBackend implements Backend {
     this.out.write(outStr);
   }
 
+  onResize(handler: () => void): () => void {
+    // Lazy: only attach the underlying 'resize' listener when the first
+    // subscriber arrives. `tty.WriteStream` emits 'resize' on SIGWINCH.
+    if (!this.resizeAttached) {
+      this.out.on('resize', this.resizeNotify);
+      this.resizeAttached = true;
+    }
+    this.resizeSubscribers.add(handler);
+    return () => { this.resizeSubscribers.delete(handler); };
+  }
+
   onKey(handler: (key: Key) => void): () => void {
     // Lazy: only flip stdin into raw mode + attach when the first subscriber arrives,
     // so a passive view backend doesn't claim the terminal.
@@ -86,6 +102,10 @@ export class TtyBackend implements Backend {
       if (this.input.isTTY) this.input.setRawMode(false);
       this.input.pause();
       this.inputAttached = false;
+    }
+    if (this.resizeAttached) {
+      this.out.removeListener('resize', this.resizeNotify);
+      this.resizeAttached = false;
     }
     if (this.terminalEntered) {
       // Show cursor + reset SGR while still in alt-screen, then exit alt-screen

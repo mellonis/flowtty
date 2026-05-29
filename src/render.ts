@@ -48,9 +48,14 @@ export async function render(element: ReactNode, backend: Backend): Promise<{ un
   await Promise.resolve();
   await Promise.resolve();
 
+  // Repaint on terminal resize. Backends with fixed dimensions (e.g. the test
+  // backend) omit onResize and this is a no-op.
+  const unsubResize = backend.onResize?.(draw);
+
   return {
     unmount() {
       unmounted = true;
+      unsubResize?.();
       root.unmount();
       backend.dispose?.();
     },

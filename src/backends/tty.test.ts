@@ -22,14 +22,15 @@ function makeStdinStub() {
 
 function makeStub(cols = 6, rows = 1) {
   const writes: string[] = [];
-  const stub = {
+  const emitter = new EventEmitter();
+  const stub = Object.assign(emitter, {
     columns: cols,
     rows,
     write(s: string) {
       writes.push(s);
       return true;
     },
-  } as unknown as NodeJS.WriteStream;
+  }) as unknown as NodeJS.WriteStream & EventEmitter;
   return { stub, writes };
 }
 
@@ -146,6 +147,32 @@ test('TtyBackend.onKey: Ctrl-C default-handled as dispose + process.exit(130) (r
   expect(subscriberCalled).toEqual([]);
 
   exitSpy.mockRestore();
+});
+
+test('TtyBackend.onResize: subscribers receive notifications on stdout "resize" events', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  let calls = 0;
+  const unsubscribe = back.onResize(() => { calls++; });
+  (out as unknown as EventEmitter).emit('resize');
+  (out as unknown as EventEmitter).emit('resize');
+  expect(calls).toBe(2);
+  unsubscribe();
+  (out as unknown as EventEmitter).emit('resize');
+  expect(calls).toBe(2); // no event after unsubscribe
+  back.dispose();
+});
+
+test('TtyBackend.dispose: detaches the resize listener (no notification after dispose)', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  let calls = 0;
+  back.onResize(() => { calls++; });
+  back.dispose();
+  (out as unknown as EventEmitter).emit('resize');
+  expect(calls).toBe(0);
 });
 
 test('TtyBackend.onKey: Ctrl-D default-handled as dispose + process.exit(130)', () => {

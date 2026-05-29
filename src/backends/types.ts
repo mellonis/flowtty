@@ -11,5 +11,11 @@ export interface Backend {
    * Backends without an input source omit this method.
    */
   onKey?(handler: (key: Key) => void): () => void;
+  /**
+   * Subscribe to terminal-resize events. Returns an unsubscribe function.
+   * Handlers are called AFTER `size()` reflects the new dimensions.
+   * Backends with fixed dimensions (e.g. the test backend) omit this method.
+   */
+  onResize?(handler: () => void): () => void;
   dispose?(): void;
 }
