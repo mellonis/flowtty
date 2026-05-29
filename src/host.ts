@@ -74,8 +74,12 @@ export function refreshMeasure(inst: Instance, _Yoga: Yoga): void {
 
 export function appendChild(parent: Instance, child: Instance | TextInstance, Yoga: Yoga): void {
   parent.children.push(child);
-  if (child.type === 'box') parent.yogaNode.insertChild(child.yogaNode, parent.yogaNode.getChildCount());
-  else child.parent = parent;
+  if (child.type === 'box') {
+    parent.yogaNode.setMeasureFunc(null); // Yoga forbids a measure func on a node with children
+    parent.yogaNode.insertChild(child.yogaNode, parent.yogaNode.getChildCount());
+  } else {
+    child.parent = parent;
+  }
   refreshMeasure(parent, Yoga);
 }
 
@@ -85,6 +89,8 @@ export function removeChild(parent: Instance, child: Instance | TextInstance, Yo
   if (child.type === 'box') {
     parent.yogaNode.removeChild(child.yogaNode);
     child.yogaNode.freeRecursive(); // free wasm node — required to avoid leaks
+  } else {
+    child.parent = undefined;
   }
   refreshMeasure(parent, Yoga);
 }
@@ -99,6 +105,7 @@ export function insertBefore(
   parent.children.splice(i < 0 ? parent.children.length : i, 0, child);
   if (child.type === 'box') {
     const boxIndex = parent.children.filter((c) => c.type === 'box').indexOf(child);
+    parent.yogaNode.setMeasureFunc(null); // Yoga forbids a measure func on a node with children
     parent.yogaNode.insertChild(child.yogaNode, boxIndex);
   } else {
     child.parent = parent;
