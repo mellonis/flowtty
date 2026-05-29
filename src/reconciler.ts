@@ -71,7 +71,7 @@ export function createReconciler(Yoga: Yoga) {
     appendInitialChild: appendChild,
     appendChild,
     appendChildToContainer: (container: Container, child: Instance | TextInstance) => {
-      container.children.push(child as Instance);
+      if (child.type === 'box') container.children.push(child);
     },
     insertBefore,
     insertInContainerBefore: (
@@ -115,7 +115,6 @@ export function createReconciler(Yoga: Yoga) {
     },
 
     // Priority API (0.31.0 shape).
-    getCurrentEventPriority: () => DefaultEventPriority,
     setCurrentUpdatePriority: (priority: number) => {
       currentUpdatePriority = priority;
     },
