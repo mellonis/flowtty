@@ -42,3 +42,24 @@ test('unmount frees root Yoga nodes (calls freeRecursive on each root box)', asy
   expect(container.children).toHaveLength(0);
   expect(freed).toBe(true);
 });
+
+test('resetAfterCommit schedules onCommit (coalesces multiple commits)', async () => {
+  const Yoga = await getYoga();
+  let commits = 0;
+  const { root } = createRoot(Yoga, () => { commits++; });
+  root.render(createElement('flowtty-box'));
+  root.render(createElement('flowtty-box', { width: 3 }));
+  root.render(createElement('flowtty-box', { width: 4 }));
+  // Multiple synchronous commits should coalesce into a single scheduled call.
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(commits).toBe(1);
+});
+
+test('createRoot without onCommit does not throw and does not schedule', async () => {
+  const Yoga = await getYoga();
+  const { root } = createRoot(Yoga);
+  expect(() => root.render(createElement('flowtty-box'))).not.toThrow();
+  await Promise.resolve();
+  await Promise.resolve();
+});

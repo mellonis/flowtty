@@ -43,7 +43,17 @@ type ReconcilerConfig = Parameters<
   >
 >[0];
 
-export function createReconciler(Yoga: Yoga) {
+export function createReconciler(Yoga: Yoga, onCommit?: () => void) {
+  let pending = false;
+  const schedulePaint = () => {
+    if (pending || !onCommit) return;
+    pending = true;
+    queueMicrotask(() => {
+      pending = false;
+      onCommit();
+    });
+  };
+
   // The current update priority is closure state per reconciler instance,
   // following the standard react-dom / ink pattern.
   let currentUpdatePriority: number = NoEventPriority;
@@ -115,7 +125,7 @@ export function createReconciler(Yoga: Yoga) {
     getChildHostContext: (parent: object) => parent,
     getPublicInstance: (instance: Instance | TextInstance) => instance,
     prepareForCommit: () => null,
-    resetAfterCommit: () => {},
+    resetAfterCommit: () => { schedulePaint(); },
     clearContainer: (container: Container) => {
       for (const c of container.children) c.yogaNode.freeRecursive();
       container.children = [];
@@ -163,8 +173,8 @@ export interface Root {
   unmount(): void;
 }
 
-export function createRoot(Yoga: Yoga): { container: Container; root: Root } {
-  const reconciler = createReconciler(Yoga);
+export function createRoot(Yoga: Yoga, onCommit?: () => void): { container: Container; root: Root } {
+  const reconciler = createReconciler(Yoga, onCommit);
   const container: Container = { children: [], Yoga };
   // react-reconciler@0.31.0's runtime `createContainer` takes 10 args (three
   // error callbacks: onUncaughtError, onCaughtError, onRecoverableError), but
