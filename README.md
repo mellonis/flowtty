@@ -11,15 +11,22 @@ buffer and draws it to the terminal (or captures it via the test backend).
 
 ## Status
 
-M0 (renderer core). Not yet usable for real apps — see the design + plan docs.
+M1a (interactivity infrastructure). Keyboard input now reaches components via
+`useInput`, React state updates trigger repaints automatically, and the test
+backend (`flowtty/testing`) can inject synthetic keys with `press`/`type` +
+`flush`. Root Yoga nodes are freed on `unmount` (the M0 leak is fixed).
 
-## M0 limitations (deliberate, will be addressed in later milestones)
+### Still deferred (will land in later milestones)
 
-- No repaint on React state updates — `render()` paints once.
-- No frame diffing — the TTY backend does a full redraw each `draw()`.
-- Root Yoga nodes are not freed on `unmount()` (M0 is render-once-then-exit).
-- `Text` ignores layout props (sized by a Yoga measure func).
-- **No way to set style (color/bold/etc.) from React elements yet** — the cell `Style`, ANSI `sgr()` serializer, and TTY-backend SGR output are all in place, but the React→paint path hardcodes empty style. Element-level styling lands in a later milestone.
+- TTY-backend stdin raw-mode + key parsing — synthetic keys via TestBackend
+  work today; real-terminal interactivity ships with M1c.
+- Frame diffing — the TTY backend still does a full redraw each `draw()`.
+- `<Text>` ignores layout props (sized by a Yoga measure func).
+- Element-level styling — the React → paint path still hardcodes empty style;
+  cell `Style` + `sgr()` + TTY SGR output remain reachable only from a
+  hand-built `Buffer`.
+- `<TextInput>` / `<Select>` / `<MultiSelect>` / `<Confirm>` / `<Form>` —
+  prompt primitives ship in M1b and M1c.
 
 ## Usage (M0)
 
