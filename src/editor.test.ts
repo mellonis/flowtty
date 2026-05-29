@@ -112,7 +112,7 @@ test('unbound key returns noop', () => {
 });
 
 test('Option+Space inserts NBSP (U+00A0)', () => {
-  const action = reduce(s('a', 1), key({ name: 'space', meta: true }));
+  const action = reduce(s('a', 1), key({ name: ' ', meta: true }));   // was 'space'
   expect(action.kind === 'edit' && action.state.value).toBe('a ');
 });
 

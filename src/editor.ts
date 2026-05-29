@@ -14,7 +14,7 @@ export type EditorAction =
 // Mac Option-modifier typography map. Each entry: keyName → [unshifted, shifted?].
 // Inserted byte-exact: NBSP, en/em dash, curly quotes.
 const OPT_MAP: Record<string, [string] | [string, string]> = {
-  space: [' '],               // U+00A0 NBSP
+  ' ': [' '],                                   // U+00A0 NBSP
   '-':   ['–', '—'],     // en-dash U+2013, em-dash U+2014
   '[':   ['“', '”'],     // left/right double quote
   ']':   ['‘', '’'],     // left/right single quote
