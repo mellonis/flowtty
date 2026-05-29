@@ -8,6 +8,16 @@ export interface BoxProps {
   width?: number;
   height?: number;
   flexDirection?: 'row' | 'column';
+  // Text wrap mode for direct text children (default: 'none' — preserves current behavior).
+  wrap?: 'wrap' | 'truncate' | 'none';
+  // Text styling applied to direct text children (paint reads these off inst.props):
+  color?: string;
+  bold?: boolean;
+  dim?: boolean;
+  underline?: boolean;
+  inverse?: boolean;
+  // Box background fill:
+  backgroundColor?: string;
 }
 
 export interface Instance {
