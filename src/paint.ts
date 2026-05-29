@@ -24,11 +24,18 @@ function textStyleOf(inst: Instance): Style {
   return style;
 }
 
-function paintInstance(inst: Instance, buffer: Buffer, offsetX: number, offsetY: number): void {
+function paintInstance(
+  inst: Instance,
+  buffer: Buffer,
+  offsetX: number,
+  offsetY: number,
+  inheritedBg: string | undefined = undefined,
+): void {
   const box: Rect = layoutOf(inst, offsetX, offsetY);
+  const ownBg = inst.props.backgroundColor;
+  const effectiveBg = ownBg ?? inheritedBg;
 
   // 1. Fill the box rect with own backgroundColor (if set).
-  const ownBg = inst.props.backgroundColor;
   if (ownBg !== undefined) {
     for (let y = box.top; y < box.top + box.height; y++) {
       for (let x = box.left; x < box.left + box.width; x++) {
@@ -43,6 +50,9 @@ function paintInstance(inst: Instance, buffer: Buffer, offsetX: number, offsetY:
     const mode = (inst.props.wrap ?? 'none') as WrapMode;
     const lines = mode === 'none' ? text.split('\n') : wrapText(text, box.width, mode);
     const textStyle = textStyleOf(inst);
+    if (textStyle.bg === undefined && effectiveBg !== undefined) {
+      textStyle.bg = effectiveBg;
+    }
     for (let row = 0; row < lines.length; row++) {
       const chars = [...(lines[row] ?? '')];
       for (let col = 0; col < chars.length; col++) {
@@ -51,8 +61,8 @@ function paintInstance(inst: Instance, buffer: Buffer, offsetX: number, offsetY:
     }
   }
 
-  // 3. Recurse into child boxes.
+  // 3. Recurse into child boxes, threading effectiveBg.
   for (const child of inst.children) {
-    if (child.type === 'box') paintInstance(child, buffer, box.left, box.top);
+    if (child.type === 'box') paintInstance(child, buffer, box.left, box.top, effectiveBg);
   }
 }

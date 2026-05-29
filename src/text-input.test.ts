@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { createElement, useState } from 'react';
-import { render } from './index.js';
+import { render, Box, Text } from './index.js';
 import { TestBackend, flush } from './testing.js';
 import { TextInput } from './text-input.js';
 
@@ -111,4 +111,22 @@ test('M1b acceptance: type, edit with cursor moves, validate-gated submit, then 
   backend.press({ name: 'escape' });
   await flush();
   expect(events).toEqual(['submit:hello', 'cancel']);
+});
+
+test('M1d acceptance: <Box width=10 backgroundColor=blue><Text color=red bold wrap>hello world</Text></Box>', async () => {
+  function App() {
+    return createElement(Box, { width: 10, height: 3, backgroundColor: 'blue' },
+      createElement(Text, { color: 'red', bold: true, wrap: 'wrap' }, 'hello world'),
+    );
+  }
+  const backend = new TestBackend(10, 3);
+  await render(createElement(App), backend);
+  // Plain text frame: text wraps to two rows; bg fills the third row.
+  expect(backend.lastFrame).toBe('hello\nworld');
+  // Cell-level style: text cells red+bold over blue; bg-only cells just blue.
+  const buf = backend.lastBuffer!;
+  expect(buf.get(0, 0)).toEqual({ char: 'h', style: { fg: 'red', bold: true, bg: 'blue' } });
+  expect(buf.get(4, 0)).toEqual({ char: 'o', style: { fg: 'red', bold: true, bg: 'blue' } });
+  expect(buf.get(5, 0)).toEqual({ char: ' ', style: { bg: 'blue' } });
+  expect(buf.get(0, 2)).toEqual({ char: ' ', style: { bg: 'blue' } });
 });
