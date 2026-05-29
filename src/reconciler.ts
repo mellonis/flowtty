@@ -97,9 +97,11 @@ export function createReconciler(Yoga: Yoga, onCommit?: () => void) {
     removeChild: (parent: Instance, child: Instance | TextInstance) => removeChild(parent, child, Yoga),
     removeChildFromContainer: (container: Container, child: Instance | TextInstance) => {
       const i = container.children.indexOf(child as Instance);
-      if (i >= 0) container.children.splice(i, 1);
-      if ((child as { type: string }).type === 'box') {
-        (child as Instance).yogaNode.freeRecursive();
+      if (i >= 0) {
+        container.children.splice(i, 1);
+        if ((child as { type: string }).type === 'box') {
+          (child as Instance).yogaNode.freeRecursive();
+        }
       }
     },
 
