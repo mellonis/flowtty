@@ -1,5 +1,7 @@
 import { FlexDirection } from 'yoga-layout/load';
 import type { Yoga, YogaNode } from './yoga.js';
+import { MeasureMode } from './yoga.js';
+import { wrapText, type WrapMode } from './wrap.js';
 
 // The host has a single element type by design: Text is sugar for Box.
 export type HostType = 'flowtty-box';
@@ -77,7 +79,24 @@ export function refreshMeasure(inst: Instance, _Yoga: Yoga): void {
   const hasBox = inst.children.some((c) => c.type === 'box');
   if (hasText && !hasBox) {
     const text = ownText(inst);
-    inst.yogaNode.setMeasureFunc(() => measureText(text));
+    const mode = (inst.props.wrap ?? 'none') as WrapMode;
+    inst.yogaNode.setMeasureFunc((width, widthMode /*, _height, _heightMode */) => {
+      // When parent imposes a width (Exactly or AtMost) and wrap mode is set,
+      // run wrapText to compute the constrained dimensions; otherwise return
+      // natural size (longest line × line count) so layout matches existing
+      // M0/M1a/M1b/M1c behavior for unwrapped text.
+      if (
+        mode !== 'none' &&
+        (widthMode === MeasureMode.Exactly || widthMode === MeasureMode.AtMost) &&
+        Number.isFinite(width)
+      ) {
+        const cap = Math.max(0, Math.floor(width));
+        const lines = wrapText(text, cap, mode);
+        const longest = lines.reduce((m, l) => Math.max(m, [...l].length), 0);
+        return { width: longest, height: lines.length };
+      }
+      return measureText(text);
+    });
   } else {
     inst.yogaNode.setMeasureFunc(null);
   }

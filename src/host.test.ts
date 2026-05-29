@@ -29,3 +29,24 @@ test('measureText returns longest-line width and line count', () => {
   expect(measureText('hi\nthere')).toEqual({ width: 5, height: 2 });
   expect(measureText('')).toEqual({ width: 0, height: 1 });
 });
+
+test('measure func: wrap mode returns wrapped dimensions when parent constrains width', async () => {
+  const Yoga = await getYoga();
+  // Parent box width 7, with text 'hello world' and wrap='wrap'.
+  // Expected wrapped lines: ['hello', 'world'] → height 2.
+  const parent = createInstance('flowtty-box', { width: 7, wrap: 'wrap' }, Yoga);
+  const txt = createTextInstance('hello world', Yoga);
+  appendChild(parent, txt, Yoga);
+  parent.yogaNode.calculateLayout(undefined, undefined);
+  expect(parent.yogaNode.getComputedHeight()).toBe(2);
+});
+
+test('measure func: no wrap (default) returns natural single-line width', async () => {
+  const Yoga = await getYoga();
+  const parent = createInstance('flowtty-box', {}, Yoga);
+  const txt = createTextInstance('hello world', Yoga);
+  appendChild(parent, txt, Yoga);
+  parent.yogaNode.calculateLayout(undefined, undefined);
+  expect(parent.yogaNode.getComputedWidth()).toBe(11);
+  expect(parent.yogaNode.getComputedHeight()).toBe(1);
+});
