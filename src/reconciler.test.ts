@@ -27,3 +27,18 @@ test('mounting <flowtty-box> builds a host tree under the container', async () =
   expect(outer.children).toHaveLength(1);
   expect(outer.yogaNode.getChildCount()).toBe(1);
 });
+
+test('unmount frees root Yoga nodes (calls freeRecursive on each root box)', async () => {
+  const Yoga = await getYoga();
+  const { container, root } = createRoot(Yoga);
+  root.render(createElement('flowtty-box', { width: 4 }));
+  const node = container.children[0]!.yogaNode;
+  let freed = false;
+  const originalFree = node.freeRecursive.bind(node);
+  // Spy: replace freeRecursive with a wrapper that records the call, then
+  // delegates so the actual wasm-node free still happens (no leak in test).
+  (node as { freeRecursive: () => void }).freeRecursive = () => { freed = true; originalFree(); };
+  root.unmount();
+  expect(container.children).toHaveLength(0);
+  expect(freed).toBe(true);
+});
