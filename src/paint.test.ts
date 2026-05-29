@@ -27,3 +27,67 @@ test('paints two row children at their computed columns', async () => {
   const buffer = paint(container, 6, 1);
   expect(buffer.toString()).toBe('abcd');
 });
+
+test('paint: wrap mode renders text across multiple rows', async () => {
+  const Yoga = await getYoga();
+  const { container, root } = createRoot(Yoga);
+  root.render(
+    createElement('flowtty-box', { width: 6, height: 2, wrap: 'wrap' }, 'hello world'),
+  );
+  computeLayout(container, 6, 2);
+  const buf = paint(container, 6, 2);
+  expect(buf.toString()).toBe('hello\nworld');
+});
+
+test('paint: truncate mode renders single line with ellipsis', async () => {
+  const Yoga = await getYoga();
+  const { container, root } = createRoot(Yoga);
+  root.render(
+    createElement('flowtty-box', { width: 7, height: 1, wrap: 'truncate' }, 'hello world'),
+  );
+  computeLayout(container, 7, 1);
+  const buf = paint(container, 7, 1);
+  expect(buf.toString()).toBe('hello …');
+});
+
+test('paint: text style props (color/bold) flow to cell Style', async () => {
+  const Yoga = await getYoga();
+  const { container, root } = createRoot(Yoga);
+  root.render(
+    createElement('flowtty-box', { color: 'red', bold: true }, 'X'),
+  );
+  computeLayout(container, 5, 1);
+  const buf = paint(container, 5, 1);
+  expect(buf.get(0, 0)).toEqual({ char: 'X', style: { fg: 'red', bold: true } });
+});
+
+test('paint: box backgroundColor fills the box rect', async () => {
+  const Yoga = await getYoga();
+  const { container, root } = createRoot(Yoga);
+  root.render(
+    createElement('flowtty-box', { width: 3, height: 2, backgroundColor: 'blue' }),
+  );
+  computeLayout(container, 3, 2);
+  const buf = paint(container, 3, 2);
+  for (let y = 0; y < 2; y++) {
+    for (let x = 0; x < 3; x++) {
+      expect(buf.get(x, y)).toEqual({ char: ' ', style: { bg: 'blue' } });
+    }
+  }
+});
+
+test('paint: bg fill then text on top — text cells use textStyle (incl. its own bg if set), bg-only cells keep bg', async () => {
+  const Yoga = await getYoga();
+  const { container, root } = createRoot(Yoga);
+  // Text-bearing box sets BOTH color (text) AND backgroundColor (the same box's bg).
+  // textStyleOf() will include both fg+bg; bgStyleOf() fills the rest with bg.
+  root.render(
+    createElement('flowtty-box', { width: 4, height: 1, backgroundColor: 'blue', color: 'red' }, 'hi'),
+  );
+  computeLayout(container, 4, 1);
+  const buf = paint(container, 4, 1);
+  expect(buf.get(0, 0)).toEqual({ char: 'h', style: { fg: 'red', bg: 'blue' } });
+  expect(buf.get(1, 0)).toEqual({ char: 'i', style: { fg: 'red', bg: 'blue' } });
+  expect(buf.get(2, 0)).toEqual({ char: ' ', style: { bg: 'blue' } });
+  expect(buf.get(3, 0)).toEqual({ char: ' ', style: { bg: 'blue' } });
+});
