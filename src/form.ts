@@ -1,5 +1,6 @@
 import { createElement, useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import { FormContext, type FormApi, type FormFieldRegistration } from './form-context.js';
+import { useInput } from './use-input.js';
 
 export interface FormProps {
   /** Aggregated submit: called when advance() is invoked from the LAST registered field. */
@@ -90,6 +91,12 @@ export function Form(props: FormProps): ReactNode {
     register, unregister, setValue, setError,
     focus, focusNext, focusPrev, advance, cancel,
   }), [values, errors, focusedField, register, unregister, setValue, setError, focus, focusNext, focusPrev, advance, cancel]);
+
+  useInput((key) => {
+    if (key.name === 'tab') { focusNext(); return; }
+    if (key.name === 'csi-Z') { focusPrev(); return; }
+    if (key.name === 'escape') { cancel(); return; }
+  }, { isActive: props.isFocused !== false });
 
   return createElement(FormContext.Provider, { value: api }, children);
 }
