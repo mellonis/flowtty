@@ -11,12 +11,20 @@ buffer and draws it to the terminal (or captures it via the test backend).
 
 ## Status
 
-M1b (interactive prompts: TextInput). The renderer + interactivity loop from
-M1a now have their first prompt-grade component: `<TextInput>` with the proven
-articles.mjs line-editor bindings — emacs (`Ctrl-A`/`E`/`B`/`F`/`D`/`H`/`K`/`U`/`W`),
-word ops (`Option`+`Left`/`Right`/`B`/`F`/`D`/`Backspace`), Mac Option-modifier
-typography (`Option`+`Space` → NBSP, `Option`+`-` → en/em dash, `Option`+`[`/`]`
-→ curly quotes), masking, and validate-gated submit (Zod-compatible).
+M1c (TTY input layer). `TtyBackend` now delivers real keyboard input — raw-mode
+stdin is parsed via `parseKeypress` (CSI arrows, SS3, Mac Option-as-Meta,
+Ctrl-A..Z, named keys) and dispatched to `useInput` subscribers the same way
+the test backend does. The M1a `useInput` + M1b `<TextInput>` work on a real
+terminal now.
+
+### Still deferred (later M1c plans + later milestones)
+
+- `<Select>` / `<MultiSelect>` / `<Confirm>` prompts — next M1c plan.
+- `<Form>` + intra-form focus ring + embedded `openDialog` — the M1c plan after that.
+- Frame diffing — full TTY redraw each `draw()`.
+- Element-level styling (color/bold/etc.) on text — paint hardcodes empty style.
+- Bracketed paste, mouse, Kitty keyboard protocol, modifier-encoded arrows
+  (`CSI 1;5A` etc.) — not parsed yet (they'd surface as `csi-…` / `ss3-…` names).
 
 ### Usage with Zod
 
@@ -40,15 +48,6 @@ function App() {
   );
 }
 ```
-
-### Still deferred (M1c and later)
-
-- TTY-backend stdin raw-mode + key parsing — synthetic keys via TestBackend
-  work today; real-terminal interactivity ships with M1c.
-- `<Select>` / `<MultiSelect>` / `<Confirm>` + intra-form focus ring + `<Form>` — M1c.
-- Frame diffing — full TTY redraw each `draw()`.
-- Element-level styling (color/bold/etc.) on text — paint hardcodes empty style.
-- Error display inside TextInput — consumers own `validate` and render errors themselves.
 
 ## Usage (M0)
 
