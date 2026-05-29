@@ -49,5 +49,41 @@ export function reduce(state: EditorState, key: Key): EditorAction {
   if (key.name === 'a' && key.ctrl) return { kind: 'edit', state: { value, cursor: 0 } };
   if (key.name === 'e' && key.ctrl) return { kind: 'edit', state: { value, cursor: value.length } };
 
+  // Word deletion (check meta-modified BEFORE plain backspace/delete)
+  if (key.name === 'backspace' && key.meta) {
+    const start = wordLeft(value, cursor);
+    return { kind: 'edit', state: { value: value.slice(0, start) + value.slice(cursor), cursor: start } };
+  }
+  if (key.name === 'w' && key.ctrl) {
+    const start = wordLeft(value, cursor);
+    return { kind: 'edit', state: { value: value.slice(0, start) + value.slice(cursor), cursor: start } };
+  }
+  if (key.name === 'd' && key.meta) {
+    const end = wordRight(value, cursor);
+    return { kind: 'edit', state: { value: value.slice(0, cursor) + value.slice(end), cursor } };
+  }
+  if (key.name === 'delete' && key.meta) {
+    const end = wordRight(value, cursor);
+    return { kind: 'edit', state: { value: value.slice(0, cursor) + value.slice(end), cursor } };
+  }
+
+  // Kill bindings
+  if (key.name === 'k' && key.ctrl) {
+    return { kind: 'edit', state: { value: value.slice(0, cursor), cursor } };
+  }
+  if (key.name === 'u' && key.ctrl) {
+    return { kind: 'edit', state: { value: value.slice(cursor), cursor: 0 } };
+  }
+
+  // Single-char deletion
+  if (key.name === 'backspace') {
+    if (cursor === 0) return { kind: 'edit', state };
+    return { kind: 'edit', state: { value: value.slice(0, cursor - 1) + value.slice(cursor), cursor: cursor - 1 } };
+  }
+  if (key.name === 'delete' || (key.name === 'd' && key.ctrl)) {
+    if (cursor === value.length) return { kind: 'edit', state };
+    return { kind: 'edit', state: { value: value.slice(0, cursor) + value.slice(cursor + 1), cursor } };
+  }
+
   return { kind: 'noop' };
 }

@@ -45,3 +45,35 @@ test('Option+right and Option+F jump to end of current/next word', () => {
   // From end of "hello" (cursor 5), skips space then to end of "world" (11)
   expect(reduce(s('hello world foo', 5), key({ name: 'right', meta: true }))).toEqual({ kind: 'edit', state: s('hello world foo', 11) });
 });
+
+test('backspace deletes left of cursor', () => {
+  expect(reduce(s('hello', 3), key({ name: 'backspace' }))).toEqual({ kind: 'edit', state: s('helo', 2) });
+  expect(reduce(s('hello', 0), key({ name: 'backspace' }))).toEqual({ kind: 'edit', state: s('hello', 0) });
+});
+
+test('delete (forward) removes right of cursor', () => {
+  expect(reduce(s('hello', 1), key({ name: 'delete' }))).toEqual({ kind: 'edit', state: s('hllo', 1) });
+  expect(reduce(s('hello', 5), key({ name: 'delete' }))).toEqual({ kind: 'edit', state: s('hello', 5) });
+});
+
+test('Ctrl-D deletes forward (emacs alias for delete)', () => {
+  expect(reduce(s('hello', 1), key({ name: 'd', ctrl: true }))).toEqual({ kind: 'edit', state: s('hllo', 1) });
+});
+
+test('Option+Backspace and Ctrl-W delete the previous word', () => {
+  expect(reduce(s('hello world', 11), key({ name: 'backspace', meta: true }))).toEqual({ kind: 'edit', state: s('hello ', 6) });
+  expect(reduce(s('hello world', 11), key({ name: 'w', ctrl: true }))).toEqual({ kind: 'edit', state: s('hello ', 6) });
+});
+
+test('Option+D (and Option+Delete) deletes the next word', () => {
+  expect(reduce(s('hello world', 5), key({ name: 'd', meta: true }))).toEqual({ kind: 'edit', state: s('hello', 5) });
+  expect(reduce(s('hello world', 5), key({ name: 'delete', meta: true }))).toEqual({ kind: 'edit', state: s('hello', 5) });
+});
+
+test('Ctrl-K kills from cursor to end', () => {
+  expect(reduce(s('hello world', 5), key({ name: 'k', ctrl: true }))).toEqual({ kind: 'edit', state: s('hello', 5) });
+});
+
+test('Ctrl-U kills from cursor to start', () => {
+  expect(reduce(s('hello world', 6), key({ name: 'u', ctrl: true }))).toEqual({ kind: 'edit', state: s('world', 0) });
+});
