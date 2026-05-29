@@ -8,6 +8,7 @@ import {
   createInstance,
   createTextInstance,
   insertBefore,
+  refreshMeasure,
   removeChild,
   type HostType,
   type Instance,
@@ -68,12 +69,13 @@ export function createReconciler(Yoga: Yoga) {
       createInstance(type, props as never, Yoga),
     createTextInstance: (text: string) => createTextInstance(text, Yoga),
 
-    appendInitialChild: appendChild,
-    appendChild,
+    appendInitialChild: (parent: Instance, child: Instance | TextInstance) => appendChild(parent, child, Yoga),
+    appendChild: (parent: Instance, child: Instance | TextInstance) => appendChild(parent, child, Yoga),
     appendChildToContainer: (container: Container, child: Instance | TextInstance) => {
       if (child.type === 'box') container.children.push(child);
     },
-    insertBefore,
+    insertBefore: (parent: Instance, child: Instance | TextInstance, before: Instance | TextInstance) =>
+      insertBefore(parent, child, before, Yoga),
     insertInContainerBefore: (
       container: Container,
       child: Instance | TextInstance,
@@ -82,7 +84,7 @@ export function createReconciler(Yoga: Yoga) {
       const i = container.children.indexOf(before as Instance);
       container.children.splice(i < 0 ? container.children.length : i, 0, child as Instance);
     },
-    removeChild,
+    removeChild: (parent: Instance, child: Instance | TextInstance) => removeChild(parent, child, Yoga),
     removeChildFromContainer: (container: Container, child: Instance | TextInstance) => {
       const i = container.children.indexOf(child as Instance);
       if (i >= 0) container.children.splice(i, 1);
@@ -103,6 +105,7 @@ export function createReconciler(Yoga: Yoga) {
     ) => applyProps(instance, newProps as never, Yoga),
     commitTextUpdate: (textInstance: TextInstance, _oldText: string, newText: string) => {
       textInstance.text = newText;
+      if (textInstance.parent) refreshMeasure(textInstance.parent, Yoga);
     },
 
     getRootHostContext: () => ({}),

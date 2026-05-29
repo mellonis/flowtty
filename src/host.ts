@@ -19,6 +19,7 @@ export interface Instance {
 export interface TextInstance {
   type: 'text';
   text: string;
+  parent?: Instance;
 }
 
 export function createInstance(type: HostType, props: BoxProps, Yoga: Yoga): Instance {
@@ -45,29 +46,62 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   );
 }
 
-export function appendChild(parent: Instance, child: Instance | TextInstance): void {
-  parent.children.push(child);
-  if (child.type === 'box') parent.yogaNode.insertChild(child.yogaNode, parent.yogaNode.getChildCount());
+export function measureText(text: string): { width: number; height: number } {
+  const lines = text.split('\n');
+  const width = lines.reduce((m, l) => Math.max(m, [...l].length), 0);
+  return { width, height: lines.length };
 }
 
-export function removeChild(parent: Instance, child: Instance | TextInstance): void {
+// Concatenate a box's direct text children into one string.
+export function ownText(inst: Instance): string {
+  return inst.children
+    .filter((c): c is TextInstance => c.type === 'text')
+    .map((c) => c.text)
+    .join('');
+}
+
+// Install/clear a Yoga measure func: text-only boxes measure to their text.
+export function refreshMeasure(inst: Instance, _Yoga: Yoga): void {
+  const hasText = inst.children.some((c) => c.type === 'text');
+  const hasBox = inst.children.some((c) => c.type === 'box');
+  if (hasText && !hasBox) {
+    const text = ownText(inst);
+    inst.yogaNode.setMeasureFunc(() => measureText(text));
+  } else {
+    inst.yogaNode.setMeasureFunc(null);
+  }
+}
+
+export function appendChild(parent: Instance, child: Instance | TextInstance, Yoga: Yoga): void {
+  parent.children.push(child);
+  if (child.type === 'box') parent.yogaNode.insertChild(child.yogaNode, parent.yogaNode.getChildCount());
+  else child.parent = parent;
+  refreshMeasure(parent, Yoga);
+}
+
+export function removeChild(parent: Instance, child: Instance | TextInstance, Yoga: Yoga): void {
   const i = parent.children.indexOf(child);
   if (i >= 0) parent.children.splice(i, 1);
   if (child.type === 'box') {
     parent.yogaNode.removeChild(child.yogaNode);
     child.yogaNode.freeRecursive(); // free wasm node — required to avoid leaks
   }
+  refreshMeasure(parent, Yoga);
 }
 
 export function insertBefore(
   parent: Instance,
   child: Instance | TextInstance,
   before: Instance | TextInstance,
+  Yoga: Yoga,
 ): void {
   const i = parent.children.indexOf(before);
   parent.children.splice(i < 0 ? parent.children.length : i, 0, child);
   if (child.type === 'box') {
     const boxIndex = parent.children.filter((c) => c.type === 'box').indexOf(child);
     parent.yogaNode.insertChild(child.yogaNode, boxIndex);
+  } else {
+    child.parent = parent;
   }
+  refreshMeasure(parent, Yoga);
 }
