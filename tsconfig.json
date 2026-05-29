@@ -9,6 +9,7 @@
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    // suppresses TS 6.0 'baseUrl is deprecated' triggered by tsup's dts worker under moduleResolution: Bundler
     "ignoreDeprecations": "6.0",
     "types": ["node", "vitest/globals"]
   },

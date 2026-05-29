@@ -1,7 +1,8 @@
 import { FlexDirection } from 'yoga-layout/load';
 import type { Yoga, YogaNode } from './yoga.js';
 
-export type HostType = 'flowtty-box' | 'flowtty-text';
+// The host has a single element type by design: Text is sugar for Box.
+export type HostType = 'flowtty-box';
 
 export interface BoxProps {
   width?: number;
@@ -23,7 +24,7 @@ export interface TextInstance {
 }
 
 export function createInstance(type: HostType, props: BoxProps, Yoga: Yoga): Instance {
-  if (type !== 'flowtty-box') throw new Error(`unknown host type: ${type}`);
+  // Single host type — 'flowtty-text' was removed; Text is sugar for Box.
   const node = Yoga.Node.create();
   const inst: Instance = { type: 'box', props, yogaNode: node, children: [] };
   applyProps(inst, props, Yoga);
