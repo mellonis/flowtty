@@ -1,10 +1,30 @@
+import { Buffer as NodeBuffer } from 'node:buffer';
 import type { Buffer, Style } from '../cells.js';
+import type { Key } from '../keys.js';
 import { CLEAR, HIDE_CURSOR, RESET, SHOW_CURSOR, sgr } from '../ansi.js';
+import { parseKeypress } from '../key-parser.js';
 import type { Backend } from './types.js';
 
 export class TtyBackend implements Backend {
-  constructor(private readonly out: NodeJS.WriteStream = process.stdout) {
+  private readonly subscribers = new Set<(key: Key) => void>();
+  // Arrow-property so `removeListener` finds the same reference we added.
+  // `NodeBuffer` avoids the name-clash with our cells `Buffer` import.
+  private readonly inputDataHandler = (chunk: NodeBuffer | string): void => {
+    const s = typeof chunk === 'string' ? chunk : chunk.toString('utf-8');
+    const keys = parseKeypress(s);
+    for (const key of keys) {
+      for (const h of [...this.subscribers]) h(key);
+    }
+  };
+  private inputAttached = false;
+  private cursorHidden = false;
+
+  constructor(
+    private readonly out: NodeJS.WriteStream = process.stdout,
+    private readonly input: NodeJS.ReadStream = process.stdin,
+  ) {
     this.out.write(HIDE_CURSOR);
+    this.cursorHidden = true;
   }
 
   size() {
@@ -32,7 +52,33 @@ export class TtyBackend implements Backend {
     this.out.write(outStr);
   }
 
+  onKey(handler: (key: Key) => void): () => void {
+    // Lazy: only flip stdin into raw mode + attach when the first subscriber arrives,
+    // so a passive view backend doesn't claim the terminal.
+    if (!this.inputAttached) {
+      if (this.input.isTTY) this.input.setRawMode(true);
+      this.input.on('data', this.inputDataHandler);
+      this.input.resume();
+      this.inputAttached = true;
+    }
+    this.subscribers.add(handler);
+    return () => {
+      this.subscribers.delete(handler);
+      // Intentionally do NOT detach on unsubscribe — render() always unsubs
+      // on unmount, and dispose() (not unsubscribe) owns lifecycle cleanup.
+    };
+  }
+
   dispose(): void {
-    this.out.write(SHOW_CURSOR + RESET);
+    if (this.inputAttached) {
+      this.input.removeListener('data', this.inputDataHandler);
+      if (this.input.isTTY) this.input.setRawMode(false);
+      this.input.pause();
+      this.inputAttached = false;
+    }
+    if (this.cursorHidden) {
+      this.out.write(SHOW_CURSOR + RESET);
+      this.cursorHidden = false;
+    }
   }
 }
