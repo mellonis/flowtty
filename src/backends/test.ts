@@ -1,9 +1,10 @@
-import type { Buffer } from '../cells.js';
+import { Buffer } from '../cells.js';
 import type { Key } from '../keys.js';
 import type { Backend } from './types.js';
 
 export class TestBackend implements Backend {
   frames: string[] = [];
+  private buffers: Buffer[] = [];
   private readonly subscribers = new Set<(key: Key) => void>();
 
   constructor(
@@ -17,10 +18,15 @@ export class TestBackend implements Backend {
 
   draw(buffer: Buffer): void {
     this.frames.push(buffer.toString());
+    this.buffers.push(buffer);
   }
 
   get lastFrame(): string {
     return this.frames[this.frames.length - 1] ?? '';
+  }
+
+  get lastBuffer(): Buffer | null {
+    return this.buffers[this.buffers.length - 1] ?? null;
   }
 
   onKey(handler: (key: Key) => void): () => void {

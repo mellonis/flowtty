@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { TestBackend } from './test.js';
 import type { Key } from '../keys.js';
+import { Buffer } from '../cells.js';
 
 test('onKey returns an unsubscribe; subscribers receive press()', () => {
   const b = new TestBackend(10, 1);
@@ -33,4 +34,14 @@ test('multiple subscribers all receive each press', () => {
   b.press({ name: 'x' });
   expect(a).toHaveLength(1);
   expect(c).toHaveLength(1);
+});
+
+test('TestBackend.lastBuffer exposes the last drawn Buffer for cell-level assertions', () => {
+  const b = new TestBackend(4, 1);
+  const buf = new Buffer(4, 1);
+  buf.set(0, 0, 'X', { bold: true, fg: 'red' });
+  b.draw(buf);
+  const got = b.lastBuffer;
+  expect(got).not.toBeNull();
+  expect(got!.get(0, 0)).toEqual({ char: 'X', style: { bold: true, fg: 'red' } });
 });
