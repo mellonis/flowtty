@@ -11,22 +11,44 @@ buffer and draws it to the terminal (or captures it via the test backend).
 
 ## Status
 
-M1a (interactivity infrastructure). Keyboard input now reaches components via
-`useInput`, React state updates trigger repaints automatically, and the test
-backend (`flowtty/testing`) can inject synthetic keys with `press`/`type` +
-`flush`. Root Yoga nodes are freed on `unmount` (the M0 leak is fixed).
+M1b (interactive prompts: TextInput). The renderer + interactivity loop from
+M1a now have their first prompt-grade component: `<TextInput>` with the proven
+articles.mjs line-editor bindings — emacs (`Ctrl-A`/`E`/`B`/`F`/`D`/`H`/`K`/`U`/`W`),
+word ops (`Option`+`Left`/`Right`/`B`/`F`/`D`/`Backspace`), Mac Option-modifier
+typography (`Option`+`Space` → NBSP, `Option`+`-` → en/em dash, `Option`+`[`/`]`
+→ curly quotes), masking, and validate-gated submit (Zod-compatible).
 
-### Still deferred (will land in later milestones)
+### Usage with Zod
+
+```tsx
+import { z } from 'zod';
+import { useState } from 'react';
+import { render, TextInput, Box, Text } from 'flowtty';
+
+const Slug = z.string().regex(/^[a-z0-9-]+$/, 'kebab-case only');
+
+function App() {
+  const [v, setV] = useState('');
+  const validate = (x: string) => {
+    const r = Slug.safeParse(x);
+    return r.success ? null : r.error.issues[0]?.message ?? 'invalid';
+  };
+  return (
+    <Box>
+      <TextInput value={v} onChange={setV} validate={validate} onSubmit={(s) => console.log('slug:', s)} />
+    </Box>
+  );
+}
+```
+
+### Still deferred (M1c and later)
 
 - TTY-backend stdin raw-mode + key parsing — synthetic keys via TestBackend
   work today; real-terminal interactivity ships with M1c.
-- Frame diffing — the TTY backend still does a full redraw each `draw()`.
-- `<Text>` ignores layout props (sized by a Yoga measure func).
-- Element-level styling — the React → paint path still hardcodes empty style;
-  cell `Style` + `sgr()` + TTY SGR output remain reachable only from a
-  hand-built `Buffer`.
-- `<TextInput>` / `<Select>` / `<MultiSelect>` / `<Confirm>` / `<Form>` —
-  prompt primitives ship in M1b and M1c.
+- `<Select>` / `<MultiSelect>` / `<Confirm>` + intra-form focus ring + `<Form>` — M1c.
+- Frame diffing — full TTY redraw each `draw()`.
+- Element-level styling (color/bold/etc.) on text — paint hardcodes empty style.
+- Error display inside TextInput — consumers own `validate` and render errors themselves.
 
 ## Usage (M0)
 

@@ -7,3 +7,5 @@ export { useInput } from './use-input.js';
 export type { UseInputOptions } from './use-input.js';
 export type { Key } from './keys.js';
 export type { InputSource, KeySubscriber } from './input-context.js';
+export { TextInput } from './text-input.js';
+export type { TextInputProps } from './text-input.js';
