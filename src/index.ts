@@ -10,3 +10,5 @@ export type { InputSource, KeySubscriber } from './input-context.js';
 export { TextInput } from './text-input.js';
 export type { TextInputProps } from './text-input.js';
 export { parseKeypress } from './key-parser.js';
+export type { TextProps } from './components.js';
+export type { WrapMode } from './wrap.js';

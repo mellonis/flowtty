@@ -11,20 +11,33 @@ buffer and draws it to the terminal (or captures it via the test backend).
 
 ## Status
 
-M1c (TTY input layer). `TtyBackend` now delivers real keyboard input — raw-mode
-stdin is parsed via `parseKeypress` (CSI arrows, SS3, Mac Option-as-Meta,
-Ctrl-A..Z, named keys) and dispatched to `useInput` subscribers the same way
-the test backend does. The M1a `useInput` + M1b `<TextInput>` work on a real
-terminal now.
+M1d (Text features). `<Text>` now accepts `wrap` (word-wrap with char-wrap
+fallback, or `truncate` with single-cell ellipsis), `color`, `bold`, `dim`,
+`underline`, `inverse`; `<Box>` accepts `backgroundColor`. Named 16-color
+palette only (`black`/`red`/`green`/`yellow`/`blue`/`magenta`/`cyan`/`white`).
+Background colors inherit from ancestor boxes into descendant text.
 
-### Still deferred (later M1c plans + later milestones)
+### Usage
+
+```tsx
+import { render, Box, Text, TtyBackend } from 'flowtty';
+
+render(
+  <Box width={20} backgroundColor="blue">
+    <Text color="red" bold wrap="wrap">hello world this is a long line</Text>
+  </Box>,
+  new TtyBackend(),
+);
+```
+
+### Still deferred (later milestones)
 
 - `<Select>` / `<MultiSelect>` / `<Confirm>` prompts — next M1c plan.
-- `<Form>` + intra-form focus ring + embedded `openDialog` — the M1c plan after that.
+- `<Form>` + intra-form focus ring + embedded `openDialog` — the plan after that.
 - Frame diffing — full TTY redraw each `draw()`.
-- Element-level styling (color/bold/etc.) on text — paint hardcodes empty style.
-- Bracketed paste, mouse, Kitty keyboard protocol, modifier-encoded arrows
-  (`CSI 1;5A` etc.) — not parsed yet (they'd surface as `csi-…` / `ss3-…` names).
+- Truecolor (`#rgb` / `rgb(…)`) — only the named 16-color palette is recognized.
+- Per-character inline style spans, RTL/bidi, CJK/emoji width awareness — assume 1 code point = 1 cell.
+- Bracketed paste, mouse, Kitty keyboard protocol, modifier-encoded arrows.
 
 ### Usage with Zod
 
