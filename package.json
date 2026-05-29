@@ -13,17 +13,20 @@
     "typecheck": "tsc --noEmit",
     "build": "tsup"
   },
-  "peerDependencies": { "react": "^19.0.0" },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
   "dependencies": {
     "react-reconciler": "^0.31.0",
     "yoga-layout": "^3.2.1"
   },
   "devDependencies": {
-    "react": "^19.2.4",
+    "@types/node": "^25.9.1",
     "@types/react": "^19",
     "@types/react-reconciler": "^0.28.9",
+    "react": "^19.2.4",
+    "tsup": "^8",
     "typescript": "^6",
-    "vitest": "^4",
-    "tsup": "^8"
+    "vitest": "^4"
   }
 }
