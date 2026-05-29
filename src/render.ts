@@ -22,10 +22,23 @@ export async function render(element: ReactNode, backend: Backend): Promise<{ un
   // If the backend provides a key source, wrap the tree in an InputContext
   // provider so useInput subscribers receive its keys. Otherwise, the
   // default no-op source in InputContext is used (passive view).
+  //
+  // Wrap each dispatched key in root.flushSync so the state update is processed
+  // synchronously inside the handler — flush() then only needs microtask rounds
+  // for the scheduled repaint instead of a macrotask for the Scheduler to drain.
   const tree = backend.onKey
     ? createElement(
         InputContext.Provider,
-        { value: { subscribe: backend.onKey.bind(backend) } as InputSource },
+        {
+          value: {
+            subscribe(handler) {
+              return backend.onKey!((key) => {
+                // Process the state update synchronously so flush() needs only microtasks.
+                root.flushSync(() => handler(key));
+              });
+            },
+          } as InputSource,
+        },
         element,
       )
     : element;

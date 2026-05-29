@@ -63,3 +63,16 @@ test('createRoot without onCommit does not throw and does not schedule', async (
   await Promise.resolve();
   await Promise.resolve();
 });
+
+test('Root exposes flushSync; renders inside it commit synchronously', async () => {
+  const Yoga = await getYoga();
+  let commits = 0;
+  const { root } = createRoot(Yoga, () => { commits++; });
+  root.flushSync(() => {
+    root.render(createElement('flowtty-box'));
+  });
+  // After flushSync returns, the commit has happened; the scheduled paint is still in a microtask.
+  await Promise.resolve();
+  await Promise.resolve();
+  expect(commits).toBe(1);
+});

@@ -171,6 +171,7 @@ export function createReconciler(Yoga: Yoga, onCommit?: () => void) {
 export interface Root {
   render(element: ReactNode): void;
   unmount(): void;
+  flushSync(fn: () => void): void;
 }
 
 export function createRoot(Yoga: Yoga, onCommit?: () => void): { container: Container; root: Root } {
@@ -211,6 +212,10 @@ export function createRoot(Yoga: Yoga, onCommit?: () => void): { container: Cont
   // host that renders frame-by-frame on demand we want a synchronous commit so
   // the host tree is fully built when `render()` returns. `@types@0.28.9` knows
   // neither method, so reach them through a cast.
+  //
+  // `flushSyncFromReconciler(fn)` runs `fn` under SyncLane priority and then
+  // drains sync work — equivalent to React DOM's `flushSync`. Verified against
+  // react-reconciler@0.31.0 cjs bundle (exports.flushSyncFromReconciler).
   const sync = reconciler as unknown as {
     updateContainerSync(
       element: ReactNode,
@@ -219,6 +224,7 @@ export function createRoot(Yoga: Yoga, onCommit?: () => void): { container: Cont
       callback: null,
     ): void;
     flushSyncWork(): void;
+    flushSyncFromReconciler(fn: () => void): void;
   };
   return {
     container,
@@ -230,6 +236,9 @@ export function createRoot(Yoga: Yoga, onCommit?: () => void): { container: Cont
       unmount() {
         sync.updateContainerSync(null, fiberRoot, null, null);
         sync.flushSyncWork();
+      },
+      flushSync(fn) {
+        sync.flushSyncFromReconciler(fn);
       },
     },
   };
