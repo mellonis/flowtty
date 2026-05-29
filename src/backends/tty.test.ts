@@ -1,7 +1,24 @@
 import { expect, test } from 'vitest';
+import { EventEmitter } from 'node:events';
 import { Buffer } from '../cells.js';
 import { TtyBackend } from './tty.js';
 import { HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET } from '../ansi.js';
+
+function makeStdinStub() {
+  const emitter = new EventEmitter() as EventEmitter & {
+    isTTY: boolean;
+    setRawMode: (b: boolean) => unknown;
+    resume: () => unknown;
+    pause: () => unknown;
+  };
+  emitter.isTTY = true;
+  let rawMode = false;
+  emitter.setRawMode = (b: boolean) => { rawMode = b; return emitter; };
+  emitter.resume = () => emitter;
+  emitter.pause = () => emitter;
+  (emitter as unknown as { __rawMode(): boolean }).__rawMode = () => rawMode;
+  return emitter as unknown as NodeJS.ReadStream & { __rawMode(): boolean };
+}
 
 function makeStub(cols = 6, rows = 1) {
   const writes: string[] = [];
@@ -50,4 +67,62 @@ test('TtyBackend.draw emits SGR when a styled cell appears, and RESET between st
   // SGR for fg red + bold appears, then a RESET before the next cell's empty-style transition
   expect(out).toContain('\x1b[1;31m'); // bold + red
   expect(out).toContain('Y');
+});
+
+test('TtyBackend.onKey: flips raw mode on first subscribe and parses incoming bytes', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const received: string[] = [];
+
+  const unsubscribe = back.onKey((k) => received.push(k.name));
+  expect((stdin as unknown as { __rawMode(): boolean }).__rawMode()).toBe(true);
+
+  // Simulate input: 'a' then ESC[C (right arrow)
+  stdin.emit('data', 'a\x1b[C');
+  expect(received).toEqual(['a', 'right']);
+
+  unsubscribe();
+  back.dispose();
+  // After dispose: raw mode restored to cooked.
+  expect((stdin as unknown as { __rawMode(): boolean }).__rawMode()).toBe(false);
+});
+
+test('TtyBackend.onKey: multiple subscribers each get every key', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const a: string[] = [];
+  const b: string[] = [];
+  back.onKey((k) => a.push(k.name));
+  back.onKey((k) => b.push(k.name));
+  stdin.emit('data', 'x');
+  expect(a).toEqual(['x']);
+  expect(b).toEqual(['x']);
+  back.dispose();
+});
+
+test('TtyBackend.dispose: idempotent (calling twice does not throw)', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  back.onKey(() => {});
+  expect(() => { back.dispose(); back.dispose(); }).not.toThrow();
+});
+
+test('TtyBackend.onKey: meta-prefix ESC + char produces meta-modified Key', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const captured: Array<{ name: string; meta: boolean }> = [];
+  back.onKey((k) => captured.push({ name: k.name, meta: k.meta }));
+
+  stdin.emit('data', '\x1bb');     // Option+b
+  stdin.emit('data', '\x1b ');     // Option+Space
+
+  expect(captured).toEqual([
+    { name: 'b', meta: true },
+    { name: ' ', meta: true },
+  ]);
+  back.dispose();
 });
