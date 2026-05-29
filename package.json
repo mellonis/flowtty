@@ -4,14 +4,16 @@
   "type": "module",
   "license": "MIT",
   "exports": {
-    ".": "./src/index.ts",
-    "./testing": "./src/testing.ts"
+    ".": { "types": "./dist/index.d.ts", "import": "./dist/index.js" },
+    "./testing": { "types": "./dist/testing.d.ts", "import": "./dist/testing.js" }
   },
+  "files": ["dist"],
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "build": "tsup"
+    "build": "tsup",
+    "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
     "react": "^19.0.0"
