@@ -122,6 +122,12 @@ export function createReconciler(Yoga: Yoga) {
     },
 
     // Priority API (0.31.0 shape).
+    // VERIFIED-RUNTIME-REQUIRED — do NOT remove these three even though static
+    // analysis flags them as unused. react-reconciler@0.31.0 reads them off
+    // the host config via `$$$config.<name>` destructuring at mount time;
+    // @types/react-reconciler@0.28.9 doesn't declare them, so the TS service
+    // can't see the consumer. Removing any of them crashes mount with
+    // "X is not a function". Confirmed in M0 T5 review.
     setCurrentUpdatePriority: (priority: number) => {
       currentUpdatePriority = priority;
     },
