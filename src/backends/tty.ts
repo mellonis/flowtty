@@ -13,6 +13,14 @@ export class TtyBackend implements Backend {
     const s = typeof chunk === 'string' ? chunk : chunk.toString('utf-8');
     const keys = parseKeypress(s);
     for (const key of keys) {
+      // Ctrl-C / Ctrl-D in raw mode are delivered as keypresses (NOT signals —
+      // raw mode swallows SIGINT). Default-handle them as "exit with restore"
+      // so apps aren't unkillable. Apps wanting custom behavior can wrap
+      // TtyBackend or implement their own backend.
+      if (key.ctrl && (key.name === 'c' || key.name === 'd')) {
+        this.dispose();
+        process.exit(130);
+      }
       for (const h of [...this.subscribers]) h(key);
     }
   };

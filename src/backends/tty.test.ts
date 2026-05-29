@@ -1,4 +1,4 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { Buffer } from '../cells.js';
 import { TtyBackend } from './tty.js';
@@ -125,4 +125,42 @@ test('TtyBackend.onKey: meta-prefix ESC + char produces meta-modified Key', () =
     { name: ' ', meta: true },
   ]);
   back.dispose();
+});
+
+test('TtyBackend.onKey: Ctrl-C default-handled as dispose + process.exit(130) (raw mode swallows SIGINT)', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const subscriberCalled: string[] = [];
+  back.onKey((k) => subscriberCalled.push(k.name));
+
+  const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+    throw new Error(`exit:${code}`);
+  }) as never);
+
+  expect(() => stdin.emit('data', '\x03')).toThrow('exit:130');
+  expect(exitSpy).toHaveBeenCalledWith(130);
+  // dispose ran: raw mode restored before exit
+  expect((stdin as unknown as { __rawMode(): boolean }).__rawMode()).toBe(false);
+  // Ctrl-C was NOT delivered to subscribers (default-handled before dispatch)
+  expect(subscriberCalled).toEqual([]);
+
+  exitSpy.mockRestore();
+});
+
+test('TtyBackend.onKey: Ctrl-D default-handled as dispose + process.exit(130)', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  back.onKey(() => {});
+
+  const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+    throw new Error(`exit:${code}`);
+  }) as never);
+
+  // Ctrl-D = 0x04
+  expect(() => stdin.emit('data', '\x04')).toThrow('exit:130');
+  expect(exitSpy).toHaveBeenCalledWith(130);
+
+  exitSpy.mockRestore();
 });
