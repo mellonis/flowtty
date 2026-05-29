@@ -11,32 +11,42 @@ buffer and draws it to the terminal (or captures it via the test backend).
 
 ## Status
 
-M1d (Text features). `<Text>` now accepts `wrap` (word-wrap with char-wrap
-fallback, or `truncate` with single-cell ellipsis), `color`, `bold`, `dim`,
-`underline`, `inverse`; `<Box>` accepts `backgroundColor`. Named 16-color
-palette only (`black`/`red`/`green`/`yellow`/`blue`/`magenta`/`cyan`/`white`).
-Background colors inherit from ancestor boxes into descendant text.
+M1c.2 (prompts). The framework now ships three standalone prompt components,
+each built on `useInput` + the editor-reducer pattern:
+
+- `<Select>` — single choice, arrow navigation (or `j`/`k`), case-insensitive
+  filter-as-you-type, Enter to submit, Esc to cancel.
+- `<MultiSelect>` — multi choice, Space to toggle the cursor item, Enter to
+  submit the value array (in original item order), Esc to cancel.
+- `<Confirm>` — yes/no with a default; `y`/`Y`/`n`/`N` for direct answer,
+  Enter takes the default, Esc cancels.
+
+All three accept `isFocused` for use in larger trees and work on the test
+backend (synthetic keys) and the TTY backend (real terminal).
 
 ### Usage
 
 ```tsx
-import { render, Box, Text, TtyBackend } from 'flowtty';
+import { render, Select, TtyBackend } from 'flowtty';
 
-render(
-  <Box width={20} backgroundColor="blue">
-    <Text color="red" bold wrap="wrap">hello world this is a long line</Text>
-  </Box>,
+await render(
+  <Select
+    items={[{ label: 'apple', value: 'a' }, { label: 'banana', value: 'b' }]}
+    value="a"
+    onChange={() => {}}
+    onSubmit={(v) => console.log('picked', v)}
+  />,
   new TtyBackend(),
 );
 ```
 
 ### Still deferred (later milestones)
 
-- `<Select>` / `<MultiSelect>` / `<Confirm>` prompts — next M1c plan.
-- `<Form>` + intra-form focus ring + embedded `openDialog` — the plan after that.
+- `<Form>` + intra-form focus ring + `<Form.Field>` + embedded `openDialog` — M1c.3.
+- MultiSelect "+ add new" inline-dialog row — needs `openDialog` (M1c.3).
 - Frame diffing — full TTY redraw each `draw()`.
-- Truecolor (`#rgb` / `rgb(…)`) — only the named 16-color palette is recognized.
-- Per-character inline style spans, RTL/bidi, CJK/emoji width awareness — assume 1 code point = 1 cell.
+- Truecolor (`#rgb` / `rgb(…)`).
+- Fuzzy filter matching for `<Select>` (substring only today).
 - Bracketed paste, mouse, Kitty keyboard protocol, modifier-encoded arrows.
 
 ### Usage with Zod
