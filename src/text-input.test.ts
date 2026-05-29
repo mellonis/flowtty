@@ -63,3 +63,52 @@ test('isFocused: false suppresses key handling (value unchanged)', async () => {
   await flush();
   expect(captured).toBe('a');
 });
+
+test('M1b acceptance: type, edit with cursor moves, validate-gated submit, then cancel', async () => {
+  const events: string[] = [];
+  function App() {
+    const [v, setV] = useState('');
+    return createElement(TextInput, {
+      value: v,
+      onChange: setV,
+      validate: (x: string) => (x.length < 3 ? 'too short' : null),
+      onSubmit: (final: string) => { events.push(`submit:${final}`); },
+      onCancel: () => { events.push('cancel'); },
+    });
+  }
+  const backend = new TestBackend(20, 1);
+  await render(createElement(App), backend);
+
+  // Type "helo"
+  backend.type('helo');
+  await flush();
+  expect(backend.lastFrame).toBe('helo▏');
+
+  // Move cursor back one and insert 'l' to make "hello"
+  backend.press({ name: 'left' });
+  await flush();
+  expect(backend.lastFrame).toBe('hel▏o');
+  backend.press({ name: 'l', sequence: 'l' });
+  await flush();
+  expect(backend.lastFrame).toBe('hell▏o');
+
+  // Submit — validate passes (length 5 >= 3) → onSubmit fires with "hello"
+  backend.press({ name: 'return' });
+  await flush();
+  expect(events).toEqual(['submit:hello']);
+
+  // Clear with Ctrl-A (home) then Ctrl-K (kill to end), then try submit with a too-short value
+  backend.press({ name: 'a', ctrl: true });    // home
+  backend.press({ name: 'k', ctrl: true });    // kill to end → empty
+  await flush();
+  backend.type('hi');
+  await flush();
+  backend.press({ name: 'return' });           // validate fails (length 2 < 3) → no submit
+  await flush();
+  expect(events).toEqual(['submit:hello']);    // unchanged — second submit blocked
+
+  // Cancel
+  backend.press({ name: 'escape' });
+  await flush();
+  expect(events).toEqual(['submit:hello', 'cancel']);
+});
