@@ -119,3 +119,68 @@ test('Esc on any field fires the Form onCancel', async () => {
   await flush();
   expect(cancelled).toBe(true);
 });
+
+test('M1c.3 acceptance: 3-field form — type/Enter/validate/submit + separate mount Esc/cancel', async () => {
+  const submits: Array<Record<string, unknown>> = [];
+
+  function SubmitApp() {
+    return createElement(Form, {
+      onSubmit: (v: Record<string, unknown>) => submits.push(v),
+    },
+      createElement(TextField, { name: 'slug', validate: (v: unknown) => /^[a-z-]+$/.test(v as string) ? null : 'kebab-case only' }),
+      createElement(TextField, { name: 'title' }),
+      createElement(TextField, { name: 'date', validate: (v: unknown) => /^\d{4}-\d{2}-\d{2}$/.test(v as string) ? null : 'YYYY-MM-DD' }),
+    );
+  }
+
+  const backend = new TestBackend(40, 6);
+  await render(createElement(SubmitApp), backend);
+  await flushAsync();
+
+  // Type a bad slug, press Enter — validation blocks, error appears
+  backend.type('Foo Bar');
+  await flush();
+  backend.press({ name: 'return' });
+  await flush();
+  expect(backend.lastFrame).toContain('kebab-case only');
+  expect(submits).toEqual([]);
+
+  // Backspace the bad value, type a good one — submit advances to next field
+  for (let i = 0; i < 7; i++) backend.press({ name: 'backspace' });
+  await flush();
+  backend.type('foo-bar');
+  await flush();
+  backend.press({ name: 'return' });
+  await flush();
+
+  // Now on 'title' (no validate) — type, Enter advances
+  backend.type('Hello World');
+  await flush();
+  backend.press({ name: 'return' });
+  await flush();
+
+  // Now on 'date' (validate YYYY-MM-DD) — type valid date, Enter submits the form
+  backend.type('2026-05-30');
+  await flush();
+  backend.press({ name: 'return' });
+  await flush();
+
+  expect(submits).toEqual([{ slug: 'foo-bar', title: 'Hello World', date: '2026-05-30' }]);
+
+  // Separate mount: verify Esc fires onCancel
+  let cancelled = false;
+  function CancelApp() {
+    return createElement(Form, {
+      onSubmit: () => {},
+      onCancel: () => { cancelled = true; },
+    },
+      createElement(TextField, { name: 'a' }),
+    );
+  }
+  const backend2 = new TestBackend(20, 1);
+  await render(createElement(CancelApp), backend2);
+  await flushAsync();
+  backend2.press({ name: 'escape' });
+  await flush();
+  expect(cancelled).toBe(true);
+});
