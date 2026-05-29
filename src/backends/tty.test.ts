@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { Buffer } from '../cells.js';
 import { TtyBackend } from './tty.js';
-import { HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET } from '../ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET } from '../ansi.js';
 
 function makeStdinStub() {
   const emitter = new EventEmitter() as EventEmitter & {
@@ -33,12 +33,12 @@ function makeStub(cols = 6, rows = 1) {
   return { stub, writes };
 }
 
-test('TtyBackend writes HIDE_CURSOR on construct and SHOW_CURSOR + RESET on dispose', () => {
+test('TtyBackend enters alt-screen + hides cursor on construct; restores on dispose', () => {
   const { stub, writes } = makeStub();
   const b = new TtyBackend(stub);
-  expect(writes[0]).toBe(HIDE_CURSOR);
+  expect(writes[0]).toBe(ALT_SCREEN_ON + HIDE_CURSOR);
   b.dispose();
-  expect(writes.at(-1)).toBe(SHOW_CURSOR + RESET);
+  expect(writes.at(-1)).toBe(SHOW_CURSOR + RESET + ALT_SCREEN_OFF);
 });
 
 test('TtyBackend.draw emits CLEAR then per-line text, opening with RESET and ending each line with RESET', () => {

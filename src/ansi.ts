@@ -20,3 +20,11 @@ export function sgr(style: Style): string {
 export const HIDE_CURSOR = '\x1b[?25l';
 export const SHOW_CURSOR = '\x1b[?25h';
 export const CLEAR = '\x1b[2J\x1b[H';
+
+// Alternate screen buffer — enter on mount, exit on dispose. Without this,
+// every full-frame redraw pushes the previous frame into the terminal's
+// scrollback, so a long-running app polluting history with hundreds of
+// stacked frames. Alt-screen makes redraws in-place and restores the
+// user's original terminal content on exit.
+export const ALT_SCREEN_ON = '\x1b[?1049h';
+export const ALT_SCREEN_OFF = '\x1b[?1049l';

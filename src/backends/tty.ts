@@ -1,7 +1,7 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import type { Buffer, Style } from '../cells.js';
 import type { Key } from '../keys.js';
-import { CLEAR, HIDE_CURSOR, RESET, SHOW_CURSOR, sgr } from '../ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, CLEAR, HIDE_CURSOR, RESET, SHOW_CURSOR, sgr } from '../ansi.js';
 import { parseKeypress } from '../key-parser.js';
 import type { Backend } from './types.js';
 
@@ -25,14 +25,17 @@ export class TtyBackend implements Backend {
     }
   };
   private inputAttached = false;
-  private cursorHidden = false;
+  private terminalEntered = false;
 
   constructor(
     private readonly out: NodeJS.WriteStream = process.stdout,
     private readonly input: NodeJS.ReadStream = process.stdin,
   ) {
-    this.out.write(HIDE_CURSOR);
-    this.cursorHidden = true;
+    // Enter the alternate screen buffer + hide cursor, atomic write.
+    // Alt-screen ensures full-frame redraws happen in place and the user's
+    // pre-launch terminal content is restored on dispose.
+    this.out.write(ALT_SCREEN_ON + HIDE_CURSOR);
+    this.terminalEntered = true;
   }
 
   size() {
@@ -84,9 +87,11 @@ export class TtyBackend implements Backend {
       this.input.pause();
       this.inputAttached = false;
     }
-    if (this.cursorHidden) {
-      this.out.write(SHOW_CURSOR + RESET);
-      this.cursorHidden = false;
+    if (this.terminalEntered) {
+      // Show cursor + reset SGR while still in alt-screen, then exit alt-screen
+      // so the user's original terminal content returns clean.
+      this.out.write(SHOW_CURSOR + RESET + ALT_SCREEN_OFF);
+      this.terminalEntered = false;
     }
   }
 }
