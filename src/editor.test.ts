@@ -110,3 +110,33 @@ test('Escape → cancel', () => {
 test('unbound key returns noop', () => {
   expect(reduce(s('hello', 5), key({ name: 'f5' }))).toEqual({ kind: 'noop' });
 });
+
+test('Option+Space inserts NBSP (U+00A0)', () => {
+  const action = reduce(s('a', 1), key({ name: 'space', meta: true }));
+  expect(action.kind === 'edit' && action.state.value).toBe('a ');
+});
+
+test('Option+- inserts en-dash (U+2013)', () => {
+  const action = reduce(s('a', 1), key({ name: '-', meta: true }));
+  expect(action.kind === 'edit' && action.state.value).toBe('a–');
+});
+
+test('Option+Shift+- inserts em-dash (U+2014)', () => {
+  const action = reduce(s('a', 1), key({ name: '-', meta: true, shift: true }));
+  expect(action.kind === 'edit' && action.state.value).toBe('a—');
+});
+
+test('Option+[ and Option+Shift+[ insert curly double quotes', () => {
+  expect((reduce(s('', 0), key({ name: '[', meta: true })) as { state: EditorState }).state.value).toBe('“'); // U+201C left double quote
+  expect((reduce(s('', 0), key({ name: '[', meta: true, shift: true })) as { state: EditorState }).state.value).toBe('”'); // U+201D right double quote
+});
+
+test('Option+] and Option+Shift+] insert curly single quotes', () => {
+  expect((reduce(s('', 0), key({ name: ']', meta: true })) as { state: EditorState }).state.value).toBe('‘'); // U+2018 left single quote
+  expect((reduce(s('', 0), key({ name: ']', meta: true, shift: true })) as { state: EditorState }).state.value).toBe('’'); // U+2019 right single quote
+});
+
+test('Option+letter that has no typography mapping is a noop (NOT a word op)', () => {
+  // 'z' has no entry in OPT_MAP and no word/movement binding
+  expect(reduce(s('hi', 2), key({ name: 'z', meta: true }))).toEqual({ kind: 'noop' });
+});

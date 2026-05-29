@@ -11,6 +11,15 @@ export type EditorAction =
   | { kind: 'cancel' }
   | { kind: 'noop' };
 
+// Mac Option-modifier typography map. Each entry: keyName → [unshifted, shifted?].
+// Inserted byte-exact: NBSP, en/em dash, curly quotes.
+const OPT_MAP: Record<string, [string] | [string, string]> = {
+  space: [' '],               // U+00A0 NBSP
+  '-':   ['–', '—'],     // en-dash U+2013, em-dash U+2014
+  '[':   ['“', '”'],     // left/right double quote
+  ']':   ['‘', '’'],     // left/right single quote
+};
+
 // A "word char" is alphanumeric (letters of any script, digits, underscore).
 // Whitespace and punctuation are word boundaries.
 const isWord = (c: string) => /[\p{L}\p{N}_]/u.test(c);
@@ -73,6 +82,13 @@ export function reduce(state: EditorState, key: Key): EditorAction {
   }
   if (key.name === 'u' && key.ctrl) {
     return { kind: 'edit', state: { value: value.slice(cursor), cursor: 0 } };
+  }
+
+  // Typography: Option+key with an OPT_MAP entry inserts a typography character.
+  if (key.meta && OPT_MAP[key.name]) {
+    const entry = OPT_MAP[key.name]!;
+    const ch = (key.shift && entry[1] !== undefined) ? entry[1]! : entry[0]!;
+    return { kind: 'edit', state: { value: value.slice(0, cursor) + ch + value.slice(cursor), cursor: cursor + 1 } };
   }
 
   // Single-char deletion
