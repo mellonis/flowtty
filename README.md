@@ -287,6 +287,26 @@ one, and only receive input when they become the top of the stack again.
 
 **Caveat:** all dialogs share a single `dialogApi` instance — calling `done()` or `cancel()` always pops the TOP, regardless of which dialog component triggered it. Since input is gated to the top dialog, normal user-driven flows are safe; the edge case is async side-effects from a lower dialog (e.g. a useEffect / setTimeout) that calls `done` after a new dialog opened on top — it would pop the wrong entry. Wrap async work in `isMounted` guards if you need to be paranoid.
 
+### Focus + Button
+
+Components inside a `<FocusGroup>` can call `useFocus()` to know if they're the active focusable. Tab cycles forward, Shift-Tab backward. First registered = auto-focused.
+
+`<DialogHost>` wraps each stack entry in an implicit `FocusGroup`, so Tab is scoped to the top dialog by default — no setup needed. Host content also gets its own implicit group.
+
+`<Button>` is focusable. Props:
+
+```tsx
+<Button label="Open" shortcut="o" onPress={() => ...} />
+```
+
+- `Enter` when focused → `onPress()`
+- `shortcut` key (anywhere in the input scope) → `onPress()` even when not focused
+- Focused state: bold + inverse-video label
+
+TextInput / Select / MultiSelect also plug into the focus system. Their `isFocused` prop becomes optional — if unset, they read from the FocusGroup. If set explicitly, the prop overrides.
+
+Outside a FocusGroup, `useFocus()` returns `{isFocused: true}` (safe default — single component receives input as before).
+
 ## Usage (M0)
 
 ```tsx

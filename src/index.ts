@@ -32,3 +32,9 @@ export { useDialog, useDialogHost, useDialogIsTop } from './use-dialog.js';
 export type {
   DialogHostApi, DialogResultApi, DialogResult,
 } from './dialog-context.js';
+export { FocusGroup } from './focus-group.js';
+export type { FocusGroupProps } from './focus-group.js';
+export { useFocus } from './use-focus.js';
+export type { UseFocusResult } from './use-focus.js';
+export { Button } from './button.js';
+export type { ButtonProps } from './button.js';
