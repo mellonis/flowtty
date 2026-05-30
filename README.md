@@ -34,6 +34,20 @@ bytes per frame instead of the full ~hundreds-of-bytes redraw.
 Modern terminal required (iTerm2, Terminal.app, Windows Terminal, modern xterm).
 Unknown values are silently ignored.
 
+### Borders
+
+`<Box border>` draws a one-cell border on all four edges. The cells are reserved
+via Yoga's per-edge border slots, so content fits inside the ring automatically.
+
+- `border="single"` → `┌─┐ │ │ └─┘`
+- `border="double"` → `╔═╗ ║ ║ ╚═╝`
+- `border="round"`  → `╭─╮ │ │ ╰─╯`
+- `border="bold"`   → `┏━┓ ┃ ┃ ┗━┛`
+- `border="classic"` → ASCII fallback `+-+ | | +-+`
+
+`borderColor` accepts the same values as `color` (named, `#rrggbb`, `rgb(...)`).
+Boxes smaller than 2×2 silently skip the border.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
