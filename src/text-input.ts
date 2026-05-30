@@ -23,8 +23,7 @@ export interface TextInputProps {
 
 // When cursor is past the end of the value (nothing to inverse), render a
 // SPACE — combined with inverse:true that's a solid filled cell on most
-// terminals, more reliably visible than the █ block char (which can render
-// thin or unstyled on some terminal renderers).
+// terminals, more reliably visible than the █ block char.
 const CURSOR_AT_END = ' ';
 
 export function TextInput(props: TextInputProps): ReactNode {
@@ -50,43 +49,46 @@ export function TextInput(props: TextInputProps): ReactNode {
 
   const display = mask ? '•'.repeat(value.length) : value;
 
-  // Compute the visible window [off, windowEnd).
-  // - If the value + cursor fits in `width` (or width unknown): show the whole value
-  //   inline; cursor is INSERTED at position (display grows by 1 char).
-  // - Else: scroll viewport to keep cursor visible; cursor OVERLAYS the char it's on.
+  // Always render exactly `width` cells (or the natural value+cursor when width
+  // is unknown — one-frame placeholder until onLayout fires).
+  // Scroll-offset rules:
+  //   1. Keep cursor in viewport: clamp when cursor leaves [off, off+w).
+  //   2. Slide LEFT when content shrinks: don't leave trailing empty space at
+  //      the right while leading content is still scrolled off-screen. Gives
+  //      q[qqqqqqqq#] → [qqqqqqqq#] → [qqqqqqq# ] as user deletes.
   const scrollOffsetRef = useRef(0);
-  const fits = width === null || display.length + 1 <= width;
-
   let off: number;
   let windowEnd: number;
-  if (fits) {
+  if (width === null) {
     off = 0;
     windowEnd = display.length;
-    scrollOffsetRef.current = 0;
   } else {
-    const w = width!;
+    const w = width;
     if (safeCursor < scrollOffsetRef.current) scrollOffsetRef.current = safeCursor;
     if (safeCursor >= scrollOffsetRef.current + w) scrollOffsetRef.current = safeCursor - w + 1;
+    // Slide-left-on-shrink: scroll offset must not exceed what's needed to fit
+    // content+cursor. Beyond that, leading content can come into view.
+    const maxUseful = Math.max(0, display.length + 1 - w);
+    if (scrollOffsetRef.current > maxUseful) scrollOffsetRef.current = maxUseful;
     off = scrollOffsetRef.current;
-    // In scroll mode the cursor REPLACES (overlays) the char it's on, so window
-    // includes one char at the cursor's position. windowEnd = off + w.
     windowEnd = off + w;
   }
 
-  // Split the visible display around the cursor. Unified model in both modes:
-  // the char AT the cursor is rendered as the cursor (inverse video) — it's
-  // consumed from the "after" slice. When cursor is past end of value, render
-  // the block glyph instead (no char to invert).
+  // Split the visible display around the cursor. The cursor consumes one cell:
+  // either the char at safeCursor (rendered with inverse) or CURSOR_AT_END
+  // (space + inverse = solid filled cell) when safeCursor is past end-of-value.
   const before = display.slice(off, safeCursor);
   const cursorChar = safeCursor < display.length ? display.charAt(safeCursor) : CURSOR_AT_END;
-  const after = display.slice(safeCursor + 1, windowEnd);
-
-  // In inline mode at end-of-value, cursorChar is the block glyph (no char to invert).
-  // We still render it as "inverse" — the block character on a swapped-bg cell looks
-  // like the block. Either way the user sees a clear cursor marker.
+  // Pad "after" with trailing spaces to fill the viewport — these become visible
+  // blank cells (with the lightgray bg) instead of leaving previous content behind.
+  const afterRaw = display.slice(safeCursor + 1, windowEnd);
+  const afterLen = Math.max(0, windowEnd - safeCursor - 1);
+  const after = width === null ? afterRaw : afterRaw.padEnd(afterLen);
 
   return createElement(Box, {
     flexDirection: 'row',
+    // Subtle lightgray bg differentiates the input from the dialog content area.
+    backgroundColor: 'rgb(211,211,211)',
     onLayout: (r: Rect) => {
       if (r.width !== width) setWidth(r.width);
     },
