@@ -242,3 +242,137 @@ describe('Box border', () => {
     expect(buf.get(2, 1).char).toBe('i');
   });
 });
+
+describe('Box padding', () => {
+  test('padding shorthand applies to all four edges (child inset by 1 on each side)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { padding: 1, width: 5, height: 5 },
+        createElement('flowtty-box', { width: 3, height: 3, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 5, 5);
+    const buf = paint(container, 5, 5);
+    // Child (3×3 red bg) should land at (1,1) — inset by padding=1 on all sides
+    expect(buf.get(1, 1).style.bg).toBe('red');
+    expect(buf.get(3, 3).style.bg).toBe('red');
+    // Outermost ring (padding cells) has no bg
+    expect(buf.get(0, 0).style.bg).toBeUndefined();
+    expect(buf.get(4, 4).style.bg).toBeUndefined();
+  });
+
+  test('paddingX shorthand: only left/right inset; top/bottom flush', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { paddingX: 1, width: 5, height: 3 },
+        createElement('flowtty-box', { width: 3, height: 3, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 5, 3);
+    const buf = paint(container, 5, 3);
+    // Child at (1, 0) — paddingX=1 insets left, paddingY=undefined keeps top flush
+    expect(buf.get(1, 0).style.bg).toBe('red');
+    expect(buf.get(3, 2).style.bg).toBe('red');
+    expect(buf.get(0, 0).style.bg).toBeUndefined();
+  });
+
+  test('paddingY shorthand: only top/bottom inset; left/right flush', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { paddingY: 1, width: 3, height: 5 },
+        createElement('flowtty-box', { width: 3, height: 3, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 3, 5);
+    const buf = paint(container, 3, 5);
+    expect(buf.get(0, 1).style.bg).toBe('red');
+    expect(buf.get(2, 3).style.bg).toBe('red');
+    expect(buf.get(0, 0).style.bg).toBeUndefined();
+  });
+
+  test('per-edge padding overrides axis and shorthand', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // padding: 2 (shorthand) for ALL edges, paddingTop: 0 wins on top edge
+    root.render(
+      createElement('flowtty-box', { padding: 2, paddingTop: 0, width: 5, height: 5 },
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 5, 5);
+    const buf = paint(container, 5, 5);
+    // Child at (2, 0): paddingLeft=2, paddingTop=0
+    expect(buf.get(2, 0).style.bg).toBe('red');
+  });
+
+  test('own text inset by padding (text-only box with padding)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { padding: 1, width: 5, height: 3 }, 'hi'),
+    );
+    computeLayout(container, 5, 3);
+    const buf = paint(container, 5, 3);
+    // Text 'hi' starts at (1, 1) — inset by padding=1 from outer (0,0)
+    expect(buf.get(1, 1).char).toBe('h');
+    expect(buf.get(2, 1).char).toBe('i');
+    // Padding cells are blank
+    expect(buf.get(0, 0).char).toBe(' ');
+    expect(buf.get(0, 1).char).toBe(' ');
+  });
+
+  test('own text inside a bordered box lands inside the border (regression — content rect subtracts border)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { border: 'single', width: 5, height: 3 }, 'hi'),
+    );
+    computeLayout(container, 5, 3);
+    const buf = paint(container, 5, 3);
+    // Border drawn on outer ring
+    expect(buf.get(0, 0).char).toBe('┌');
+    expect(buf.get(4, 0).char).toBe('┐');
+    expect(buf.get(0, 2).char).toBe('└');
+    expect(buf.get(4, 2).char).toBe('┘');
+    // Text inside the border (NOT painted over the top-left corner)
+    expect(buf.get(1, 1).char).toBe('h');
+    expect(buf.get(2, 1).char).toBe('i');
+  });
+
+  test('padding + border combine: text inset by both', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { border: 'single', padding: 1, width: 7, height: 5 }, 'hi'),
+    );
+    computeLayout(container, 7, 5);
+    const buf = paint(container, 7, 5);
+    // Border on outer ring (0..6 wide, 0..4 tall)
+    expect(buf.get(0, 0).char).toBe('┌');
+    expect(buf.get(6, 4).char).toBe('┘');
+    // Text inside border+padding — at (2, 2)
+    expect(buf.get(2, 2).char).toBe('h');
+    expect(buf.get(3, 2).char).toBe('i');
+  });
+
+  test('backgroundColor fills padding cells too (not just content area)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { padding: 1, backgroundColor: 'blue', width: 3, height: 3 }, 'x'),
+    );
+    computeLayout(container, 3, 3);
+    const buf = paint(container, 3, 3);
+    // All 9 cells have blue bg (including the padding ring)
+    for (let y = 0; y < 3; y++) {
+      for (let x = 0; x < 3; x++) {
+        expect(buf.get(x, y).style.bg).toBe('blue');
+      }
+    }
+    // Text 'x' at content (1, 1)
+    expect(buf.get(1, 1).char).toBe('x');
+  });
+});

@@ -4,6 +4,7 @@ import { ownText, type Instance } from './host.js';
 import type { Container } from './reconciler.js';
 import { wrapText, type WrapMode } from './wrap.js';
 import { BORDER_CHARS } from './borders.js';
+import { Edge } from './yoga.js';
 
 export function paint(container: Container, width: number, height: number): Buffer {
   const buffer = new Buffer(width, height);
@@ -62,6 +63,25 @@ function paintBorder(inst: Instance, buffer: Buffer, box: Rect): void {
   }
 }
 
+// Inner content rect (padding + border subtracted). Yoga's computed values are
+// only valid AFTER computeLayout, so this must be called inside paintInstance,
+// not at applyProps time. Border cells and padding cells are reserved by Yoga
+// in the LAYOUT phase (so children land inside the content rect automatically),
+// but own-text painting still needs the inset coordinates explicitly.
+function contentRectOf(inst: Instance, box: Rect): Rect {
+  const n = inst.yogaNode;
+  const padT = n.getComputedPadding(Edge.Top)    + n.getComputedBorder(Edge.Top);
+  const padR = n.getComputedPadding(Edge.Right)  + n.getComputedBorder(Edge.Right);
+  const padB = n.getComputedPadding(Edge.Bottom) + n.getComputedBorder(Edge.Bottom);
+  const padL = n.getComputedPadding(Edge.Left)   + n.getComputedBorder(Edge.Left);
+  return {
+    left:   box.left + padL,
+    top:    box.top  + padT,
+    width:  Math.max(0, box.width  - padL - padR),
+    height: Math.max(0, box.height - padT - padB),
+  };
+}
+
 function paintInstance(
   inst: Instance,
   buffer: Buffer,
@@ -85,19 +105,23 @@ function paintInstance(
   // 1b. Draw border (if set) on the outermost ring before content paints.
   paintBorder(inst, buffer, box);
 
-  // 2. Paint own text (wrapped if wrap prop set).
+  // 2. Paint own text (wrapped if wrap prop set) inside the content area
+  //    (rect with padding + border subtracted).
   const text = ownText(inst);
   if (text) {
+    const content = contentRectOf(inst, box);
     const mode = (inst.props.wrap ?? 'none') as WrapMode;
-    const lines = mode === 'none' ? text.split('\n') : wrapText(text, box.width, mode);
+    const lines = mode === 'none' ? text.split('\n') : wrapText(text, content.width, mode);
     const textStyle = textStyleOf(inst);
     if (textStyle.bg === undefined && effectiveBg !== undefined) {
       textStyle.bg = effectiveBg;
     }
     for (let row = 0; row < lines.length; row++) {
+      if (row >= content.height) break; // clip vertically against content area
       const chars = [...(lines[row] ?? '')];
       for (let col = 0; col < chars.length; col++) {
-        buffer.set(box.left + col, box.top + row, chars[col]!, textStyle);
+        if (col >= content.width) break; // clip horizontally
+        buffer.set(content.left + col, content.top + row, chars[col]!, textStyle);
       }
     }
   }

@@ -36,6 +36,15 @@ export interface BoxProps {
   border?: BorderStyle;
   // Color for border glyphs — same string format as `color` (named or truecolor).
   borderColor?: string;
+  // Padding (cells). Per-edge wins over axis wins over shorthand.
+  // E.g. paddingTop overrides paddingY which overrides padding.
+  padding?: number;
+  paddingX?: number;
+  paddingY?: number;
+  paddingTop?: number;
+  paddingRight?: number;
+  paddingBottom?: number;
+  paddingLeft?: number;
 }
 
 export interface Instance {
@@ -96,6 +105,17 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   n.setBorder(Edge.Right, borderWidth);
   n.setBorder(Edge.Bottom, borderWidth);
   n.setBorder(Edge.Left, borderWidth);
+
+  // Padding edge reservation — per-edge ?? axis ?? all ?? 0.
+  // Always set (including 0) so removing the prop re-renders correctly.
+  const padTop    = props.paddingTop    ?? props.paddingY ?? props.padding ?? 0;
+  const padRight  = props.paddingRight  ?? props.paddingX ?? props.padding ?? 0;
+  const padBottom = props.paddingBottom ?? props.paddingY ?? props.padding ?? 0;
+  const padLeft   = props.paddingLeft   ?? props.paddingX ?? props.padding ?? 0;
+  n.setPadding(Edge.Top, padTop);
+  n.setPadding(Edge.Right, padRight);
+  n.setPadding(Edge.Bottom, padBottom);
+  n.setPadding(Edge.Left, padLeft);
 
   // Alignment.
   n.setJustifyContent(jcMap(props.justifyContent));
@@ -160,6 +180,10 @@ export function refreshMeasure(inst: Instance, _Yoga: Yoga): void {
       }
       return measureText(text);
     });
+    // yoga-layout 3.x WASM does not reliably mark the node dirty when
+    // setMeasureFunc is called (e.g. on text updates). markDirty() forces
+    // the next calculateLayout call to recompute rather than use stale cache.
+    inst.yogaNode.markDirty();
   } else {
     inst.yogaNode.setMeasureFunc(null);
   }
