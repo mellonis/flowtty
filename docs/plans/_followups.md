@@ -59,4 +59,48 @@ When the hello-world is launched from WebStorm's IDE run interface (not a real t
 
 ---
 
-(More entries added as Tasks 2-6 surface issues.)
+## List view (Task 2)
+
+### Shared script + module pattern: top-level side-effectful `await` blocks import
+
+`articles.mjs` ends with `await main()` at top level. A consumer that does `import { listFolders } from './articles.mjs'` triggers the entire CLI wizard at import time — the two competing TUI apps share the same stdin/raw-mode state and produce garbage output.
+
+**Hit when:** first `import { listFolders, buildRows, statusOf } from './articles.mjs'` would have hung in the wizard.
+
+**Fix applied:** gate with `if (process.argv[1]) { ... pathToFileURL check ... }` at the bottom of articles.mjs. This is standard ES-module "main guard" pattern.
+
+**Action:** flowtty can't prevent this — it's a Node.js module-system concern. Consider adding a note to the getting-started guide: "If you import helpers from a CLI script that ends with a top-level `await`, guard it with an `import.meta.url` check." May be worth showing the pattern in a documentation example.
+
+### No `clearScreen` or `altScreen` lifecycle hook on render()
+
+`listInteractive` in articles.mjs calls `console.clear()` on every render to give a full-screen feel. In flowtty, the TtyBackend's alt-screen handles this, but after unmount the cursor is left wherever it was last painted — there's no `onMount`/`onUnmount` lifecycle callback on the render handle to do post-exit cleanup (e.g. clear a line, move cursor home).
+
+**Hit when:** thinking through how the list view would look after unmount in contrast to how articles.mjs clears the screen on every key press.
+
+**Action:** Lower priority — TtyBackend already uses alt-screen which auto-restores the original scrollback on unmount. But a `handle.onUnmount(cb)` hook or a `cleanup` field on the render return value would be useful for consumers who need post-exit side effects.
+
+---
+
+---
+
+## Create wizard (Task 3)
+
+### `MultiSelect.onAddNew` is `() => void` — can't return the new item id
+
+The M1c.4 design intent was for `onAddNew` to be `async () => Promise<string | null>` so the component could automatically splice in and select the new item when the callback resolves. The actual implementation signature is `() => void`. There's no return channel.
+
+**Workaround:** Consumer must manage a sub-step state machine: on `onAddNew()` call, switch the wizard to an `'add-tag'` step, render `TextInput` there, and on submit call `addArticleTagToContent`, mutate the `knownTags` array held in `useState`, add the new tag to `selectedTags`, and switch back to `'tags'`.
+
+**Action:** Upgrade `onAddNew` to `() => Promise<string | null>` (or `() => Promise<void>` with the component re-reading the items array after the promise resolves). The sync `() => void` forces consumers to invent their own sub-prompt state machine for what should be a self-contained flow. This is the highest-priority ergonomics gap from Task 3.
+
+### `TextInput` has no `defaultValue` prop — seeding a step requires a child component
+
+`TextInput` is fully controlled (`value` + `onChange` required). To seed the slug step with `slugify(title, lang)`, the implementation needs a separate `SlugStep` child component that owns its own `useState` initialised from a prop. A `defaultValue` prop that populates the initial uncontrolled state would eliminate one component and several lines of boilerplate per wizard step.
+
+**Action:** Add an uncontrolled mode (or at least a `defaultValue` seed) to `TextInput`. The controlled pattern is correct for form integration, but single-shot prompts inside a step-wizard are much simpler with an uncontrolled `defaultValue`.
+
+### No `validate` error rendering — consumer must mirror the error in state
+
+`TextInput`'s `validate` callback blocks `onSubmit` on failure, but the component does not render the error string. The consumer must duplicate the validation in its own state (`useState<string | null>`) and render it separately below the input.
+
+**Action:** `TextInput` should render the validation error itself (below the cursor line) when `validate` returns a non-null string. Removes a boilerplate pattern that every wizard step with validation has to repeat.
