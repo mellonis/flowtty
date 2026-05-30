@@ -43,7 +43,12 @@ export async function render(
   const handleError = (error: unknown, source: ErrorSource) => {
     if (cleanedUp) return;
     cleanedUp = true;
-    // Restore terminal FIRST so any stderr that follows is readable.
+    // Mark unmounted FIRST so any queued paint microtask (e.g. from a re-render
+    // after the boundary commits null children) becomes a no-op. Otherwise the
+    // queued paint runs after dispose() exits alt-screen and writes 24 blank
+    // lines to the main screen above the error trace.
+    unmounted = true;
+    // Restore terminal so any stderr that follows is readable.
     try { backend.dispose?.(); } catch { /* ignore — dispose must not mask the real error */ }
     if (options.onError) {
       try { options.onError({ error, source }); } catch { /* user's onError can't break the path */ }
