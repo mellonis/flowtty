@@ -150,6 +150,15 @@ Each accepts a cell count or a percent string. Undefined = no constraint. Useful
 
 Useful for media-style panels where you want a fixed shape regardless of container size — e.g., a flex child with `flexGrow={1} aspectRatio={3}` claims leftover horizontal space and adjusts its height to maintain a 3:1 ratio.
 
+### Display
+
+`<Box display>` controls whether this box (and its subtree) participates in layout. Default `'flex'`.
+
+- `display="flex"` (default) — normal flexbox participation
+- `display="none"` — box and all descendants are removed from layout and skipped by paint. Siblings reflow as if this box didn't exist. React state is preserved (unlike conditionally unmounting).
+
+Useful for tab panels, collapsible sections, and conditional UI where remounting would lose form state, scroll position, or other ephemeral state.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
