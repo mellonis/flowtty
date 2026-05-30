@@ -122,3 +122,21 @@ test('multiple absolute siblings paint in tree order (later overlays earlier)', 
   // 'AAAA' (0-3) then 'BBBB' (2-5) → overlays AAAA at 2,3 → 'AABBBB'
   expect(buf.toString()).toBe('AABBBB');
 });
+
+test('absolute child declared BEFORE stack-flow sibling still paints on top (gates two-pass)', async () => {
+  const Yoga = await getYoga();
+  const { container, root } = createRoot(Yoga);
+  // Absolute child declared FIRST in the tree. With a single-pass paint, the
+  // stack-flow sibling rendered after would overwrite cells under the
+  // absolute. Two-pass paints stack-flow first then absolutes on top → absolute wins.
+  root.render(
+    createElement('flowtty-box', { width: 6, height: 1 },
+      createElement('flowtty-box', { position: 'absolute', top: 0, left: 2, width: 2, height: 1 }, 'XX'),
+      createElement('flowtty-box', { width: 6, height: 1 }, 'abcdef'),
+    ),
+  );
+  computeLayout(container, 6, 1);
+  const buf = paint(container, 6, 1);
+  // Stack-flow 'abcdef' painted first; absolute 'XX' overlays cols 2..3 → 'abXXef'
+  expect(buf.toString()).toBe('abXXef');
+});
