@@ -8,6 +8,7 @@ import { useInput } from './use-input.js';
 import { DialogHost } from './dialog-host.js';
 import { useDialog, useDialogHost } from './use-dialog.js';
 import type { DialogResult } from './dialog-context.js';
+import { MultiSelect } from './multi-select.js';
 
 function NamePromptDialog() {
   const { done, cancel } = useDialog();
@@ -107,4 +108,52 @@ test('after dialog closes, host resumes receiving keys', async () => {
   backend.press({ name: 'b' });
   await flush();
   expect(hostKeys).toEqual(['o', 'a', 'b']);
+});
+
+test('M1c.4 acceptance: MultiSelect+add-new opens dialog, dialog submit appends and selects', async () => {
+  function App() {
+    const host = useDialogHost();
+    const [items, setItems] = useState<{ label: string; value: string }[]>([
+      { label: 'apple', value: 'apple' },
+      { label: 'banana', value: 'banana' },
+    ]);
+    const [selected, setSelected] = useState<string[]>([]);
+    return createElement(MultiSelect<string>, {
+      items,
+      value: selected,
+      onChange: setSelected,
+      onSubmit: () => {},
+      onAddNew: async () => {
+        const r = await host.openDialog<string>(createElement(NamePromptDialog));
+        if (r.status === 'done' && r.value) {
+          const newItem = { label: r.value, value: r.value };
+          setItems((prev) => [...prev, newItem]);
+          setSelected((prev) => [...prev, r.value]);
+        }
+      },
+    });
+  }
+  const backend = new TestBackend(40, 6);
+  await render(createElement(DialogHost, null, createElement(App)), backend);
+  await flushAsync();
+
+  // Cursor 0 = 'apple'; move to '+ add new' row (index 2 = items.length 2)
+  backend.press({ name: 'down' });
+  await flush();
+  backend.press({ name: 'down' });
+  await flush();
+
+  // Enter on add-new → opens dialog
+  backend.press({ name: 'return' });
+  await flushAsync();
+
+  // Dialog mounted; host muted. Type 'cherry' into its TextInput.
+  backend.type('cherry');
+  await flush();
+  backend.press({ name: 'return' });  // dialog calls done('cherry')
+  await flushAsync();
+
+  // Dialog closes; MultiSelect re-renders with appended 'cherry' selected.
+  expect(backend.lastFrame).toContain('[x] cherry');
+  expect(backend.lastFrame).toContain('+ add new');
 });
