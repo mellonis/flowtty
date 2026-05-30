@@ -1141,3 +1141,64 @@ describe('Box min/max sizing', () => {
     expect(buf.get(5, 0).style.bg).toBeUndefined(); // capped at 50% = 5 cells
   });
 });
+
+describe('Box aspectRatio', () => {
+  test('width given + aspectRatio derives height (ratio 2 → height = width/2)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Child width:4 aspectRatio:2 → Yoga derives height 2. Red fills 4×2 at top-left of 4×4 canvas.
+    root.render(
+      createElement('flowtty-box', { width: 4, height: 4 },
+        createElement('flowtty-box', { width: 4, aspectRatio: 2, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 4, 4);
+    const buf = paint(container, 4, 4);
+    // Red at y=0..1 (height 2), full width 0..3
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(3, 0).style.bg).toBe('red');
+    expect(buf.get(0, 1).style.bg).toBe('red');
+    expect(buf.get(3, 1).style.bg).toBe('red');
+    // Below derived height — no bg
+    expect(buf.get(0, 2).style.bg).toBeUndefined();
+    expect(buf.get(0, 3).style.bg).toBeUndefined();
+  });
+
+  test('height given + aspectRatio derives width (ratio 0.5 → width = height*0.5)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Child height:4 aspectRatio:0.5 → Yoga derives width 2. Red fills 2×4 at top-left.
+    root.render(
+      createElement('flowtty-box', { width: 4, height: 4 },
+        createElement('flowtty-box', { height: 4, aspectRatio: 0.5, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 4, 4);
+    const buf = paint(container, 4, 4);
+    // Red at x=0..1 (width 2), full height 0..3
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBe('red');
+    expect(buf.get(0, 3).style.bg).toBe('red');
+    expect(buf.get(1, 3).style.bg).toBe('red');
+    // Beyond derived width — no bg
+    expect(buf.get(2, 0).style.bg).toBeUndefined();
+    expect(buf.get(3, 0).style.bg).toBeUndefined();
+  });
+
+  test('aspectRatio: 1 makes a square (height = width)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Child width:3 aspectRatio:1 → height 3. Red fills 3×3.
+    root.render(
+      createElement('flowtty-box', { width: 5, height: 5 },
+        createElement('flowtty-box', { width: 3, aspectRatio: 1, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 5, 5);
+    const buf = paint(container, 5, 5);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(2, 2).style.bg).toBe('red'); // bottom-right of the 3×3 square
+    expect(buf.get(3, 0).style.bg).toBeUndefined(); // outside square
+    expect(buf.get(0, 3).style.bg).toBeUndefined();
+  });
+});

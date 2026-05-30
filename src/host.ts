@@ -79,6 +79,9 @@ export interface BoxProps {
   maxWidth?: number | `${number}%`;
   minHeight?: number | `${number}%`;
   maxHeight?: number | `${number}%`;
+  /** Width / height ratio. Yoga derives the missing dimension from the constrained one.
+   *  CSS convention: `aspectRatio: 2` = twice as wide as tall; `0.5` = twice as tall as wide; `1` = square. */
+  aspectRatio?: number;
   /** Stacking order within the same paint pass. Higher values paint on top.
    *  Default 0. Tree order is the tiebreaker. Does NOT cross pass boundaries:
    *  absolutes always overlay stack-flow regardless of zIndex. */
@@ -196,6 +199,7 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   n.setMaxWidth(props.maxWidth);
   n.setMinHeight(props.minHeight);
   n.setMaxHeight(props.maxHeight);
+  n.setAspectRatio(props.aspectRatio);
 
   // flex-wrap → Yoga Wrap enum. Always set so removing the prop re-renders correctly.
   n.setFlexWrap(wrapMap(props.flexWrap));
