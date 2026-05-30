@@ -84,13 +84,15 @@ test('M1b acceptance: type, edit with cursor moves, validate-gated submit, then 
   await flush();
   expect(backend.lastFrame).toBe('helo█');
 
-  // Move cursor back one and insert 'l' to make "hello"
+  // Move cursor back one and insert 'l' to make "hello".
+  // The cursor is now rendered as the actual character with inverse style (not
+  // a separate cursor glyph), so the visible content is just the value chars.
   backend.press({ name: 'left' });
   await flush();
-  expect(backend.lastFrame).toBe('hel█o');
+  expect(backend.lastFrame).toBe('helo');
   backend.press({ name: 'l', sequence: 'l' });
   await flush();
-  expect(backend.lastFrame).toBe('hell█o');
+  expect(backend.lastFrame).toBe('hello');
 
   // Submit — validate passes (length 5 >= 3) → onSubmit fires with "hello"
   backend.press({ name: 'return' });

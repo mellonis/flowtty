@@ -21,7 +21,10 @@ export interface TextInputProps {
   isFocused?: boolean;
 }
 
-const CURSOR = '█'; // FULL BLOCK — solid cursor (no blink; terminal-native blink would need timer-driven re-render)
+// When cursor is past the end of the value (nothing to inverse), render this
+// glyph instead. Standard text-input convention: cursor IS at a character →
+// inverse the character (so it stays visible); cursor at end → block glyph.
+const CURSOR_AT_END = '█';
 
 export function TextInput(props: TextInputProps): ReactNode {
   const { value, onChange, onSubmit, onCancel, validate, mask, isFocused = true } = props;
@@ -46,33 +49,49 @@ export function TextInput(props: TextInputProps): ReactNode {
 
   const display = mask ? '•'.repeat(value.length) : value;
 
-  // Two-mode rendering:
-  // - "inline" (default): cursor INSERTED at position; display grows by 1 char.
-  //   Used when display + cursor fits the allocated width (or width unknown).
-  // - "scroll": cursor OVERLAYS the char at its column inside a fixed-width
-  //   viewport. The viewport scrolls to keep the cursor visible.
-  //   Used when display would overflow the allocated width.
+  // Compute the visible window [off, windowEnd).
+  // - If the value + cursor fits in `width` (or width unknown): show the whole value
+  //   inline; cursor is INSERTED at position (display grows by 1 char).
+  // - Else: scroll viewport to keep cursor visible; cursor OVERLAYS the char it's on.
   const scrollOffsetRef = useRef(0);
-  let renderText: string;
-  if (width === null || display.length + 1 <= width) {
-    // Fits inline — keep classic insert-cursor behavior.
-    renderText = display.slice(0, safeCursor) + CURSOR + display.slice(safeCursor);
-    // Reset scroll so re-entering scroll mode starts from a sensible place.
+  const fits = width === null || display.length + 1 <= width;
+
+  let off: number;
+  let windowEnd: number;
+  if (fits) {
+    off = 0;
+    windowEnd = display.length;
     scrollOffsetRef.current = 0;
   } else {
-    const w = width;
+    const w = width!;
     if (safeCursor < scrollOffsetRef.current) scrollOffsetRef.current = safeCursor;
     if (safeCursor >= scrollOffsetRef.current + w) scrollOffsetRef.current = safeCursor - w + 1;
-    const off = scrollOffsetRef.current;
-    const slice = display.slice(off, off + w);
-    const padded = slice.padEnd(w);
-    const cursorCol = safeCursor - off; // 0..w-1
-    renderText = padded.slice(0, cursorCol) + CURSOR + padded.slice(cursorCol + 1);
+    off = scrollOffsetRef.current;
+    // In scroll mode the cursor REPLACES (overlays) the char it's on, so window
+    // includes one char at the cursor's position. windowEnd = off + w.
+    windowEnd = off + w;
   }
 
+  // Split the visible display around the cursor. Unified model in both modes:
+  // the char AT the cursor is rendered as the cursor (inverse video) — it's
+  // consumed from the "after" slice. When cursor is past end of value, render
+  // the block glyph instead (no char to invert).
+  const before = display.slice(off, safeCursor);
+  const cursorChar = safeCursor < display.length ? display.charAt(safeCursor) : CURSOR_AT_END;
+  const after = display.slice(safeCursor + 1, windowEnd);
+
+  // In inline mode at end-of-value, cursorChar is the block glyph (no char to invert).
+  // We still render it as "inverse" — the block character on a swapped-bg cell looks
+  // like the block. Either way the user sees a clear cursor marker.
+
   return createElement(Box, {
+    flexDirection: 'row',
     onLayout: (r: Rect) => {
       if (r.width !== width) setWidth(r.width);
     },
-  }, createElement(Text, null, renderText));
+  },
+    before ? createElement(Text, null, before) : null,
+    createElement(Text, { inverse: true }, cursorChar),
+    after ? createElement(Text, null, after) : null,
+  );
 }
