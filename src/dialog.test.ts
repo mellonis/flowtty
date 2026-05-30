@@ -180,4 +180,8 @@ test('M1f acceptance: dialog renders as a centered overlay ON TOP of the host co
   // The dialog overlay sits INSIDE the 5-row frame; the dialog's "name: " prompt is visible.
   expect(backend.lastFrame.split('\n').length).toBeLessThanOrEqual(5);
   expect(backend.lastFrame).toContain('name:');
+  // Host content at the top and bottom rows is intact — the dialog did NOT paint over row 1
+  // (which would happen if the dialog rendered as a sibling at origin instead of a true overlay).
+  expect(backend.lastFrame).toContain('HOST CONTENT ROW 1');
+  expect(backend.lastFrame).toContain('HOST CONTENT ROW 5');
 });
