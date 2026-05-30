@@ -104,3 +104,37 @@ The M1c.4 design intent was for `onAddNew` to be `async () => Promise<string | n
 `TextInput`'s `validate` callback blocks `onSubmit` on failure, but the component does not render the error string. The consumer must duplicate the validation in its own state (`useState<string | null>`) and render it separately below the input.
 
 **Action:** `TextInput` should render the validation error itself (below the cursor line) when `validate` returns a non-null string. Removes a boilerplate pattern that every wizard step with validation has to repeat.
+
+---
+
+## Wizard dialog UX (post-Task 5 polish)
+
+### `createElement` strips generic component params (Select<T>, MultiSelect<T>)
+
+JSX would auto-infer `T` from `items` / `value` props; `createElement(Select, {...})` does not, so callbacks fall back to `(value: unknown[]) => void`. Workaround: `createElement<SelectProps<T>>(Select, {...})` at every call site.
+
+**Action:** README should document `createElement<Props<T>>(Component, ...)` for typed generic components, OR recommend JSX for app code using flowtty.
+
+### Border-title (top edge: `┌── title ──┐`) not supported
+
+Currently dialogs render their title as the first line INSIDE the border + a dim HR below. Real on-border titles like `┌── New article ──────┐` would need a `borderTitle?: string` prop with paint-time substitution into the top edge.
+
+**Action:** small flowtty feature; ~10 lines paint.ts change.
+
+### Marquee/scrolling Text (no truncate, no wrap)
+
+When a single-line Text doesn't fit, options today are `wrap: 'wrap'` (multi-line) or `wrap: 'truncate'` (ellipsis). A `wrap: 'marquee'` mode that horizontally scrolls within the allocated width on a timer would be nicer for long-but-must-fit values.
+
+**Action:** would need a timer-driven re-render mechanism in flowtty; non-trivial.
+
+### `width: '100%'` on root child doesn't resolve as expected
+
+In a test that does `computeLayout(container, 20, 1)`, a Box with `width: '100%'` whose parent is the root resolved to the box's CONTENT width, not 20. Workaround: `alignItems: 'stretch'` on parents to grow children cross-axis.
+
+**Action:** investigate why Yoga's `calculateLayout(w, h)` ownerSize doesn't satisfy percentage resolution on root children. Possibly need `setWidth(w)` on root before `calculateLayout` — but that overrides explicit widths on root nodes (broke 4 paint tests when tried).
+
+### Cursor variant + behaviour (config)
+
+Hardcoded cursor glyph (`█` block) in `text-input.ts`. No blink (would need timer-driven re-render).
+
+**Action:** add an app-level config (or per-TextInput prop) for `cursorGlyph: string` and optional `cursorBlink: boolean`. Blink requires a timer that toggles a state in TextInput → re-render; probably opt-in only since it adds animation overhead.

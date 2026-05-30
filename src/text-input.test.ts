@@ -10,8 +10,8 @@ test('TextInput renders the value with a trailing cursor bar', async () => {
   }
   const backend = new TestBackend(10, 1);
   await render(createElement(App), backend);
-  // Cursor defaults to end of value → 'hi' + '▏' (3 cells)
-  expect(backend.lastFrame).toBe('hi▏');
+  // Cursor defaults to end of value → 'hi' + '█' (3 cells)
+  expect(backend.lastFrame).toBe('hi█');
 });
 
 test('typing appends characters and onChange fires per key', async () => {
@@ -26,7 +26,7 @@ test('typing appends characters and onChange fires per key', async () => {
   backend.type('hi');
   await flush();
   expect(captured).toBe('hi');
-  expect(backend.lastFrame).toBe('hi▏');
+  expect(backend.lastFrame).toBe('hi█');
 });
 
 test('backspace removes the char before cursor', async () => {
@@ -38,7 +38,7 @@ test('backspace removes the char before cursor', async () => {
   await render(createElement(App), backend);
   backend.press({ name: 'backspace' });
   await flush();
-  expect(backend.lastFrame).toBe('hell▏');
+  expect(backend.lastFrame).toBe('hell█');
 });
 
 test('mask renders bullets instead of characters', async () => {
@@ -47,7 +47,7 @@ test('mask renders bullets instead of characters', async () => {
   }
   const backend = new TestBackend(10, 1);
   await render(createElement(App), backend);
-  expect(backend.lastFrame).toBe('••••••▏'); // six bullets + cursor bar
+  expect(backend.lastFrame).toBe('••••••█'); // six bullets + cursor bar
 });
 
 test('isFocused: false suppresses key handling (value unchanged)', async () => {
@@ -82,15 +82,15 @@ test('M1b acceptance: type, edit with cursor moves, validate-gated submit, then 
   // Type "helo"
   backend.type('helo');
   await flush();
-  expect(backend.lastFrame).toBe('helo▏');
+  expect(backend.lastFrame).toBe('helo█');
 
   // Move cursor back one and insert 'l' to make "hello"
   backend.press({ name: 'left' });
   await flush();
-  expect(backend.lastFrame).toBe('hel▏o');
+  expect(backend.lastFrame).toBe('hel█o');
   backend.press({ name: 'l', sequence: 'l' });
   await flush();
-  expect(backend.lastFrame).toBe('hell▏o');
+  expect(backend.lastFrame).toBe('hell█o');
 
   // Submit — validate passes (length 5 >= 3) → onSubmit fires with "hello"
   backend.press({ name: 'return' });
