@@ -45,6 +45,15 @@ export interface BoxProps {
   paddingRight?: number;
   paddingBottom?: number;
   paddingLeft?: number;
+  // Margin (cells). Per-edge wins over axis wins over shorthand.
+  // Negative values are allowed (Yoga supports overlap layouts).
+  margin?: number;
+  marginX?: number;
+  marginY?: number;
+  marginTop?: number;
+  marginRight?: number;
+  marginBottom?: number;
+  marginLeft?: number;
 }
 
 export interface Instance {
@@ -116,6 +125,17 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   n.setPadding(Edge.Right, padRight);
   n.setPadding(Edge.Bottom, padBottom);
   n.setPadding(Edge.Left, padLeft);
+
+  // Margin edge reservation — per-edge ?? axis ?? all ?? 0.
+  // Always set (including 0) so removing the prop re-renders correctly.
+  const marTop    = props.marginTop    ?? props.marginY ?? props.margin ?? 0;
+  const marRight  = props.marginRight  ?? props.marginX ?? props.margin ?? 0;
+  const marBottom = props.marginBottom ?? props.marginY ?? props.margin ?? 0;
+  const marLeft   = props.marginLeft   ?? props.marginX ?? props.margin ?? 0;
+  n.setMargin(Edge.Top, marTop);
+  n.setMargin(Edge.Right, marRight);
+  n.setMargin(Edge.Bottom, marBottom);
+  n.setMargin(Edge.Left, marLeft);
 
   // Alignment.
   n.setJustifyContent(jcMap(props.justifyContent));

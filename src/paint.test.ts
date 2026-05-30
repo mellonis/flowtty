@@ -376,3 +376,114 @@ describe('Box padding', () => {
     expect(buf.get(1, 1).char).toBe('x');
   });
 });
+
+describe('Box margin', () => {
+  test('margin shorthand offsets the child away from the parent edges on all four sides', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 5×3; single child with margin:1 and width:3 height:1 (= 5-2 × 3-2).
+    root.render(
+      createElement('flowtty-box', { width: 5, height: 3 },
+        createElement('flowtty-box', { margin: 1, width: 3, height: 1, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 5, 3);
+    const buf = paint(container, 5, 3);
+    // Child landed at (1, 1) (margin offset on each side)
+    expect(buf.get(1, 1).style.bg).toBe('red');
+    expect(buf.get(3, 1).style.bg).toBe('red');
+    // Outside the child — no bg
+    expect(buf.get(0, 0).style.bg).toBeUndefined();
+    expect(buf.get(0, 1).style.bg).toBeUndefined(); // left margin column
+    expect(buf.get(4, 1).style.bg).toBeUndefined(); // right margin column
+  });
+
+  test('marginX shorthand: only left/right offset; top/bottom flush', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { width: 5, height: 3 },
+        createElement('flowtty-box', { marginX: 1, width: 3, height: 3, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 5, 3);
+    const buf = paint(container, 5, 3);
+    // Child at (1, 0) — marginX=1 offsets left; marginY=undefined keeps top flush
+    expect(buf.get(1, 0).style.bg).toBe('red');
+    expect(buf.get(3, 2).style.bg).toBe('red');
+    // Left/right margin columns are blank
+    expect(buf.get(0, 0).style.bg).toBeUndefined();
+    expect(buf.get(4, 0).style.bg).toBeUndefined();
+  });
+
+  test('marginY shorthand: only top/bottom offset; left/right flush', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { width: 3, height: 5 },
+        createElement('flowtty-box', { marginY: 1, width: 3, height: 3, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 3, 5);
+    const buf = paint(container, 3, 5);
+    // Child at (0, 1)
+    expect(buf.get(0, 1).style.bg).toBe('red');
+    expect(buf.get(2, 3).style.bg).toBe('red');
+    expect(buf.get(0, 0).style.bg).toBeUndefined();
+  });
+
+  test('per-edge margin overrides axis and shorthand', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // margin: 2 for all edges, marginTop: 0 wins on top.
+    root.render(
+      createElement('flowtty-box', { width: 5, height: 5 },
+        createElement('flowtty-box', { margin: 2, marginTop: 0, width: 1, height: 1, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 5, 5);
+    const buf = paint(container, 5, 5);
+    // Child at (2, 0): marginLeft=2, marginTop=0
+    expect(buf.get(2, 0).style.bg).toBe('red');
+  });
+
+  test('marginRight separates row siblings', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // flex row, first child marginRight:2 — second child starts at x = 1 + 2 = 3
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 5, height: 1 },
+        createElement('flowtty-box', { marginRight: 2, width: 1, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 5, 1);
+    const buf = paint(container, 5, 1);
+    // First child at x=0 (red)
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    // Margin gap at x=1, x=2 (no bg)
+    expect(buf.get(1, 0).style.bg).toBeUndefined();
+    expect(buf.get(2, 0).style.bg).toBeUndefined();
+    // Second child at x=3 (blue)
+    expect(buf.get(3, 0).style.bg).toBe('blue');
+  });
+
+  test('negative margin pulls child outside parent rect (overlap layout)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 5×3 with another sibling, plus a 3-wide child with marginLeft: -1
+    // pulled left from its row-flow position.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 5, height: 1 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { marginLeft: -1, width: 2, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 5, 1);
+    const buf = paint(container, 5, 1);
+    // First child at x=0..1 (red); second child shifted left by -1 to x=1..2 (blue overwrites red at x=1)
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBe('blue'); // overlapped
+    expect(buf.get(2, 0).style.bg).toBe('blue');
+  });
+});
