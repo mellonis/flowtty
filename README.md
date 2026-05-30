@@ -11,66 +11,48 @@ buffer and draws it to the terminal (or captures it via the test backend).
 
 ## Status
 
-M1c.4 (embedded dialogs). Any descendant of `<DialogHost>` can pop a modal
-sub-prompt and await its result without unmounting the host:
+M1f (overlay positioning). `<Box>` is now position-aware:
 
-- `useDialogHost()` → `{ openDialog(element): Promise<{status:'done',value}|{status:'cancelled'}> }`
-- `useDialog()` → `{ done(value), cancel() }` (called from inside a dialog component)
-- `<DialogHost>` swaps the `InputContext` source while a dialog is open so the
-  host subtree receives no keys; the dialog gets the outer source.
+- `position: 'absolute'` + `top` / `left` / `right` / `bottom` (cells) — takes a
+  box out of stack flow and positions it relative to the nearest non-static
+  ancestor (typically the root, for full-screen overlays).
+- `width` / `height` accept percentage strings (`'100%'`, `'50%'`) in addition
+  to cell counts.
+- `justifyContent` (`'flex-start'` | `'center'` | `'flex-end'` | `'space-between'`
+  | `'space-around'` | `'space-evenly'`) and `alignItems` (`'flex-start'` |
+  `'center'` | `'flex-end'` | `'stretch'`) for Yoga-flexbox alignment.
 
-`<MultiSelect>` gained an `onAddNew?` prop: when set, a `+ add new` row
-appears at the bottom; Enter on it triggers the callback (typically opens a
-`<TextInput>` dialog and appends the result to the items list).
-
-**Visual caveat:** flowtty's stack layout has no `position: absolute` / z-index,
-so the dialog renders **below** the host content in the cell buffer (behaviorally
-modal — keys gated + awaitable — but visually inline). A true centered overlay
-needs positioning primitives, planned for a later layout milestone.
+The paint pass renders stack-flow children first and absolutely-positioned
+children **on top**, so overlays composite correctly. **`<DialogHost>` uses
+this to render dialogs as centered overlays** on top of the host content,
+resolving M1c.4's inline-position caveat.
 
 ### Usage
 
 ```tsx
-import {
-  render, DialogHost, useDialogHost, useDialog,
-  MultiSelect, TextInput, Box, Text, TtyBackend,
-} from 'flowtty';
+import { Box, Text, render, TtyBackend } from 'flowtty';
 
-function NameDialog() {
-  const { done, cancel } = useDialog();
-  const [v, setV] = useState('');
-  return (
-    <Box>
-      <Text>new label: </Text>
-      <TextInput value={v} onChange={setV} onSubmit={() => done(v)} onCancel={cancel} />
+await render(
+  <Box width={40} height={10}>
+    <Text>host content here</Text>
+    <Box position="absolute" top={0} left={0} width="100%" height="100%"
+         justifyContent="center" alignItems="center">
+      <Box width={20} height={3} backgroundColor="blue">
+        <Text color="white">CENTERED OVERLAY</Text>
+      </Box>
     </Box>
-  );
-}
-
-function App() {
-  const host = useDialogHost();
-  const [items, setItems] = useState([{ label: 'apple', value: 'a' }]);
-  return (
-    <MultiSelect
-      items={items} value={[]} onChange={() => {}} onSubmit={() => {}}
-      onAddNew={async () => {
-        const r = await host.openDialog<string>(<NameDialog />);
-        if (r.status === 'done') setItems((p) => [...p, { label: r.value, value: r.value }]);
-      }}
-    />
-  );
-}
-
-await render(<DialogHost><App /></DialogHost>, new TtyBackend());
+  </Box>,
+  new TtyBackend(),
+);
 ```
 
 ### Still deferred (later milestones)
 
-- Stacked/nested dialogs (one at a time today).
-- True modal overlay positioning (absolute/z-index) — dialogs render below host inline.
+- Explicit `zIndex` prop for cross-depth stacking order (tree order is the
+  current implicit z; later siblings overlay earlier siblings at the same depth).
+- `position: 'relative'` with edge offsets.
 - Frame diffing — full TTY redraw each `draw()`.
 - Truecolor (`#rgb` / `rgb(…)`).
-- Async-rendered dialog components (Suspense).
 - Bracketed paste, mouse, Kitty keyboard protocol, modifier-encoded arrows.
 
 ### Usage with Zod
