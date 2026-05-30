@@ -191,3 +191,94 @@ test('TtyBackend.onKey: Ctrl-D default-handled as dispose + process.exit(130)', 
 
   exitSpy.mockRestore();
 });
+
+test('TtyBackend.draw: second frame with NO changes writes nothing (no-op diff)', () => {
+  const { stub: out, writes } = makeStub(4, 1);
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const buf = new Buffer(4, 1);
+  buf.set(0, 0, 'a'); buf.set(1, 0, 'b'); buf.set(2, 0, 'c'); buf.set(3, 0, 'd');
+  back.draw(buf);
+  const beforeLen = writes.length;
+  // Draw the SAME buffer again
+  back.draw(buf);
+  // No additional writes (zero changes)
+  expect(writes.length).toBe(beforeLen);
+  back.dispose();
+});
+
+test('TtyBackend.draw: second frame with ONE cell changed writes a single cursor-positioned char', () => {
+  const { stub: out, writes } = makeStub(4, 1);
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const buf1 = new Buffer(4, 1);
+  buf1.set(0, 0, 'a'); buf1.set(1, 0, 'b'); buf1.set(2, 0, 'c'); buf1.set(3, 0, 'd');
+  back.draw(buf1);
+  const beforeLen = writes.length;
+  const buf2 = new Buffer(4, 1);
+  buf2.set(0, 0, 'a'); buf2.set(1, 0, 'X'); buf2.set(2, 0, 'c'); buf2.set(3, 0, 'd');
+  back.draw(buf2);
+  // One new write for the diff
+  expect(writes.length).toBe(beforeLen + 1);
+  const diff = writes[writes.length - 1]!;
+  // Should contain cursorTo(1, 0) = '\x1b[1;2H' and the char 'X'
+  expect(diff).toContain('\x1b[1;2H');
+  expect(diff).toContain('X');
+  // Should NOT contain 'a', 'b', 'c', 'd' as new chars — only X is rewritten
+  expect(diff).not.toContain('abcd');
+  back.dispose();
+});
+
+test('TtyBackend.draw: adjacent changes share one cursor move (run is written contiguously)', () => {
+  const { stub: out, writes } = makeStub(6, 1);
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const buf1 = new Buffer(6, 1);
+  for (let i = 0; i < 6; i++) buf1.set(i, 0, 'a');
+  back.draw(buf1);
+  const buf2 = new Buffer(6, 1);
+  buf2.set(0, 0, 'a'); buf2.set(1, 0, 'X'); buf2.set(2, 0, 'Y'); buf2.set(3, 0, 'Z'); buf2.set(4, 0, 'a'); buf2.set(5, 0, 'a');
+  back.draw(buf2);
+  const diff = writes[writes.length - 1]!;
+  // ONE cursor move to (1,0) = '\x1b[1;2H', then 'XYZ' contiguously
+  expect(diff).toContain('\x1b[1;2HXYZ');
+  // (Should NOT contain a second cursor move within the run — only the leading one.)
+  // Count CSI H sequences:
+  const cursorMoves = diff.match(/\x1b\[\d+;\d+H/g) ?? [];
+  expect(cursorMoves.length).toBe(1);
+  back.dispose();
+});
+
+test('TtyBackend.draw: style change emits SGR before the char', () => {
+  const { stub: out, writes } = makeStub(3, 1);
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const buf1 = new Buffer(3, 1);
+  buf1.set(0, 0, 'a'); buf1.set(1, 0, 'b'); buf1.set(2, 0, 'c');
+  back.draw(buf1);
+  const buf2 = new Buffer(3, 1);
+  buf2.set(0, 0, 'a'); buf2.set(1, 0, 'b', { bold: true, fg: 'red' }); buf2.set(2, 0, 'c');
+  back.draw(buf2);
+  const diff = writes[writes.length - 1]!;
+  // Cursor to (1,0); SGR for bold + red (1;31); 'b'; reset trailing
+  expect(diff).toContain('\x1b[1;2H');
+  expect(diff).toContain('\x1b[1;31m');
+  expect(diff).toContain('b');
+  back.dispose();
+});
+
+test('TtyBackend.draw: first frame still does a full redraw (CLEAR + full content)', () => {
+  const { stub: out, writes } = makeStub(3, 1);
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const before = writes.length;
+  const buf = new Buffer(3, 1);
+  buf.set(0, 0, 'a'); buf.set(1, 0, 'b'); buf.set(2, 0, 'c');
+  back.draw(buf);
+  const drawWrite = writes[before]!;
+  // Existing M0 contract: CLEAR + content + RESET
+  expect(drawWrite.startsWith(CLEAR)).toBe(true);
+  expect(drawWrite).toContain('abc');
+  expect(drawWrite.endsWith(RESET)).toBe(true);
+  back.dispose();
+});

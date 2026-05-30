@@ -1,7 +1,7 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import type { Buffer, Style } from '../cells.js';
 import type { Key } from '../keys.js';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, CLEAR, HIDE_CURSOR, RESET, SHOW_CURSOR, sgr } from '../ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, CLEAR, HIDE_CURSOR, RESET, SHOW_CURSOR, cellsEqual, cursorTo, sgr } from '../ansi.js';
 import { parseKeypress } from '../key-parser.js';
 import type { Backend } from './types.js';
 
@@ -31,6 +31,7 @@ export class TtyBackend implements Backend {
     for (const h of [...this.resizeSubscribers]) h();
   };
   private resizeAttached = false;
+  private previousBuffer: Buffer | null = null;
 
   constructor(
     private readonly out: NodeJS.WriteStream = process.stdout,
@@ -47,9 +48,22 @@ export class TtyBackend implements Backend {
     return { width: this.out.columns ?? 80, height: this.out.rows ?? 24 };
   }
 
-  // M0: full-frame redraw (no diffing). Clears, then writes every line with
-  // per-cell SGR. Frame-diffing is a later optimization behind this same seam.
   draw(buffer: Buffer): void {
+    if (
+      this.previousBuffer === null ||
+      this.previousBuffer.width !== buffer.width ||
+      this.previousBuffer.height !== buffer.height
+    ) {
+      this.drawFull(buffer);
+    } else {
+      this.drawDiff(this.previousBuffer, buffer);
+    }
+    this.previousBuffer = buffer;
+  }
+
+  // Extracted from the original draw — full-frame redraw with CLEAR and per-line
+  // SGR runs. Used on the first frame and after size changes.
+  private drawFull(buffer: Buffer): void {
     let outStr = CLEAR;
     for (let y = 0; y < buffer.height; y++) {
       let line = '';
@@ -66,6 +80,45 @@ export class TtyBackend implements Backend {
       outStr += line + RESET + (y < buffer.height - 1 ? '\n' : '');
     }
     this.out.write(outStr);
+  }
+
+  // Emit only cells that differ from `prev`. Adjacency optimization: when the
+  // previous emitted cell was at (x-1, y), skip the cursor positioning for the
+  // next cell — characters flow naturally to the right after a write.
+  // Style state is tracked across all changes so we only emit SGR when needed.
+  private drawDiff(prev: Buffer, next: Buffer): void {
+    let out = '';
+    // The terminal pen is always at RESET after a drawFull or drawDiff call
+    // (both end with a trailing RESET). Initialize the pen to the default/reset
+    // style so we skip needless RESET+sgr for cells that carry an empty style.
+    let penStyle: Style = {};
+    let lastX = -2;
+    let lastY = -2;
+
+    for (let y = 0; y < next.height; y++) {
+      for (let x = 0; x < next.width; x++) {
+        const a = prev.get(x, y);
+        const b = next.get(x, y);
+        if (cellsEqual(a, b)) continue;
+
+        // Cursor move iff this cell isn't immediately right of the prior emitted one.
+        if (!(y === lastY && x === lastX + 1)) {
+          out += cursorTo(x, y);
+        }
+        // Style change iff the pen's style doesn't already match.
+        if (JSON.stringify(b.style) !== JSON.stringify(penStyle)) {
+          out += RESET + sgr(b.style);
+          penStyle = b.style;
+        }
+        out += b.char;
+        lastX = x;
+        lastY = y;
+      }
+    }
+
+    if (out !== '') {
+      this.out.write(out + RESET);
+    }
   }
 
   onResize(handler: () => void): () => void {
