@@ -64,6 +64,7 @@ export function sgr(style: Style): string {
   if (style.dim) parts.push('2');
   if (style.underline) parts.push('4');
   if (style.inverse) parts.push('7');
+  if (style.strikethrough) parts.push('9');
   if (style.fg) {
     const rgb = parseColor(style.fg);
     if (rgb) {

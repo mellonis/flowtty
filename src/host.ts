@@ -30,6 +30,7 @@ export interface BoxProps {
   dim?: boolean;
   underline?: boolean;
   inverse?: boolean;
+  strikethrough?: boolean;
   // Box background fill:
   backgroundColor?: string;
   // Border drawn around the box (one cell on each side). When set, Yoga

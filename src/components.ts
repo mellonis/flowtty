@@ -12,6 +12,7 @@ export interface TextProps {
   dim?: boolean;
   underline?: boolean;
   inverse?: boolean;
+  strikethrough?: boolean;
   /** Default 'none' (no wrap). 'wrap' = word-wrap with char-wrap fallback. 'truncate' = single-cell ellipsis. */
   wrap?: 'wrap' | 'truncate' | 'none';
 }

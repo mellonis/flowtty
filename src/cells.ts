@@ -5,6 +5,7 @@ export interface Style {
   dim?: boolean;
   underline?: boolean;
   inverse?: boolean;
+  strikethrough?: boolean;
 }
 
 export interface Cell {
