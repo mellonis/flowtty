@@ -13,4 +13,4 @@ export function getYoga(): Promise<Yoga> {
 }
 
 // Re-export the enums the rest of the renderer needs.
-export { FlexDirection, MeasureMode } from 'yoga-layout/load';
+export { FlexDirection, MeasureMode, PositionType, Edge, Justify, Align } from 'yoga-layout/load';

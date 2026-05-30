@@ -50,3 +50,50 @@ test('measure func: no wrap (default) returns natural single-line width', async 
   expect(parent.yogaNode.getComputedWidth()).toBe(11);
   expect(parent.yogaNode.getComputedHeight()).toBe(1);
 });
+
+test('position absolute + top/left positions the node at fixed coords inside its parent', async () => {
+  const Yoga = await getYoga();
+  const parent = createInstance('flowtty-box', { width: 20, height: 10 }, Yoga);
+  const child = createInstance('flowtty-box', { position: 'absolute', top: 3, left: 5, width: 4, height: 2 }, Yoga);
+  appendChild(parent, child, Yoga);
+  parent.yogaNode.calculateLayout(undefined, undefined);
+  expect(child.yogaNode.getComputedTop()).toBe(3);
+  expect(child.yogaNode.getComputedLeft()).toBe(5);
+  expect(child.yogaNode.getComputedWidth()).toBe(4);
+  expect(child.yogaNode.getComputedHeight()).toBe(2);
+});
+
+test('width: "100%" sizes child to parent width', async () => {
+  const Yoga = await getYoga();
+  const parent = createInstance('flowtty-box', { width: 30, height: 5 }, Yoga);
+  const child = createInstance('flowtty-box', { width: '100%', height: 2 }, Yoga);
+  appendChild(parent, child, Yoga);
+  parent.yogaNode.calculateLayout(undefined, undefined);
+  expect(child.yogaNode.getComputedWidth()).toBe(30);
+});
+
+test('justifyContent center + alignItems center centers a child in its parent', async () => {
+  const Yoga = await getYoga();
+  // 20x10 parent, child 4x2 → centered should be at top=4, left=8
+  const parent = createInstance('flowtty-box', {
+    width: 20, height: 10,
+    justifyContent: 'center', alignItems: 'center',
+  }, Yoga);
+  const child = createInstance('flowtty-box', { width: 4, height: 2 }, Yoga);
+  appendChild(parent, child, Yoga);
+  parent.yogaNode.calculateLayout(undefined, undefined);
+  expect(child.yogaNode.getComputedTop()).toBe(4);
+  expect(child.yogaNode.getComputedLeft()).toBe(8);
+});
+
+test('back-compat: a box without new props lays out exactly as before (auto size, static, FlexStart)', async () => {
+  const Yoga = await getYoga();
+  const parent = createInstance('flowtty-box', { width: 10, height: 3 }, Yoga);
+  const child = createInstance('flowtty-box', { width: 5, height: 2 }, Yoga);
+  appendChild(parent, child, Yoga);
+  parent.yogaNode.calculateLayout(undefined, undefined);
+  expect(child.yogaNode.getComputedTop()).toBe(0);
+  expect(child.yogaNode.getComputedLeft()).toBe(0);
+  expect(child.yogaNode.getComputedWidth()).toBe(5);
+  expect(child.yogaNode.getComputedHeight()).toBe(2);
+});
