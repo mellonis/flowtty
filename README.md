@@ -159,6 +159,37 @@ Useful for media-style panels where you want a fixed shape regardless of contain
 
 Useful for tab panels, collapsible sections, and conditional UI where remounting would lose form state, scroll position, or other ephemeral state.
 
+### Size awareness
+
+Two complementary primitives for components that need to know their allocated space.
+
+**`onLayout` (per-box, nested-friendly):**
+
+```tsx
+<Box onLayout={(rect) => {/* rect = { left, top, width, height } */}}>
+```
+
+Fires after layout with this box's computed rect. Use for components inside a flexbox layout (e.g. an `<ArticleReader>` in a 70% panel needs to paginate against the panel's width, not the terminal's). **Diff before `setState`** — onLayout fires on every paint; unconditionally setting state with a new object infinite-loops:
+
+```tsx
+<Box flexGrow={1} onLayout={(r) => {
+  if (!size || size.width !== r.width || size.height !== r.height) setSize(r);
+}}>
+```
+
+**`useTerminalSize()` (whole terminal):**
+
+```tsx
+import { useTerminalSize } from 'flowtty';
+
+function App() {
+  const { width, height } = useTerminalSize();
+  return <Box width={width} height={height}>…</Box>;
+}
+```
+
+Returns the current terminal size; re-renders on `backend.onResize` (TTY) or initial-only (TestBackend / fixed-size). Useful for full-screen apps that own the terminal. For nested components, prefer `onLayout`.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
