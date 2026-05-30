@@ -1,4 +1,4 @@
-import { describe, expect, test } from 'vitest';
+import { describe, expect, test, vi } from 'vitest';
 import { createElement, type ReactNode } from 'react';
 import { render } from './index.js';
 import { TestBackend, flushAsync } from './testing.js';
@@ -6,6 +6,8 @@ import { DialogHost } from './dialog-host.js';
 import { useDialog, useDialogHost } from './use-dialog.js';
 import { useInput } from './use-input.js';
 import type { DialogResult, DialogResultApi } from './dialog-context.js';
+import { Box } from './components.js';
+import { Button } from './button.js';
 
 describe('DialogHost stack', () => {
   test('two consecutive openDialog calls stack instead of cancelling', async () => {
@@ -184,6 +186,87 @@ describe('DialogHost stack', () => {
     backend.press({ name: 'b', sequence: 'b', ctrl: false, meta: false, shift: false });
     await flushAsync();
     expect(hostKeys).toEqual(['a']); // 'b' did NOT reach host
+    handle.unmount();
+  });
+
+  test('each dialog has its own focus scope; Tab cycles within top dialog only', async () => {
+    const backend = new TestBackend(30, 10);
+    let openD!: <T>(el: ReactNode) => Promise<DialogResult<T>>;
+    let topApi: DialogResultApi | null = null;
+
+    const lowerBtn1 = vi.fn();
+    const lowerBtn2 = vi.fn();
+    const upperBtn1 = vi.fn();
+    const upperBtn2 = vi.fn();
+
+    function Host() {
+      const { openDialog } = useDialogHost();
+      openD = openDialog;
+      return null;
+    }
+    function CaptureApi() {
+      topApi = useDialog();
+      return null;
+    }
+
+    const handle = await render(
+      createElement(DialogHost, {}, createElement(Host)),
+      backend,
+    );
+    await flushAsync();
+
+    // Open lower dialog with 2 buttons.
+    openD(
+      createElement(Box, { flexDirection: 'column' },
+        createElement(Button, { label: 'L1', onPress: lowerBtn1 }),
+        createElement(Button, { label: 'L2', onPress: lowerBtn2 }),
+      ),
+    );
+    await flushAsync();
+
+    // Open upper dialog with 2 buttons + api capture.
+    openD(
+      createElement(Box, { flexDirection: 'column' },
+        createElement(Button, { label: 'U1', onPress: upperBtn1 }),
+        createElement(Button, { label: 'U2', onPress: upperBtn2 }),
+        createElement(CaptureApi),
+      ),
+    );
+    await flushAsync();
+    await flushAsync();
+
+    // Upper dialog is active; U1 is auto-focused. Enter fires U1.
+    backend.press({ name: 'return' });
+    await flushAsync();
+    expect(upperBtn1).toHaveBeenCalledTimes(1);
+    expect(lowerBtn1).not.toHaveBeenCalled();
+
+    // Tab in upper moves focus to U2. Enter fires U2.
+    backend.press({ name: 'tab' });
+    await flushAsync();
+    backend.press({ name: 'return' });
+    await flushAsync();
+    expect(upperBtn2).toHaveBeenCalledTimes(1);
+    expect(lowerBtn1).not.toHaveBeenCalled();
+    expect(lowerBtn2).not.toHaveBeenCalled();
+
+    // Close the top dialog.
+    topApi!.done(null);
+    await flushAsync();
+
+    // Lower dialog is now top. Its FocusGroup was never reset — L1 is still
+    // auto-focused (it was first to register and focus was never stolen).
+    backend.press({ name: 'return' });
+    await flushAsync();
+    expect(lowerBtn1).toHaveBeenCalledTimes(1);
+
+    // Tab in lower moves focus to L2. Enter fires L2.
+    backend.press({ name: 'tab' });
+    await flushAsync();
+    backend.press({ name: 'return' });
+    await flushAsync();
+    expect(lowerBtn2).toHaveBeenCalledTimes(1);
+
     handle.unmount();
   });
 });

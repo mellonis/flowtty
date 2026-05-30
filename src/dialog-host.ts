@@ -9,6 +9,7 @@ import {
   type DialogResult,
   type DialogResultApi,
 } from './dialog-context.js';
+import { FocusGroup } from './focus-group.js';
 
 interface PendingDialog {
   element: ReactNode;
@@ -65,7 +66,7 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
     createElement(
       InputContext.Provider,
       { value: hasOpenDialog ? mutedSource : outerSource },
-      props.children,
+      createElement(FocusGroup, { isActive: !hasOpenDialog }, props.children),
     ),
     // Stack: render each dialog as a full-screen absolute overlay in stack
     // order. Tree order = paint order (M1f two-pass) so the top stack entry
@@ -90,7 +91,9 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
           // from lower dialogs (e.g. via async timers) would pop the wrong
           // entry. Accept that constraint; flag in README if it bites.
           createElement(DialogResultContext.Provider, { value: dialogApi },
-            createElement(DialogIsTopContext.Provider, { value: isTop }, d.element),
+            createElement(DialogIsTopContext.Provider, { value: isTop },
+              createElement(FocusGroup, { isActive: isTop }, d.element),
+            ),
           ),
         ),
       );
