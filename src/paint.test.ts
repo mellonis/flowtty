@@ -487,3 +487,116 @@ describe('Box margin', () => {
     expect(buf.get(2, 0).style.bg).toBe('blue');
   });
 });
+
+describe('Box gap', () => {
+  test('gap shorthand: row flex spaces siblings horizontally', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Three 1×1 children in a 5×1 row flex with gap:1 → x positions 0, 2, 4
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', gap: 1, width: 5, height: 1 },
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'green' }),
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 5, 1);
+    const buf = paint(container, 5, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBeUndefined(); // gap
+    expect(buf.get(2, 0).style.bg).toBe('green');
+    expect(buf.get(3, 0).style.bg).toBeUndefined(); // gap
+    expect(buf.get(4, 0).style.bg).toBe('blue');
+  });
+
+  test('gap shorthand: column flex spaces siblings vertically', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Three 1×1 children in a 1×5 column flex with gap:1 → y positions 0, 2, 4
+    root.render(
+      createElement('flowtty-box', { gap: 1, width: 1, height: 5 },
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'green' }),
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 1, 5);
+    const buf = paint(container, 1, 5);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(0, 1).style.bg).toBeUndefined(); // gap
+    expect(buf.get(0, 2).style.bg).toBe('green');
+    expect(buf.get(0, 3).style.bg).toBeUndefined(); // gap
+    expect(buf.get(0, 4).style.bg).toBe('blue');
+  });
+
+  test('rowGap controls vertical spacing in column flex', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // rowGap:2 between two 1×1 children in a column flex → y positions 0 and 3
+    root.render(
+      createElement('flowtty-box', { rowGap: 2, width: 1, height: 4 },
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 1, 4);
+    const buf = paint(container, 1, 4);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(0, 1).style.bg).toBeUndefined();
+    expect(buf.get(0, 2).style.bg).toBeUndefined();
+    expect(buf.get(0, 3).style.bg).toBe('blue');
+  });
+
+  test('columnGap controls horizontal spacing in row flex', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // columnGap:2 between two 1×1 children in a row flex → x positions 0 and 3
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', columnGap: 2, width: 4, height: 1 },
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 1);
+    const buf = paint(container, 4, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBeUndefined();
+    expect(buf.get(2, 0).style.bg).toBeUndefined();
+    expect(buf.get(3, 0).style.bg).toBe('blue');
+  });
+
+  test('per-axis gap overrides shorthand (columnGap wins over gap on row axis)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // gap:2 (shorthand) + columnGap:0 (axis) — horizontal spacing should be 0
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', gap: 2, columnGap: 0, width: 2, height: 1 },
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 2, 1);
+    const buf = paint(container, 2, 1);
+    // No gap → siblings flush at x=0 and x=1
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBe('blue');
+  });
+
+  test('gap does not apply at the leading/trailing edges (only between siblings)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Two 1×1 children in a 3×1 row flex with gap:1 → first child at x=0, second at x=2.
+    // If gap were applied at the start, first child would be at x=1, not x=0.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', gap: 1, width: 3, height: 1 },
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 3, 1);
+    const buf = paint(container, 3, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');   // flush left, no leading gap
+    expect(buf.get(1, 0).style.bg).toBeUndefined(); // the one gap, between
+    expect(buf.get(2, 0).style.bg).toBe('blue');
+  });
+});

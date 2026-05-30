@@ -1,4 +1,4 @@
-import { Align, Edge, FlexDirection, Justify, MeasureMode, PositionType, type Yoga, type YogaNode } from './yoga.js';
+import { Align, Edge, FlexDirection, Gutter, Justify, MeasureMode, PositionType, type Yoga, type YogaNode } from './yoga.js';
 import { wrapText, type WrapMode } from './wrap.js';
 import type { BorderStyle } from './borders.js';
 
@@ -54,6 +54,12 @@ export interface BoxProps {
   marginRight?: number;
   marginBottom?: number;
   marginLeft?: number;
+  // Gap between flex children (cells). Per-axis wins over shorthand.
+  // CSS convention: rowGap = gap BETWEEN rows (vertical spacing in column flex);
+  // columnGap = gap BETWEEN columns (horizontal spacing in row flex).
+  gap?: number;
+  rowGap?: number;
+  columnGap?: number;
 }
 
 export interface Instance {
@@ -136,6 +142,13 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   n.setMargin(Edge.Right, marRight);
   n.setMargin(Edge.Bottom, marBottom);
   n.setMargin(Edge.Left, marLeft);
+
+  // Gap between siblings — per-axis ?? shorthand ?? 0.
+  // Always set so removing the prop re-renders correctly.
+  const rGap = props.rowGap    ?? props.gap ?? 0;
+  const cGap = props.columnGap ?? props.gap ?? 0;
+  n.setGap(Gutter.Row, rGap);
+  n.setGap(Gutter.Column, cGap);
 
   // Alignment.
   n.setJustifyContent(jcMap(props.justifyContent));
