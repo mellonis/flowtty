@@ -1,4 +1,4 @@
-import { Align, Edge, FlexDirection, Gutter, Justify, MeasureMode, PositionType, type Yoga, type YogaNode } from './yoga.js';
+import { Align, Edge, FlexDirection, Gutter, Justify, MeasureMode, PositionType, Wrap, type Yoga, type YogaNode } from './yoga.js';
 import { wrapText, type WrapMode } from './wrap.js';
 import type { BorderStyle } from './borders.js';
 
@@ -67,6 +67,9 @@ export interface BoxProps {
   flexGrow?: number;
   flexShrink?: number;
   flexBasis?: number | 'auto' | `${number}%`;
+  // Multi-line flex: 'wrap' / 'wrap-reverse' lets children flow onto additional lines
+  // when they overflow the main axis. Default 'nowrap'.
+  flexWrap?: 'nowrap' | 'wrap' | 'wrap-reverse';
 }
 
 export interface Instance {
@@ -170,9 +173,20 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
     n.setFlexBasisAuto();
   }
 
+  // flex-wrap → Yoga Wrap enum. Always set so removing the prop re-renders correctly.
+  n.setFlexWrap(wrapMap(props.flexWrap));
+
   // Alignment.
   n.setJustifyContent(jcMap(props.justifyContent));
   n.setAlignItems(aiMap(props.alignItems));
+}
+
+function wrapMap(v: BoxProps['flexWrap']): number {
+  switch (v) {
+    case 'wrap':         return Wrap.Wrap;
+    case 'wrap-reverse': return Wrap.WrapReverse;
+    default:             return Wrap.NoWrap;
+  }
 }
 
 function jcMap(v: BoxProps['justifyContent']): number {

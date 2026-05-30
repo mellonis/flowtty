@@ -718,3 +718,95 @@ describe('Box flex sizing', () => {
     expect(buf.get(7, 0).style.bg).toBe('blue');
   });
 });
+
+describe('Box flexWrap', () => {
+  test('flexWrap="wrap": children that exceed main axis wrap to the next line', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 4×2 row flex, three 2-wide children. AA + BB fit on line 1 (4 wide total),
+    // CC wraps to line 2.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', flexWrap: 'wrap', width: 4, height: 2 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'green' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 2);
+    const buf = paint(container, 4, 2);
+    // Line 1
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBe('green');
+    expect(buf.get(3, 0).style.bg).toBe('green');
+    // Line 2 (wrapped)
+    expect(buf.get(0, 1).style.bg).toBe('blue');
+    expect(buf.get(1, 1).style.bg).toBe('blue');
+  });
+
+  test('default flexWrap is "nowrap" — children overflow the parent rather than wrap', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Same children, no flexWrap. Total width 6 > parent 4; third child overflows past x=4.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 4, height: 1 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'green' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    // Give canvas room to render the overflow so we can observe it.
+    computeLayout(container, 6, 1);
+    const buf = paint(container, 6, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBe('green');
+    expect(buf.get(4, 0).style.bg).toBe('blue');
+    expect(buf.get(5, 0).style.bg).toBe('blue');
+  });
+
+  test('flexWrap="wrap-reverse": wrap lines stack in reverse cross-axis order', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Same scenario as the "wrap" test but with wrap-reverse. The line that would
+    // normally land at y=0 ends up at y=1, and the wrapped line lands at y=0.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', flexWrap: 'wrap-reverse', width: 4, height: 2 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'green' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 2);
+    const buf = paint(container, 4, 2);
+    // Wrapped (last) line is at TOP
+    expect(buf.get(0, 0).style.bg).toBe('blue');
+    expect(buf.get(1, 0).style.bg).toBe('blue');
+    // First line is at BOTTOM
+    expect(buf.get(0, 1).style.bg).toBe('red');
+    expect(buf.get(2, 1).style.bg).toBe('green');
+  });
+
+  test('flexWrap="wrap" + rowGap: lines are separated by rowGap cells', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 4×3 row flex with wrap + rowGap:1. AA BB at y=0, gap at y=1, CC at y=2.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', flexWrap: 'wrap', rowGap: 1, width: 4, height: 3 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'green' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 3);
+    const buf = paint(container, 4, 3);
+    // Line 1 at y=0
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBe('green');
+    // rowGap at y=1 (no bg)
+    expect(buf.get(0, 1).style.bg).toBeUndefined();
+    expect(buf.get(2, 1).style.bg).toBeUndefined();
+    // Wrapped line at y=2
+    expect(buf.get(0, 2).style.bg).toBe('blue');
+    expect(buf.get(1, 2).style.bg).toBe('blue');
+  });
+});
