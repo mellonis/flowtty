@@ -12,15 +12,77 @@ const BG: Record<string, number> = {
   blue: 44, magenta: 45, cyan: 46, white: 47,
 };
 
+/**
+ * Parse a color string into 0–255 RGB components.
+ * Accepts:
+ *   - "#rgb"     — 3-digit hex, each digit doubled (e.g. "#f80" → ff,88,00)
+ *   - "#rrggbb"  — 6-digit hex
+ *   - "rgb(R, G, B)" — CSS-style, each channel 0–255 integer
+ * Returns null for anything else (named colors, malformed, out-of-range).
+ * Callers should fall back to a named-color map on null.
+ */
+export function parseColor(input: string): { r: number; g: number; b: number } | null {
+  if (typeof input !== 'string' || input.length === 0) return null;
+  const s = input.trim();
+
+  // Hex form
+  if (s.startsWith('#')) {
+    const hex = s.slice(1);
+    if (hex.length === 3) {
+      if (!/^[0-9a-fA-F]{3}$/.test(hex)) return null;
+      const r = parseInt(hex[0]! + hex[0]!, 16);
+      const g = parseInt(hex[1]! + hex[1]!, 16);
+      const b = parseInt(hex[2]! + hex[2]!, 16);
+      return { r, g, b };
+    }
+    if (hex.length === 6) {
+      if (!/^[0-9a-fA-F]{6}$/.test(hex)) return null;
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return { r, g, b };
+    }
+    return null;
+  }
+
+  // rgb(r, g, b) form
+  const m = /^rgb\(\s*(-?\d+)\s*,\s*(-?\d+)\s*,\s*(-?\d+)\s*\)$/i.exec(s);
+  if (m) {
+    const r = Number(m[1]);
+    const g = Number(m[2]);
+    const b = Number(m[3]);
+    if (r < 0 || r > 255 || g < 0 || g > 255 || b < 0 || b > 255) return null;
+    return { r, g, b };
+  }
+
+  return null;
+}
+
 export function sgr(style: Style): string {
-  const codes: number[] = [];
-  if (style.bold) codes.push(1);
-  if (style.dim) codes.push(2);
-  if (style.underline) codes.push(4);
-  if (style.inverse) codes.push(7);
-  if (style.fg && FG[style.fg] !== undefined) codes.push(FG[style.fg]!);
-  if (style.bg && BG[style.bg] !== undefined) codes.push(BG[style.bg]!);
-  return codes.length ? `\x1b[${codes.join(';')}m` : '';
+  const parts: string[] = [];
+  if (style.bold) parts.push('1');
+  if (style.dim) parts.push('2');
+  if (style.underline) parts.push('4');
+  if (style.inverse) parts.push('7');
+  if (style.fg) {
+    const rgb = parseColor(style.fg);
+    if (rgb) {
+      parts.push(`38;2;${rgb.r};${rgb.g};${rgb.b}`);
+    } else {
+      const code = FG[style.fg];
+      if (code !== undefined) parts.push(String(code));
+    }
+  }
+  if (style.bg) {
+    const rgb = parseColor(style.bg);
+    if (rgb) {
+      parts.push(`48;2;${rgb.r};${rgb.g};${rgb.b}`);
+    } else {
+      const code = BG[style.bg];
+      if (code !== undefined) parts.push(String(code));
+    }
+  }
+  return parts.length ? `\x1b[${parts.join(';')}m` : '';
 }
 
 export const HIDE_CURSOR = '\x1b[?25l';
