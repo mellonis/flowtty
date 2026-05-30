@@ -80,3 +80,8 @@ test('unterminated CSI mid-buffer surfaces as escape (rather than swallowing sil
   const keys = parseKeypress('\x1b[');
   expect(keys[0]!.name).toBe('escape');
 });
+
+test('Shift+Tab (CSI Z) parses as tab with shift=true', () => {
+  const keys = parseKeypress('\x1b[Z');
+  expect(keys).toEqual([{ name: 'tab', sequence: '\x1b[Z', ctrl: false, meta: false, shift: true }]);
+});

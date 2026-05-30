@@ -39,6 +39,16 @@ export function parseKeypress(input: string): Key[] {
         if (j < input.length) {
           const final = input[j]!;
           const params = input.slice(i + 2, j);
+          // CSI Z = Shift+Tab (xterm backtab). Carry the shift modifier.
+          if (final === 'Z' && params === '') {
+            out.push({
+              name: 'tab',
+              sequence: input.slice(i, j + 1),
+              ctrl: false, meta: false, shift: true,
+            });
+            i = j + 1;
+            continue;
+          }
           out.push({
             name: csiName(final, params),
             sequence: input.slice(i, j + 1),
