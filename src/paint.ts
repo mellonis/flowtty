@@ -61,8 +61,15 @@ function paintInstance(
     }
   }
 
-  // 3. Recurse into child boxes, threading effectiveBg.
+  // 3. Two-pass: stack-flow children first, then absolute children on top.
+  // (Multiple absolutes at the same depth paint in tree order — later siblings
+  // overlay earlier, giving implicit z-ordering without an explicit zIndex prop.)
+  const stackFlow: Instance[] = [];
+  const absolutes: Instance[] = [];
   for (const child of inst.children) {
-    if (child.type === 'box') paintInstance(child, buffer, box.left, box.top, effectiveBg);
+    if (child.type !== 'box') continue;
+    (child.props.position === 'absolute' ? absolutes : stackFlow).push(child);
   }
+  for (const child of stackFlow) paintInstance(child, buffer, box.left, box.top, effectiveBg);
+  for (const child of absolutes) paintInstance(child, buffer, box.left, box.top, effectiveBg);
 }

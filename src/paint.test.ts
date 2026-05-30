@@ -91,3 +91,34 @@ test('paint: bg fill then text on top — text cells use textStyle (incl. its ow
   expect(buf.get(2, 0)).toEqual({ char: ' ', style: { bg: 'blue' } });
   expect(buf.get(3, 0)).toEqual({ char: ' ', style: { bg: 'blue' } });
 });
+
+test('absolute-positioned child paints ON TOP of stack-flow content (overlays correctly)', async () => {
+  const Yoga = await getYoga();
+  const { container, root } = createRoot(Yoga);
+  // 10x2 parent: a stack-flow text fills row 0; an absolute box overlays cols 2..3 with "XX"
+  root.render(
+    createElement('flowtty-box', { width: 10, height: 2 },
+      createElement('flowtty-box', { width: 10, height: 1 }, 'abcdefghij'),
+      createElement('flowtty-box', { position: 'absolute', top: 0, left: 2, width: 2, height: 1 }, 'XX'),
+    ),
+  );
+  computeLayout(container, 10, 2);
+  const buf = paint(container, 10, 2);
+  // Row 0: 'ab' + 'XX' overlay + 'efghij'
+  expect(buf.toString().split('\n')[0]).toBe('abXXefghij');
+});
+
+test('multiple absolute siblings paint in tree order (later overlays earlier)', async () => {
+  const Yoga = await getYoga();
+  const { container, root } = createRoot(Yoga);
+  root.render(
+    createElement('flowtty-box', { width: 6, height: 1 },
+      createElement('flowtty-box', { position: 'absolute', top: 0, left: 0, width: 4, height: 1 }, 'AAAA'),
+      createElement('flowtty-box', { position: 'absolute', top: 0, left: 2, width: 4, height: 1 }, 'BBBB'),
+    ),
+  );
+  computeLayout(container, 6, 1);
+  const buf = paint(container, 6, 1);
+  // 'AAAA' (0-3) then 'BBBB' (2-5) → overlays AAAA at 2,3 → 'AABBBB'
+  expect(buf.toString()).toBe('AABBBB');
+});
