@@ -138,3 +138,17 @@ In a test that does `computeLayout(container, 20, 1)`, a Box with `width: '100%'
 Hardcoded cursor glyph (`█` block) in `text-input.ts`. No blink (would need timer-driven re-render).
 
 **Action:** add an app-level config (or per-TextInput prop) for `cursorGlyph: string` and optional `cursorBlink: boolean`. Blink requires a timer that toggles a state in TextInput → re-render; probably opt-in only since it adds animation overhead.
+
+---
+
+## Delete / publish / withdraw (Task 6)
+
+### `setDraftForFolder` writes to stdout during alt-screen session
+
+`setDraftForFolder` (and `updateIdeasStatus`) call `console.log` / `console.warn` internally. These writes go to the alt-screen buffer between flowtty repaints. TtyBackend's full-redraw overwrites them on the next frame (invisible in practice) but the pattern is fragile: any stdout write during alt-screen can cause a 1-frame blip.
+
+**Action:** flowtty should document (or enforce) that `process.stdout.write` and `console.log` are unsafe during an active TtyBackend session. A warning shim that throws or bufffers all stdout writes while alt-screen is active would catch this class of bug automatically. A `handle.onUnmount` hook (logged in Task 2) would also let consumers defer logging to after unmount.
+
+### `bumpKey` is not needed — `setStatusMessage` triggers re-render + fresh disk read
+
+After `setDraftForFolder` resolves, calling `setStatusMessage('published: <id>')` causes React to re-render; `ListView` calls `listFolders()` + `statusOf()` fresh from disk on every render, so the updated draft state appears automatically. No extra counter state required.
