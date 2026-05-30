@@ -269,6 +269,24 @@ function App() {
 }
 ```
 
+### DialogHost (stack)
+
+`<DialogHost>` lets components anywhere in its subtree open dialogs via
+`useDialogHost().openDialog(element)`. Each call **pushes** a new dialog on
+top of the stack — previously open dialogs stay alive, render behind the new
+one, and only receive input when they become the top of the stack again.
+
+`useDialog().done(value)` / `.cancel()` **pop** the top dialog, resolving the
+`openDialog` promise it returned. Lower stack entries are untouched.
+
+**Input gating:**
+
+- Host content's `useInput` is muted whenever ANY dialog is open.
+- Lower dialogs' `useInput` is muted while a higher dialog is on top.
+- Only the topmost dialog receives keys.
+
+**Caveat:** all dialogs share a single `dialogApi` instance — calling `done()` or `cancel()` always pops the TOP, regardless of which dialog component triggered it. Since input is gated to the top dialog, normal user-driven flows are safe; the edge case is async side-effects from a lower dialog (e.g. a useEffect / setTimeout) that calls `done` after a new dialog opened on top — it would pop the wrong entry. Wrap async work in `isMounted` guards if you need to be paranoid.
+
 ## Usage (M0)
 
 ```tsx

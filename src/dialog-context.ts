@@ -11,7 +11,9 @@ export interface DialogHostApi {
    * Mount `element` as a modal dialog. Returns a promise that resolves when
    * the dialog calls done(value) (→ {status:'done',value}) or cancel()
    * (→ {status:'cancelled'}). Calling openDialog while one is already open
-   * REPLACES the current dialog (stacking is out of scope for M1c.4).
+   * PUSHES a new dialog on top of the stack — previously open dialogs stay
+   * alive, render behind the new one, and receive input again when the top
+   * dialog is closed.
    */
   openDialog<T = unknown>(element: ReactNode): Promise<DialogResult<T>>;
 }
