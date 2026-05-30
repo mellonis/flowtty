@@ -244,8 +244,13 @@ function aiMap(v: BoxProps['alignItems']): number {
   switch (v) {
     case 'center': return Align.Center;
     case 'flex-end': return Align.FlexEnd;
-    case 'stretch': return Align.Stretch;
-    default: return Align.FlexStart;
+    case 'flex-start': return Align.FlexStart;
+    // Default 'stretch' (matches React Native; deviates from CSS flex-start).
+    // Rationale: most TUI use cases want children to fill cross-axis (e.g. a
+    // column dialog wants its TextInput/buttons to span the dialog width); CSS's
+    // flex-start default forces content-sizing which causes percentage children
+    // to collapse and onLayout-driven scroll to misreport viewport widths.
+    default: return Align.Stretch;
   }
 }
 
