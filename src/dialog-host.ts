@@ -15,30 +15,34 @@ interface PendingDialog {
 }
 
 export function DialogHost(props: { children?: ReactNode }): ReactNode {
-  // Capture the outer InputSource ONCE per mount. We'll swap between this
-  // (host can hear keys) and a muted no-op source (dialog open → host muted).
   const outerSource = useContext(InputContext);
-  const [dialog, setDialog] = useState<PendingDialog | null>(null);
+  const [stack, setStack] = useState<PendingDialog[]>([]);
 
   const mutedSource = useMemo<InputSource>(
     () => ({ subscribe: () => () => {} }),
     [],
   );
 
+  // Pop the top dialog, resolve it with the given result. Lower stack entries
+  // are untouched (still rendered, still pending their own resolution).
   const close = useCallback((result: DialogResult<unknown>) => {
-    setDialog((current) => {
-      if (current) current.resolve(result);
-      return null;
+    setStack((s) => {
+      if (s.length === 0) return s;
+      const top = s[s.length - 1]!;
+      top.resolve(result);
+      return s.slice(0, -1);
     });
   }, []);
 
+  // Push a new dialog onto the top of the stack. Previous dialogs are NOT
+  // cancelled — they stay open, just visually behind + input-muted until the
+  // newly-opened dialog closes.
   const openDialog = useCallback(<T,>(element: ReactNode): Promise<DialogResult<T>> => {
     return new Promise<DialogResult<T>>((resolve) => {
-      setDialog((current) => {
-        // M1c.4 doesn't stack — opening while one is open cancels the prior.
-        if (current) current.resolve({ status: 'cancelled' } as DialogResult<unknown>);
-        return { element, resolve: resolve as (r: DialogResult<unknown>) => void };
-      });
+      setStack((s) => [
+        ...s,
+        { element, resolve: resolve as (r: DialogResult<unknown>) => void },
+      ]);
     });
   }, []);
 
@@ -51,32 +55,42 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
     [close],
   );
 
+  const hasOpenDialog = stack.length > 0;
+
   return createElement(
     DialogHostContext.Provider,
     { value: hostApi },
+    // Host content: muted when ANY dialog is open.
     createElement(
       InputContext.Provider,
-      { value: dialog ? mutedSource : outerSource },
+      { value: hasOpenDialog ? mutedSource : outerSource },
       props.children,
     ),
-    dialog
-      ? createElement(
-          Box,
-          {
-            // Full-screen absolute overlay; flexbox centers the dialog content.
-            // Resolves the M1c.4 "renders below host" visual caveat — the paint
-            // two-pass (M1f T2) ensures this Box overlays the host content.
-            position: 'absolute',
-            top: 0, left: 0,
-            width: '100%', height: '100%',
-            justifyContent: 'center', alignItems: 'center',
-          },
-          createElement(
-            InputContext.Provider,
-            { value: outerSource },
-            createElement(DialogResultContext.Provider, { value: dialogApi }, dialog.element),
-          ),
-        )
-      : null,
+    // Stack: render each dialog as a full-screen absolute overlay in stack
+    // order. Tree order = paint order (M1f two-pass) so the top stack entry
+    // paints on top of lower entries. Input gating: only the topmost dialog
+    // gets the real outerSource; lower dialogs get mutedSource.
+    ...stack.map((d, i) => {
+      const isTop = i === stack.length - 1;
+      return createElement(
+        Box,
+        {
+          key: i,
+          position: 'absolute',
+          top: 0, left: 0,
+          width: '100%', height: '100%',
+          justifyContent: 'center', alignItems: 'center',
+        },
+        createElement(
+          InputContext.Provider,
+          { value: isTop ? outerSource : mutedSource },
+          // dialogApi resolves the TOP — all dialogs share the same instance,
+          // but only the top dialog can interact (input is gated), so calls
+          // from lower dialogs (e.g. via async timers) would pop the wrong
+          // entry. Accept that constraint; flag in README if it bites.
+          createElement(DialogResultContext.Provider, { value: dialogApi }, d.element),
+        ),
+      );
+    }),
   );
 }
