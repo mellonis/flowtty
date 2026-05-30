@@ -48,6 +48,17 @@ via Yoga's per-edge border slots, so content fits inside the ring automatically.
 `borderColor` accepts the same values as `color` (named, `#rrggbb`, `rgb(...)`).
 Boxes smaller than 2×2 silently skip the border.
 
+### Padding
+
+`<Box>` accepts CSS-style padding props. Per-edge wins over axis wins over shorthand.
+
+- `padding={n}` — all four edges
+- `paddingX={n}` — left + right
+- `paddingY={n}` — top + bottom
+- `paddingTop`, `paddingRight`, `paddingBottom`, `paddingLeft` — per-edge override
+
+Values are integer cell counts. Padding and border combine — a `<Box border="single" padding={1}>` insets content by 2 cells on each side (1 border + 1 padding). `backgroundColor` fills the full rect including padding cells.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
