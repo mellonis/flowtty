@@ -21,10 +21,11 @@ export interface TextInputProps {
   isFocused?: boolean;
 }
 
-// When cursor is past the end of the value (nothing to inverse), render this
-// glyph instead. Standard text-input convention: cursor IS at a character →
-// inverse the character (so it stays visible); cursor at end → block glyph.
-const CURSOR_AT_END = '█';
+// When cursor is past the end of the value (nothing to inverse), render a
+// SPACE — combined with inverse:true that's a solid filled cell on most
+// terminals, more reliably visible than the █ block char (which can render
+// thin or unstyled on some terminal renderers).
+const CURSOR_AT_END = ' ';
 
 export function TextInput(props: TextInputProps): ReactNode {
   const { value, onChange, onSubmit, onCancel, validate, mask, isFocused = true } = props;
