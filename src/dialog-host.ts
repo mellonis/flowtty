@@ -3,6 +3,7 @@ import { Box } from './components.js';
 import { InputContext, type InputSource } from './input-context.js';
 import {
   DialogHostContext,
+  DialogIsTopContext,
   DialogResultContext,
   type DialogHostApi,
   type DialogResult,
@@ -88,7 +89,9 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
           // but only the top dialog can interact (input is gated), so calls
           // from lower dialogs (e.g. via async timers) would pop the wrong
           // entry. Accept that constraint; flag in README if it bites.
-          createElement(DialogResultContext.Provider, { value: dialogApi }, d.element),
+          createElement(DialogResultContext.Provider, { value: dialogApi },
+            createElement(DialogIsTopContext.Provider, { value: isTop }, d.element),
+          ),
         ),
       );
     }),

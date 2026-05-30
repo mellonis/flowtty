@@ -28,7 +28,7 @@ export { useField } from './use-field.js';
 export type { UseFieldOptions, FieldControl } from './use-field.js';
 export type { FormApi, FormFieldRegistration } from './form-context.js';
 export { DialogHost } from './dialog-host.js';
-export { useDialog, useDialogHost } from './use-dialog.js';
+export { useDialog, useDialogHost, useDialogIsTop } from './use-dialog.js';
 export type {
   DialogHostApi, DialogResultApi, DialogResult,
 } from './dialog-context.js';

@@ -1,6 +1,7 @@
 import { useContext } from 'react';
 import {
   DialogHostContext,
+  DialogIsTopContext,
   DialogResultContext,
   type DialogHostApi,
   type DialogResultApi,
@@ -14,4 +15,11 @@ export function useDialog(): DialogResultApi {
 /** Anywhere under a <DialogHost>: get the host's openDialog. */
 export function useDialogHost(): DialogHostApi {
   return useContext(DialogHostContext);
+}
+
+/** Inside a dialog component: true if THIS dialog is the topmost on the stack.
+ *  Lower stacked dialogs read false. Use for visual treatments that highlight
+ *  the active dialog (e.g., bold/coloured border vs. dim for inactive). */
+export function useDialogIsTop(): boolean {
+  return useContext(DialogIsTopContext);
 }

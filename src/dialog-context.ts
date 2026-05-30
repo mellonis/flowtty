@@ -32,3 +32,9 @@ const noopResult: DialogResultApi = { done() {}, cancel() {} };
 
 export const DialogHostContext = createContext<DialogHostApi>(noopHost);
 export const DialogResultContext = createContext<DialogResultApi>(noopResult);
+
+/** True when this dialog is the topmost on the stack (receives input + should
+ *  render its focused/active visual treatment). Lower stacked dialogs read false.
+ *  Outside a DialogHost the default is true (so standalone dialog components
+ *  outside a stack render in their "active" style). */
+export const DialogIsTopContext = createContext<boolean>(true);
