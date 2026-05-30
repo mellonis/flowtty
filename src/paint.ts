@@ -26,12 +26,33 @@ function textStyleOf(inst: Instance): Style {
   return style;
 }
 
+// Gate a buffer write on a clip rect. If clip is null, write unconditionally.
+function setClipped(buffer: Buffer, x: number, y: number, char: string, style: Style, clip: Rect | null): void {
+  if (clip !== null) {
+    if (x < clip.left || y < clip.top || x >= clip.left + clip.width || y >= clip.top + clip.height) return;
+  }
+  buffer.set(x, y, char, style);
+}
+
+// Intersection of two rects. Null treated as "no clip" (returns the other rect).
+// Returns an empty (width:0 / height:0) rect when there's no overlap — setClipped
+// will skip all writes against it.
+function intersectRects(a: Rect | null, b: Rect): Rect {
+  if (a === null) return b;
+  const left = Math.max(a.left, b.left);
+  const top = Math.max(a.top, b.top);
+  const right = Math.min(a.left + a.width, b.left + b.width);
+  const bottom = Math.min(a.top + a.height, b.top + b.height);
+  if (right <= left || bottom <= top) return { left, top, width: 0, height: 0 };
+  return { left, top, width: right - left, height: bottom - top };
+}
+
 // Draw the box's 8-slot border (4 corners + 4 edge runs) directly into the
 // buffer. Called BEFORE children paint so content / nested children overlay
 // the border interior. The border itself sits on the outermost cell ring of
 // the box rect; Yoga's setBorder(edge, 1) reserved those cells from layout
 // so neither own-text nor child layout will land on them.
-function paintBorder(inst: Instance, buffer: Buffer, box: Rect): void {
+function paintBorder(inst: Instance, buffer: Buffer, box: Rect, clip: Rect | null): void {
   const style = inst.props.border;
   if (!style) return;
   if (box.width < 2 || box.height < 2) return; // can't draw a border without an interior
@@ -46,20 +67,20 @@ function paintBorder(inst: Instance, buffer: Buffer, box: Rect): void {
   const y1 = box.top + box.height - 1;
 
   // Corners
-  buffer.set(x0, y0, chars.tl, cellStyle);
-  buffer.set(x1, y0, chars.tr, cellStyle);
-  buffer.set(x0, y1, chars.bl, cellStyle);
-  buffer.set(x1, y1, chars.br, cellStyle);
+  setClipped(buffer, x0, y0, chars.tl, cellStyle, clip);
+  setClipped(buffer, x1, y0, chars.tr, cellStyle, clip);
+  setClipped(buffer, x0, y1, chars.bl, cellStyle, clip);
+  setClipped(buffer, x1, y1, chars.br, cellStyle, clip);
 
   // Top + bottom edges (between corners)
   for (let x = x0 + 1; x < x1; x++) {
-    buffer.set(x, y0, chars.t, cellStyle);
-    buffer.set(x, y1, chars.b, cellStyle);
+    setClipped(buffer, x, y0, chars.t, cellStyle, clip);
+    setClipped(buffer, x, y1, chars.b, cellStyle, clip);
   }
   // Left + right edges (between corners)
   for (let y = y0 + 1; y < y1; y++) {
-    buffer.set(x0, y, chars.l, cellStyle);
-    buffer.set(x1, y, chars.r, cellStyle);
+    setClipped(buffer, x0, y, chars.l, cellStyle, clip);
+    setClipped(buffer, x1, y, chars.r, cellStyle, clip);
   }
 }
 
@@ -88,25 +109,25 @@ function paintInstance(
   offsetX: number,
   offsetY: number,
   inheritedBg: string | undefined = undefined,
+  clip: Rect | null = null,
 ): void {
   const box: Rect = layoutOf(inst, offsetX, offsetY);
   const ownBg = inst.props.backgroundColor;
   const effectiveBg = ownBg ?? inheritedBg;
 
-  // 1. Fill the box rect with own backgroundColor (if set).
+  // 1. Fill the box rect with own backgroundColor (if set). Clipped by inherited clip.
   if (ownBg !== undefined) {
     for (let y = box.top; y < box.top + box.height; y++) {
       for (let x = box.left; x < box.left + box.width; x++) {
-        buffer.set(x, y, ' ', { bg: ownBg });
+        setClipped(buffer, x, y, ' ', { bg: ownBg }, clip);
       }
     }
   }
 
-  // 1b. Draw border (if set) on the outermost ring before content paints.
-  paintBorder(inst, buffer, box);
+  // 1b. Border (if set), clipped by inherited clip.
+  paintBorder(inst, buffer, box, clip);
 
-  // 2. Paint own text (wrapped if wrap prop set) inside the content area
-  //    (rect with padding + border subtracted).
+  // 2. Own text — clipped by content rect (existing behavior) AND inherited clip.
   const text = ownText(inst);
   if (text) {
     const content = contentRectOf(inst, box);
@@ -117,14 +138,20 @@ function paintInstance(
       textStyle.bg = effectiveBg;
     }
     for (let row = 0; row < lines.length; row++) {
-      if (row >= content.height) break; // clip vertically against content area
+      if (row >= content.height) break;
       const chars = [...(lines[row] ?? '')];
       for (let col = 0; col < chars.length; col++) {
-        if (col >= content.width) break; // clip horizontally
-        buffer.set(content.left + col, content.top + row, chars[col]!, textStyle);
+        if (col >= content.width) break;
+        setClipped(buffer, content.left + col, content.top + row, chars[col]!, textStyle, clip);
       }
     }
   }
+
+  // Compute descendant clip: if this box has overflow:hidden, intersect inherited
+  // clip with this box's content rect; otherwise pass inherited through.
+  const childClip = inst.props.overflow === 'hidden'
+    ? intersectRects(clip, contentRectOf(inst, box))
+    : clip;
 
   // 3. Two-pass: stack-flow children first, then absolute children on top.
   // Within each pass, sort by zIndex (default 0). JS sort is stable per ES2019,
@@ -139,6 +166,6 @@ function paintInstance(
   const byZ = (a: Instance, b: Instance) => (a.props.zIndex ?? 0) - (b.props.zIndex ?? 0);
   stackFlow.sort(byZ);
   absolutes.sort(byZ);
-  for (const child of stackFlow) paintInstance(child, buffer, box.left, box.top, effectiveBg);
-  for (const child of absolutes) paintInstance(child, buffer, box.left, box.top, effectiveBg);
+  for (const child of stackFlow) paintInstance(child, buffer, box.left, box.top, effectiveBg, childClip);
+  for (const child of absolutes) paintInstance(child, buffer, box.left, box.top, effectiveBg, childClip);
 }

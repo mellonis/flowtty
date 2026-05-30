@@ -77,6 +77,10 @@ export interface BoxProps {
    *  Default 0. Tree order is the tiebreaker. Does NOT cross pass boundaries:
    *  absolutes always overlay stack-flow regardless of zIndex. */
   zIndex?: number;
+  /** Clip descendants to this box's content rect. Default 'visible' (no clipping).
+   *  'hidden' clips ALL descendant writes including their backgrounds and borders.
+   *  Does NOT clip this box's own background or border (those are this box's own area). */
+  overflow?: 'visible' | 'hidden';
 }
 
 export interface Instance {

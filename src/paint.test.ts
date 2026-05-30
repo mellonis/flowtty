@@ -967,3 +967,99 @@ describe('Box zIndex', () => {
     expect(buf.get(1, 0).style.bg).toBe('blue');
   });
 });
+
+describe('Box overflow', () => {
+  test('overflow="visible" (default): child extends past parent — written outside parent rect', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 2×1 with an absolute child width=4 — without clipping, child writes to x=0..3.
+    root.render(
+      createElement('flowtty-box', { width: 2, height: 1 },
+        createElement('flowtty-box', { position: 'absolute', top: 0, left: 0, width: 4, height: 1, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 4, 1);
+    const buf = paint(container, 4, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBe('red'); // outside parent — still painted
+    expect(buf.get(3, 0).style.bg).toBe('red');
+  });
+
+  test('overflow="hidden": child clipped to parent content rect — cells outside have no bg', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Same scenario with overflow:hidden — child writes only to x=0..1.
+    root.render(
+      createElement('flowtty-box', { overflow: 'hidden', width: 2, height: 1 },
+        createElement('flowtty-box', { position: 'absolute', top: 0, left: 0, width: 4, height: 1, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 4, 1);
+    const buf = paint(container, 4, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBeUndefined(); // clipped
+    expect(buf.get(3, 0).style.bg).toBeUndefined(); // clipped
+  });
+
+  test('overflow="hidden" clips own text past content rect even with padding', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // 3×1 box with padding:1 → content area is 1×0 (no vertical room). text shouldn't render
+    // (covered by existing contentRect clip), and overflow:hidden adds nothing here.
+    // Wider test: 3×1 with NO padding — content rect is 3×1, "abcde" wraps off the right.
+    // Without overflow, text overflows visually past x=2; with overflow:hidden, x=3..4 stay blank.
+    // (Note: the existing content-rect clip already cuts at content.width, so this test
+    //  primarily verifies that adding overflow:hidden doesn't BREAK the existing behavior.)
+    root.render(
+      createElement('flowtty-box', { overflow: 'hidden', width: 3, height: 1 }, 'abcde'),
+    );
+    computeLayout(container, 5, 1);
+    const buf = paint(container, 5, 1);
+    expect(buf.get(0, 0).char).toBe('a');
+    expect(buf.get(2, 0).char).toBe('c');
+    expect(buf.get(3, 0).char).toBe(' '); // outside the box — never written
+    expect(buf.get(4, 0).char).toBe(' ');
+  });
+
+  test('overflow="hidden" nested: inner clip intersects with outer clip', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Outer 3×1 overflow:hidden contains a stack-flow child 2×1 overflow:hidden, which
+    // contains an absolute child width=10. Effective clip for the grandchild is the
+    // intersection of outer (0..2) and middle (0..1) → (0..1).
+    root.render(
+      createElement('flowtty-box', { overflow: 'hidden', width: 3, height: 1 },
+        createElement('flowtty-box', { overflow: 'hidden', width: 2, height: 1 },
+          createElement('flowtty-box', { position: 'absolute', top: 0, left: 0, width: 10, height: 1, backgroundColor: 'red' }),
+        ),
+      ),
+    );
+    computeLayout(container, 5, 1);
+    const buf = paint(container, 5, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBeUndefined(); // beyond inner overflow:hidden
+    expect(buf.get(3, 0).style.bg).toBeUndefined();
+    expect(buf.get(4, 0).style.bg).toBeUndefined();
+  });
+
+  test('overflow="hidden" does NOT clip the parents own background or border', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // The parent ITSELF has overflow:hidden but renders into its own rect — bg and border fill its full 3×3 rect.
+    // (Demonstrates: overflow on a box affects DESCENDANTS, not the box's own self-drawing.)
+    root.render(
+      createElement('flowtty-box', { overflow: 'hidden', border: 'single', backgroundColor: 'blue', width: 3, height: 3 }),
+    );
+    computeLayout(container, 3, 3);
+    const buf = paint(container, 3, 3);
+    // Border corners + bg in interior all rendered normally
+    expect(buf.get(0, 0).char).toBe('┌');
+    expect(buf.get(2, 0).char).toBe('┐');
+    expect(buf.get(1, 1).style.bg).toBe('blue');
+    expect(buf.get(0, 2).char).toBe('└');
+    expect(buf.get(2, 2).char).toBe('┘');
+  });
+});
