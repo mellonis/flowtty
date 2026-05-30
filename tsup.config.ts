@@ -12,4 +12,10 @@ export default defineConfig({
   // is loaded at runtime — which, with bundled reconciler + external react, is
   // unambiguously the consumer's.
   noExternal: ['react-reconciler'],
+  // react-reconciler is CJS and contains `require('react')`. In ESM output, tsup's
+  // require shim throws "Dynamic require not supported". Inject a real require via
+  // createRequire so the shim's `typeof require !== "undefined"` branch succeeds.
+  banner: {
+    js: `import { createRequire as __flowtty_createRequire__ } from 'node:module';\nvar require = __flowtty_createRequire__(import.meta.url);`,
+  },
 });
