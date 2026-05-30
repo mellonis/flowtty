@@ -810,3 +810,91 @@ describe('Box flexWrap', () => {
     expect(buf.get(1, 2).style.bg).toBe('blue');
   });
 });
+
+describe('Box alignContent', () => {
+  test('alignContent="flex-end": wrap lines pack at the bottom (cross-axis end)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // 2 lines (2 rows used) in a 4-row parent → 2 free rows.
+    // flex-end: free space at top, line 1 at y=2, line 2 at y=3.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', flexWrap: 'wrap', alignContent: 'flex-end', width: 4, height: 4 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'green' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 4);
+    const buf = paint(container, 4, 4);
+    expect(buf.get(0, 0).style.bg).toBeUndefined(); // free
+    expect(buf.get(0, 1).style.bg).toBeUndefined(); // free
+    expect(buf.get(0, 2).style.bg).toBe('red');     // line 1
+    expect(buf.get(2, 2).style.bg).toBe('green');
+    expect(buf.get(0, 3).style.bg).toBe('blue');    // line 2
+  });
+
+  test('alignContent="center": wrap lines pack in the middle of cross-axis', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // center: 1 free row above, 1 free row below → line 1 at y=1, line 2 at y=2.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', flexWrap: 'wrap', alignContent: 'center', width: 4, height: 4 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'green' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 4);
+    const buf = paint(container, 4, 4);
+    expect(buf.get(0, 0).style.bg).toBeUndefined(); // free
+    expect(buf.get(0, 1).style.bg).toBe('red');     // line 1 centered
+    expect(buf.get(2, 1).style.bg).toBe('green');
+    expect(buf.get(0, 2).style.bg).toBe('blue');    // line 2
+    expect(buf.get(0, 3).style.bg).toBeUndefined(); // free
+  });
+
+  test('alignContent="space-between": first line at top, last at bottom, free space between', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // space-between: line 1 at y=0, line 2 at y=3, free at y=1 and y=2.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', flexWrap: 'wrap', alignContent: 'space-between', width: 4, height: 4 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'green' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 4);
+    const buf = paint(container, 4, 4);
+    expect(buf.get(0, 0).style.bg).toBe('red');     // line 1 at top
+    expect(buf.get(2, 0).style.bg).toBe('green');
+    expect(buf.get(0, 1).style.bg).toBeUndefined(); // free
+    expect(buf.get(0, 2).style.bg).toBeUndefined(); // free
+    expect(buf.get(0, 3).style.bg).toBe('blue');    // line 2 at bottom
+  });
+
+  test('alignContent="stretch": wrap lines stretch to fill cross-axis (each line 2 rows tall)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // 2 lines stretch to fill 4 rows → each line is 2 rows tall.
+    // Children with height:1 + default alignItems='flex-start' render at the TOP of their line.
+    // Line 1 spans y=0..1; children render at y=0. Line 2 spans y=2..3; children at y=2.
+    // Compare to flex-start default (lines at y=0 and y=1, free at y=2,3) to see the difference.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', flexWrap: 'wrap', alignContent: 'stretch', width: 4, height: 4 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'green' }),
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 4);
+    const buf = paint(container, 4, 4);
+    // Line 1 (stretched to y=0..1): children at y=0
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBe('green');
+    expect(buf.get(0, 1).style.bg).toBeUndefined(); // line 1 bottom row (stretched, no child)
+    // Line 2 (stretched to y=2..3): children at y=2
+    expect(buf.get(0, 2).style.bg).toBe('blue');
+    expect(buf.get(0, 3).style.bg).toBeUndefined(); // line 2 bottom row
+  });
+});

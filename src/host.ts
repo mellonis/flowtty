@@ -70,6 +70,9 @@ export interface BoxProps {
   // Multi-line flex: 'wrap' / 'wrap-reverse' lets children flow onto additional lines
   // when they overflow the main axis. Default 'nowrap'.
   flexWrap?: 'nowrap' | 'wrap' | 'wrap-reverse';
+  /** Cross-axis distribution of wrap lines. Only effective when flexWrap is 'wrap' or 'wrap-reverse'
+   *  AND the parent has extra cross-axis space. Default 'flex-start'. */
+  alignContent?: 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly' | 'stretch';
 }
 
 export interface Instance {
@@ -175,6 +178,7 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
 
   // flex-wrap → Yoga Wrap enum. Always set so removing the prop re-renders correctly.
   n.setFlexWrap(wrapMap(props.flexWrap));
+  n.setAlignContent(acMap(props.alignContent));
 
   // Alignment.
   n.setJustifyContent(jcMap(props.justifyContent));
@@ -206,6 +210,18 @@ function aiMap(v: BoxProps['alignItems']): number {
     case 'flex-end': return Align.FlexEnd;
     case 'stretch': return Align.Stretch;
     default: return Align.FlexStart;
+  }
+}
+
+function acMap(v: BoxProps['alignContent']): number {
+  switch (v) {
+    case 'flex-end':      return Align.FlexEnd;
+    case 'center':        return Align.Center;
+    case 'space-between': return Align.SpaceBetween;
+    case 'space-around':  return Align.SpaceAround;
+    case 'space-evenly':  return Align.SpaceEvenly;
+    case 'stretch':       return Align.Stretch;
+    default:              return Align.FlexStart;
   }
 }
 
