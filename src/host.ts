@@ -73,6 +73,12 @@ export interface BoxProps {
   /** Cross-axis distribution of wrap lines. Only effective when flexWrap is 'wrap' or 'wrap-reverse'
    *  AND the parent has extra cross-axis space. Default 'flex-start'. */
   alignContent?: 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly' | 'stretch';
+  /** Minimum cell size — Yoga prevents the box from shrinking below this.
+   *  Accepts a number (cells) or a percent string (e.g. '50%'). Undefined = no minimum. */
+  minWidth?: number | `${number}%`;
+  maxWidth?: number | `${number}%`;
+  minHeight?: number | `${number}%`;
+  maxHeight?: number | `${number}%`;
   /** Stacking order within the same paint pass. Higher values paint on top.
    *  Default 0. Tree order is the tiebreaker. Does NOT cross pass boundaries:
    *  absolutes always overlay stack-flow regardless of zIndex. */
@@ -183,6 +189,13 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   } else {
     n.setFlexBasisAuto();
   }
+
+  // Min/max constraints — pass-through. Yoga's signatures accept number | '${number}%' | undefined
+  // directly, so no manual branching is needed (different from width/height which support 'auto').
+  n.setMinWidth(props.minWidth);
+  n.setMaxWidth(props.maxWidth);
+  n.setMinHeight(props.minHeight);
+  n.setMaxHeight(props.maxHeight);
 
   // flex-wrap → Yoga Wrap enum. Always set so removing the prop re-renders correctly.
   n.setFlexWrap(wrapMap(props.flexWrap));

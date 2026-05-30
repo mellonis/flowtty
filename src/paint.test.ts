@@ -1063,3 +1063,81 @@ describe('Box overflow', () => {
     expect(buf.get(2, 2).char).toBe('┘');
   });
 });
+
+describe('Box min/max sizing', () => {
+  test('minWidth prevents flexShrink from shrinking child below threshold', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 4×1 row flex; two children width:4 flexShrink:1 (would normally shrink to 2 each).
+    // Add minWidth:3 to the first child → it shrinks only to 3; second child takes the remaining 1.
+    // Total: 3 + 1 = 4. Red at x=0..2 (width 3), blue at x=3 (width 1).
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 4, height: 1 },
+        createElement('flowtty-box', { width: 4, height: 1, flexShrink: 1, minWidth: 3, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 4, height: 1, flexShrink: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 1);
+    const buf = paint(container, 4, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBe('red');
+    expect(buf.get(3, 0).style.bg).toBe('blue');
+  });
+
+  test('maxWidth caps flexGrow expansion at the threshold', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 10×1 row flex; one child width:1 flexGrow:1 maxWidth:3 — grows from 1 toward 10
+    // but caps at 3. Red at x=0..2.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 10, height: 1 },
+        createElement('flowtty-box', { width: 1, height: 1, flexGrow: 1, maxWidth: 3, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 10, 1);
+    const buf = paint(container, 10, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBe('red');
+    expect(buf.get(3, 0).style.bg).toBeUndefined(); // beyond maxWidth
+  });
+
+  test('minHeight + maxHeight constrain column-flex children symmetrically', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 1×10 column flex; child with no height + flexGrow:1 maxHeight:2 — caps at 2.
+    // Child with height:5 flexShrink:1 minHeight:4 in a tight 4-tall would clamp at 4, but
+    // here we just check the maxHeight cap. Red at y=0..1; green at y=2..3 (next child fills minHeight).
+    root.render(
+      createElement('flowtty-box', { width: 1, height: 10 },
+        createElement('flowtty-box', { width: 1, flexGrow: 1, maxHeight: 2, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 1, height: 1, minHeight: 3, backgroundColor: 'green' }),
+      ),
+    );
+    computeLayout(container, 1, 10);
+    const buf = paint(container, 1, 10);
+    // Red capped at 2 cells tall (y=0..1)
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(0, 1).style.bg).toBe('red');
+    expect(buf.get(0, 2).style.bg).toBe('green'); // green starts immediately after red
+    // Green's minHeight:3 → cells at y=2,3,4
+    expect(buf.get(0, 3).style.bg).toBe('green');
+    expect(buf.get(0, 4).style.bg).toBe('green');
+  });
+
+  test('maxWidth as percent string caps at fraction of parent width', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 10×1 row flex; child flexGrow:1 maxWidth:'50%' caps at 5.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 10, height: 1 },
+        createElement('flowtty-box', { height: 1, flexGrow: 1, maxWidth: '50%', backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 10, 1);
+    const buf = paint(container, 10, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(4, 0).style.bg).toBe('red');
+    expect(buf.get(5, 0).style.bg).toBeUndefined(); // capped at 50% = 5 cells
+  });
+});
