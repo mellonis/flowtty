@@ -140,6 +140,16 @@ CSS deviation: CSS3 defaults `align-content` to `'stretch'` for flex; flowtty de
 
 Each accepts a cell count or a percent string. Undefined = no constraint. Useful for responsive layouts (e.g. `maxWidth: '80%'` on a content panel) and for keeping flex-grow children from claiming all available space.
 
+### Aspect ratio
+
+`<Box aspectRatio>` is a number representing `width / height` (CSS convention). When one dimension is constrained (via `width`, `height`, or flex sizing), Yoga derives the other from the ratio.
+
+- `aspectRatio={2}` — twice as wide as tall (e.g., `width=10` → `height=5`)
+- `aspectRatio={0.5}` — twice as tall as wide (e.g., `height=4` → `width=2`)
+- `aspectRatio={1}` — square
+
+Useful for media-style panels where you want a fixed shape regardless of container size — e.g., a flex child with `flexGrow={1} aspectRatio={3}` claims leftover horizontal space and adjusts its height to maintain a 3:1 ratio.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
