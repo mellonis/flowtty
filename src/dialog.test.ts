@@ -157,3 +157,27 @@ test('M1c.4 acceptance: MultiSelect+add-new opens dialog, dialog submit appends 
   expect(backend.lastFrame).toContain('[x] cherry');
   expect(backend.lastFrame).toContain('+ add new');
 });
+
+test('M1f acceptance: dialog renders as a centered overlay ON TOP of the host content (frame fits in host row count)', async () => {
+  function HostApp() {
+    const host = useDialogHost();
+    useInput((key) => {
+      if (key.name === 'o') host.openDialog<string>(createElement(NamePromptDialog));
+    });
+    return createElement(Box, { width: 30, height: 5 },
+      createElement(Text, null, 'HOST CONTENT ROW 1'),
+      createElement(Text, null, 'HOST CONTENT ROW 2'),
+      createElement(Text, null, 'HOST CONTENT ROW 3'),
+      createElement(Text, null, 'HOST CONTENT ROW 4'),
+      createElement(Text, null, 'HOST CONTENT ROW 5'),
+    );
+  }
+  const backend = new TestBackend(30, 5);
+  await render(createElement(DialogHost, null, createElement(HostApp)), backend);
+  await flushAsync();
+  backend.press({ name: 'o' });
+  await flushAsync();
+  // The dialog overlay sits INSIDE the 5-row frame; the dialog's "name: " prompt is visible.
+  expect(backend.lastFrame.split('\n').length).toBeLessThanOrEqual(5);
+  expect(backend.lastFrame).toContain('name:');
+});

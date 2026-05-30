@@ -1,4 +1,5 @@
 import { createElement, useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { Box } from './components.js';
 import { InputContext, type InputSource } from './input-context.js';
 import {
   DialogHostContext,
@@ -50,10 +51,6 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
     [close],
   );
 
-  // Layout: host children + dialog as siblings. Stack layout means the dialog
-  // renders BELOW the host content in the cell buffer (behaviorally modal —
-  // keys gated + awaitable — but visually inline). True overlay positioning
-  // needs absolute/z-index (later layout milestone).
   return createElement(
     DialogHostContext.Provider,
     { value: hostApi },
@@ -64,9 +61,21 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
     ),
     dialog
       ? createElement(
-          InputContext.Provider,
-          { value: outerSource },
-          createElement(DialogResultContext.Provider, { value: dialogApi }, dialog.element),
+          Box,
+          {
+            // Full-screen absolute overlay; flexbox centers the dialog content.
+            // Resolves the M1c.4 "renders below host" visual caveat — the paint
+            // two-pass (M1f T2) ensures this Box overlays the host content.
+            position: 'absolute',
+            top: 0, left: 0,
+            width: '100%', height: '100%',
+            justifyContent: 'center', alignItems: 'center',
+          },
+          createElement(
+            InputContext.Provider,
+            { value: outerSource },
+            createElement(DialogResultContext.Provider, { value: dialogApi }, dialog.element),
+          ),
         )
       : null,
   );
