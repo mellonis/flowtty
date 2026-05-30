@@ -1,4 +1,4 @@
-import type { Style } from './cells.js';
+import type { Cell, Style } from './cells.js';
 
 export const RESET = '\x1b[0m';
 
@@ -34,3 +34,20 @@ export const CLEAR = '\x1b[2J\x1b[H';
 // user's original terminal content on exit.
 export const ALT_SCREEN_ON = '\x1b[?1049h';
 export const ALT_SCREEN_OFF = '\x1b[?1049l';
+
+/**
+ * CSI Cursor Position: move cursor to (col, row), both 1-indexed in the ANSI
+ * spec. We accept 0-indexed (x, y) and convert.
+ */
+export function cursorTo(x: number, y: number): string {
+  return `\x1b[${y + 1};${x + 1}H`;
+}
+
+/** True iff two cells have identical char AND identical style. */
+export function cellsEqual(a: Cell, b: Cell): boolean {
+  if (a.char !== b.char) return false;
+  // Style objects are small (~6 optional bool/string fields). JSON.stringify
+  // is correct + fast enough at this scale; matches the existing per-cell
+  // SGR change-detection pattern used in TtyBackend.draw.
+  return JSON.stringify(a.style) === JSON.stringify(b.style);
+}
