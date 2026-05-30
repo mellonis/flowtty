@@ -11,48 +11,22 @@ buffer and draws it to the terminal (or captures it via the test backend).
 
 ## Status
 
-M1f (overlay positioning). `<Box>` is now position-aware:
+M1e (TTY frame diff). `TtyBackend` now writes only the cells that changed
+since the previous frame. Adjacent changes on the same row share one cursor
+move (the run flows contiguously). Style changes emit SGR only when the pen
+state needs updating. **No-op repaints write nothing.** First frame + size
+mismatch + terminal resize fall back to a full redraw.
 
-- `position: 'absolute'` + `top` / `left` / `right` / `bottom` (cells) — takes a
-  box out of stack flow and positions it relative to the nearest non-static
-  ancestor (typically the root, for full-screen overlays).
-- `width` / `height` accept percentage strings (`'100%'`, `'50%'`) in addition
-  to cell counts.
-- `justifyContent` (`'flex-start'` | `'center'` | `'flex-end'` | `'space-between'`
-  | `'space-around'` | `'space-evenly'`) and `alignItems` (`'flex-start'` |
-  `'center'` | `'flex-end'` | `'stretch'`) for Yoga-flexbox alignment.
-
-The paint pass renders stack-flow children first and absolutely-positioned
-children **on top**, so overlays composite correctly. **`<DialogHost>` uses
-this to render dialogs as centered overlays** on top of the host content,
-resolving M1c.4's inline-position caveat.
-
-### Usage
-
-```tsx
-import { Box, Text, render, TtyBackend } from 'flowtty';
-
-await render(
-  <Box width={40} height={10}>
-    <Text>host content here</Text>
-    <Box position="absolute" top={0} left={0} width="100%" height="100%"
-         justifyContent="center" alignItems="center">
-      <Box width={20} height={3} backgroundColor="blue">
-        <Text color="white">CENTERED OVERLAY</Text>
-      </Box>
-    </Box>
-  </Box>,
-  new TtyBackend(),
-);
-```
+This is a perf-only change — no public API additions. Interactive apps
+(counter, prompt, form) that repaint per keystroke now issue a handful of
+bytes per frame instead of the full ~hundreds-of-bytes redraw.
 
 ### Still deferred (later milestones)
 
-- Explicit `zIndex` prop for cross-depth stacking order (tree order is the
-  current implicit z; later siblings overlay earlier siblings at the same depth).
-- `position: 'relative'` with edge offsets.
-- Frame diffing — full TTY redraw each `draw()`.
+- Scrolling-region optimization for log-stream apps.
+- Column-only cursor moves (`CSI <col>G`) when row is unchanged — small extra perf nibble.
 - Truecolor (`#rgb` / `rgb(…)`).
+- Explicit `zIndex` prop, `position: 'relative'`.
 - Bracketed paste, mouse, Kitty keyboard protocol, modifier-encoded arrows.
 
 ### Usage with Zod

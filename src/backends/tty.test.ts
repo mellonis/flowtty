@@ -282,3 +282,25 @@ test('TtyBackend.draw: first frame still does a full redraw (CLEAR + full conten
   expect(drawWrite.endsWith(RESET)).toBe(true);
   back.dispose();
 });
+
+test('TtyBackend: resize invalidates previousBuffer → next draw is a full redraw', () => {
+  const { stub: out, writes } = makeStub(4, 1);
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const buf1 = new Buffer(4, 1);
+  buf1.set(0, 0, 'a'); buf1.set(1, 0, 'b'); buf1.set(2, 0, 'c'); buf1.set(3, 0, 'd');
+  back.draw(buf1);  // first frame: full
+  // Subscribe to onResize to attach the resize listener; then emit the resize event
+  // The resize handler invalidates previousBuffer before notifying subscribers.
+  back.onResize(() => {});
+  (out as unknown as EventEmitter).emit('resize');
+  // Second draw of the SAME contents — diff would write nothing; but we just resized,
+  // so a full redraw fires (CLEAR + 'abcd' + RESET).
+  const before = writes.length;
+  back.draw(buf1);
+  const drawWrite = writes[before];
+  expect(drawWrite).toBeDefined();
+  expect(drawWrite!.startsWith(CLEAR)).toBe(true);
+  expect(drawWrite).toContain('abcd');
+  back.dispose();
+});

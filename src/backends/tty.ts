@@ -28,6 +28,9 @@ export class TtyBackend implements Backend {
   private terminalEntered = false;
   private readonly resizeSubscribers = new Set<() => void>();
   private readonly resizeNotify = (): void => {
+    // Invalidate the diff baseline — the next paint will likely use new dimensions
+    // and previous cell coordinates would be wrong against the resized terminal.
+    this.previousBuffer = null;
     for (const h of [...this.resizeSubscribers]) h();
   };
   private resizeAttached = false;
