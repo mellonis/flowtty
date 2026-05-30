@@ -90,6 +90,19 @@ export function TextInput(props: TextInputProps): ReactNode {
   const afterLen = Math.max(0, windowEnd - safeCursor - 1);
   const after = width === null ? afterRaw : afterRaw.padEnd(afterLen);
 
+  // When NOT focused: render the display flat, no cursor cell. Tells the user
+  // at a glance which field has focus (only the focused one shows the inverse cursor).
+  if (!isFocused) {
+    const flat = width === null ? display : display.padEnd(width);
+    return createElement(Box, {
+      flexDirection: 'row',
+      backgroundColor: 'rgb(211,211,211)',
+      onLayout: (r: Rect) => {
+        if (r.width !== width) setWidth(r.width);
+      },
+    }, createElement(Text, null, flat));
+  }
+
   return createElement(Box, {
     flexDirection: 'row',
     // Subtle lightgray bg differentiates the input from the dialog content area.
