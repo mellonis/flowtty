@@ -1,4 +1,5 @@
 import { describe, expect, test } from 'vitest';
+import { vi } from 'vitest';
 import { createElement } from 'react';
 import { getYoga } from './yoga.js';
 import { createRoot } from './reconciler.js';
@@ -1267,5 +1268,55 @@ describe('Box aspectRatio', () => {
     expect(buf.get(2, 2).style.bg).toBe('red'); // bottom-right of the 3×3 square
     expect(buf.get(3, 0).style.bg).toBeUndefined(); // outside square
     expect(buf.get(0, 3).style.bg).toBeUndefined();
+  });
+});
+
+describe('Box onLayout', () => {
+  test('onLayout fires with the computed rect (left, top, width, height)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    const handler = vi.fn();
+    root.render(createElement('flowtty-box', { width: 5, height: 3, onLayout: handler }));
+    computeLayout(container, 10, 10);
+    paint(container, 10, 10);
+    expect(handler).toHaveBeenCalledTimes(1);
+    expect(handler).toHaveBeenCalledWith({ left: 0, top: 0, width: 5, height: 3 });
+  });
+
+  test('onLayout fires for a nested box with offset-adjusted left/top', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    const handler = vi.fn();
+    root.render(
+      createElement('flowtty-box', { width: 10, height: 5, padding: 2 },
+        createElement('flowtty-box', { width: 4, height: 1, onLayout: handler }),
+      ),
+    );
+    computeLayout(container, 10, 5);
+    paint(container, 10, 5);
+    // Child inset by padding=2 on each side → child's box at (2, 2)
+    expect(handler).toHaveBeenCalledWith({ left: 2, top: 2, width: 4, height: 1 });
+  });
+
+  test('onLayout does NOT fire for display:"none" boxes (early return)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    const handler = vi.fn();
+    root.render(createElement('flowtty-box', { width: 5, height: 3, display: 'none', onLayout: handler }));
+    computeLayout(container, 10, 10);
+    paint(container, 10, 10);
+    expect(handler).not.toHaveBeenCalled();
+  });
+
+  test('onLayout fires on every paint (caller responsible for diffing)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    const handler = vi.fn();
+    root.render(createElement('flowtty-box', { width: 5, height: 3, onLayout: handler }));
+    computeLayout(container, 10, 10);
+    paint(container, 10, 10);
+    paint(container, 10, 10);
+    paint(container, 10, 10);
+    expect(handler).toHaveBeenCalledTimes(3);
   });
 });

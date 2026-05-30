@@ -118,6 +118,7 @@ function paintInstance(
   if (inst.props.display === 'none') return;
 
   const box: Rect = layoutOf(inst, offsetX, offsetY);
+  inst.props.onLayout?.(box);
   const ownBg = inst.props.backgroundColor;
   const effectiveBg = ownBg ?? inheritedBg;
 

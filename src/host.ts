@@ -1,6 +1,7 @@
 import { Align, Display, Edge, FlexDirection, Gutter, Justify, MeasureMode, PositionType, Wrap, type Yoga, type YogaNode } from './yoga.js';
 import { wrapText, type WrapMode } from './wrap.js';
 import type { BorderStyle } from './borders.js';
+import type { Rect } from './layout.js';
 
 // The host has a single element type by design: Text is sugar for Box.
 export type HostType = 'flowtty-box';
@@ -85,6 +86,12 @@ export interface BoxProps {
   /** 'none' removes this box and all descendants from layout (siblings don't reserve space for it,
    *  and paint skips the subtree). Default 'flex'. Useful for conditional UI without unmounting. */
   display?: 'flex' | 'none';
+  /** Fires after layout with this box's computed rect. Use to read allocated dimensions
+   *  for responsive rendering (e.g. paginating an article reader). **Diff before setState** —
+   *  this fires on EVERY paint, and unconditionally calling setState with a new object
+   *  will infinite-loop. Pattern:
+   *    onLayout={(r) => { if (!size || size.width !== r.width || size.height !== r.height) setSize(r); }} */
+  onLayout?: (rect: Rect) => void;
   /** Stacking order within the same paint pass. Higher values paint on top.
    *  Default 0. Tree order is the tiebreaker. Does NOT cross pass boundaries:
    *  absolutes always overlay stack-flow regardless of zIndex. */
