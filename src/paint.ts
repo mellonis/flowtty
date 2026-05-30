@@ -123,10 +123,15 @@ function paintInstance(
   const effectiveBg = ownBg ?? inheritedBg;
 
   // 1. Fill the box rect with own backgroundColor (if set). Clipped by inherited clip.
+  // Sentinel `backgroundColor: 'default'` fills with spaces using NO bg style —
+  // overwrites whatever was in those cells without tinting (terminal default bg
+  // shows through). Use this for opaque dialogs/overlays that should mask
+  // underlying content but match the terminal theme.
   if (ownBg !== undefined) {
+    const fillStyle: Style = ownBg === 'default' ? {} : { bg: ownBg };
     for (let y = box.top; y < box.top + box.height; y++) {
       for (let x = box.left; x < box.left + box.width; x++) {
-        setClipped(buffer, x, y, ' ', { bg: ownBg }, clip);
+        setClipped(buffer, x, y, ' ', fillStyle, clip);
       }
     }
   }
