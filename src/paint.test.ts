@@ -1,9 +1,10 @@
-import { expect, test } from 'vitest';
+import { describe, expect, test } from 'vitest';
 import { createElement } from 'react';
 import { getYoga } from './yoga.js';
 import { createRoot } from './reconciler.js';
 import { computeLayout } from './layout.js';
 import { paint } from './paint.js';
+import { BORDER_CHARS } from './borders.js';
 
 test('paints text inside a box at the box origin', async () => {
   const Yoga = await getYoga();
@@ -139,4 +140,105 @@ test('absolute child declared BEFORE stack-flow sibling still paints on top (gat
   const buf = paint(container, 6, 1);
   // Stack-flow 'abcdef' painted first; absolute 'XX' overlays cols 2..3 → 'abXXef'
   expect(buf.toString()).toBe('abXXef');
+});
+
+describe('Box border', () => {
+  test('border="single" draws ┌─┐ / │ │ / └─┘ on a 3×3 box', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(createElement('flowtty-box', { border: 'single', width: 3, height: 3 }));
+    computeLayout(container, 3, 3);
+    const buf = paint(container, 3, 3);
+    // Top row
+    expect(buf.get(0, 0).char).toBe('┌');
+    expect(buf.get(1, 0).char).toBe('─');
+    expect(buf.get(2, 0).char).toBe('┐');
+    // Middle row — only side edges; interior cell is blank
+    expect(buf.get(0, 1).char).toBe('│');
+    expect(buf.get(1, 1).char).toBe(' '); // interior
+    expect(buf.get(2, 1).char).toBe('│');
+    // Bottom row
+    expect(buf.get(0, 2).char).toBe('└');
+    expect(buf.get(1, 2).char).toBe('─');
+    expect(buf.get(2, 2).char).toBe('┘');
+  });
+
+  test.each([
+    ['double',  { tl: '╔', tr: '╗', bl: '╚', br: '╝', t: '═', l: '║' }],
+    ['round',   { tl: '╭', tr: '╮', bl: '╰', br: '╯', t: '─', l: '│' }],
+    ['bold',    { tl: '┏', tr: '┓', bl: '┗', br: '┛', t: '━', l: '┃' }],
+    ['classic', { tl: '+', tr: '+', bl: '+', br: '+', t: '-', l: '|' }],
+  ] as const)('border="%s" draws its corner + edge glyphs', async (style, want) => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(createElement('flowtty-box', { border: style, width: 3, height: 3 }));
+    computeLayout(container, 3, 3);
+    const buf = paint(container, 3, 3);
+    expect(buf.get(0, 0).char).toBe(want.tl);
+    expect(buf.get(2, 0).char).toBe(want.tr);
+    expect(buf.get(0, 2).char).toBe(want.bl);
+    expect(buf.get(2, 2).char).toBe(want.br);
+    expect(buf.get(1, 0).char).toBe(want.t);
+    expect(buf.get(0, 1).char).toBe(want.l);
+  });
+
+  test('borderColor applies fg style to border cells', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(createElement('flowtty-box', { border: 'single', borderColor: 'red', width: 3, height: 3 }));
+    computeLayout(container, 3, 3);
+    const buf = paint(container, 3, 3);
+    expect(buf.get(0, 0).style.fg).toBe('red');
+    expect(buf.get(1, 1).style.fg).toBeUndefined(); // interior cell unaffected
+  });
+
+  test('borderColor accepts truecolor values', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(createElement('flowtty-box', { border: 'single', borderColor: '#ff0000', width: 3, height: 3 }));
+    computeLayout(container, 3, 3);
+    const buf = paint(container, 3, 3);
+    expect(buf.get(0, 0).style.fg).toBe('#ff0000');
+  });
+
+  test('Yoga enforces minimum 2-cell size when border is set, so guard (width < 2) is never triggered in practice', async () => {
+    // Yoga expands a border-enabled box to at least 2 wide × 2 tall to accommodate
+    // the 1-cell border reservation on each edge. The guard in paintBorder exists as
+    // a defensive check for abnormal rect values; Yoga never produces sub-2 rects
+    // for a bordered node. This test confirms Yoga's enforcement.
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(createElement('flowtty-box', { border: 'single', width: 1, height: 1 }));
+    computeLayout(container, 10, 10);
+    const node = (container.children[0] as any).yogaNode;
+    // Yoga enforces the border space — actual computed width and height are both >= 2.
+    expect(node.getComputedWidth()).toBeGreaterThanOrEqual(2);
+    expect(node.getComputedHeight()).toBeGreaterThanOrEqual(2);
+    // And therefore the border IS drawn (2×2 has only 4 corners, no edge runs):
+    const buf = paint(container, 10, 10);
+    expect(buf.get(0, 0).char).toBe(BORDER_CHARS.single.tl);
+    expect(buf.get(1, 0).char).toBe(BORDER_CHARS.single.tr);
+    expect(buf.get(0, 1).char).toBe(BORDER_CHARS.single.bl);
+    expect(buf.get(1, 1).char).toBe(BORDER_CHARS.single.br);
+  });
+
+  test('border + content: text lands inside the border (Yoga reserves the ring)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { border: 'single', width: 5, height: 3 },
+        createElement('flowtty-box', {}, 'hi'),
+      ),
+    );
+    computeLayout(container, 5, 3);
+    const buf = paint(container, 5, 3);
+    // Border cells
+    expect(buf.get(0, 0).char).toBe('┌');
+    expect(buf.get(4, 0).char).toBe('┐');
+    expect(buf.get(0, 2).char).toBe('└');
+    expect(buf.get(4, 2).char).toBe('┘');
+    // Text inside the border (Yoga reserved 1-cell ring → content area is 3×1 at (1,1))
+    expect(buf.get(1, 1).char).toBe('h');
+    expect(buf.get(2, 1).char).toBe('i');
+  });
 });

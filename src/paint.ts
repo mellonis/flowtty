@@ -3,6 +3,7 @@ import { layoutOf, type Rect } from './layout.js';
 import { ownText, type Instance } from './host.js';
 import type { Container } from './reconciler.js';
 import { wrapText, type WrapMode } from './wrap.js';
+import { BORDER_CHARS } from './borders.js';
 
 export function paint(container: Container, width: number, height: number): Buffer {
   const buffer = new Buffer(width, height);
@@ -24,6 +25,43 @@ function textStyleOf(inst: Instance): Style {
   return style;
 }
 
+// Draw the box's 8-slot border (4 corners + 4 edge runs) directly into the
+// buffer. Called BEFORE children paint so content / nested children overlay
+// the border interior. The border itself sits on the outermost cell ring of
+// the box rect; Yoga's setBorder(edge, 1) reserved those cells from layout
+// so neither own-text nor child layout will land on them.
+function paintBorder(inst: Instance, buffer: Buffer, box: Rect): void {
+  const style = inst.props.border;
+  if (!style) return;
+  if (box.width < 2 || box.height < 2) return; // can't draw a border without an interior
+
+  const chars = BORDER_CHARS[style];
+  const cellStyle: Style = {};
+  if (inst.props.borderColor !== undefined) cellStyle.fg = inst.props.borderColor;
+
+  const x0 = box.left;
+  const y0 = box.top;
+  const x1 = box.left + box.width - 1;
+  const y1 = box.top + box.height - 1;
+
+  // Corners
+  buffer.set(x0, y0, chars.tl, cellStyle);
+  buffer.set(x1, y0, chars.tr, cellStyle);
+  buffer.set(x0, y1, chars.bl, cellStyle);
+  buffer.set(x1, y1, chars.br, cellStyle);
+
+  // Top + bottom edges (between corners)
+  for (let x = x0 + 1; x < x1; x++) {
+    buffer.set(x, y0, chars.t, cellStyle);
+    buffer.set(x, y1, chars.b, cellStyle);
+  }
+  // Left + right edges (between corners)
+  for (let y = y0 + 1; y < y1; y++) {
+    buffer.set(x0, y, chars.l, cellStyle);
+    buffer.set(x1, y, chars.r, cellStyle);
+  }
+}
+
 function paintInstance(
   inst: Instance,
   buffer: Buffer,
@@ -43,6 +81,9 @@ function paintInstance(
       }
     }
   }
+
+  // 1b. Draw border (if set) on the outermost ring before content paints.
+  paintBorder(inst, buffer, box);
 
   // 2. Paint own text (wrapped if wrap prop set).
   const text = ownText(inst);

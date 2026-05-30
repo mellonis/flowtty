@@ -1,6 +1,7 @@
 export { render } from './render.js';
 export { Box, Text } from './components.js';
 export type { BoxProps } from './host.js';
+export type { BorderStyle, BorderChars } from './borders.js';
 export type { Backend } from './backends/types.js';
 export { TtyBackend } from './backends/tty.js';
 export { useInput } from './use-input.js';

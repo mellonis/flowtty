@@ -1,5 +1,6 @@
 import { Align, Edge, FlexDirection, Justify, MeasureMode, PositionType, type Yoga, type YogaNode } from './yoga.js';
 import { wrapText, type WrapMode } from './wrap.js';
+import type { BorderStyle } from './borders.js';
 
 // The host has a single element type by design: Text is sugar for Box.
 export type HostType = 'flowtty-box';
@@ -30,6 +31,11 @@ export interface BoxProps {
   inverse?: boolean;
   // Box background fill:
   backgroundColor?: string;
+  // Border drawn around the box (one cell on each side). When set, Yoga
+  // reserves 1 cell on each edge so border doesn't overlap content.
+  border?: BorderStyle;
+  // Color for border glyphs — same string format as `color` (named or truecolor).
+  borderColor?: string;
 }
 
 export interface Instance {
@@ -82,6 +88,14 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   if (props.left !== undefined) n.setPosition(Edge.Left, props.left);
   if (props.right !== undefined) n.setPosition(Edge.Right, props.right);
   if (props.bottom !== undefined) n.setPosition(Edge.Bottom, props.bottom);
+
+  // Border edge reservation — Yoga subtracts these from content space.
+  // Always set (including to 0 when border drops away) so prop changes re-render correctly.
+  const borderWidth = props.border ? 1 : 0;
+  n.setBorder(Edge.Top, borderWidth);
+  n.setBorder(Edge.Right, borderWidth);
+  n.setBorder(Edge.Bottom, borderWidth);
+  n.setBorder(Edge.Left, borderWidth);
 
   // Alignment.
   n.setJustifyContent(jcMap(props.justifyContent));
