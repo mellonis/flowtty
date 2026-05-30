@@ -5,6 +5,7 @@ import { computeLayout } from './layout.js';
 import { paint } from './paint.js';
 import type { Backend } from './backends/types.js';
 import { InputContext, type InputSource } from './input-context.js';
+import { TerminalSizeProvider } from './terminal-size.js';
 
 export async function render(element: ReactNode, backend: Backend): Promise<{ unmount(): void }> {
   const Yoga = await getYoga();
@@ -26,7 +27,7 @@ export async function render(element: ReactNode, backend: Backend): Promise<{ un
   // Wrap each dispatched key in root.flushSync so the state update is processed
   // synchronously inside the handler — flush() then only needs microtask rounds
   // for the scheduled repaint instead of a macrotask for the Scheduler to drain.
-  const tree = backend.onKey
+  const innerTree = backend.onKey
     ? createElement(
         InputContext.Provider,
         {
@@ -42,6 +43,8 @@ export async function render(element: ReactNode, backend: Backend): Promise<{ un
         element,
       )
     : element;
+
+  const tree = createElement(TerminalSizeProvider, { backend }, innerTree);
 
   root.render(tree);
   // Wait for the initial scheduled paint (via resetAfterCommit → queueMicrotask).

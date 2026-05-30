@@ -1,4 +1,5 @@
 export { render } from './render.js';
+export { useTerminalSize, type TerminalSize } from './terminal-size.js';
 export { Box, Text } from './components.js';
 export type { BoxProps } from './host.js';
 export type { BorderStyle, BorderChars } from './borders.js';
