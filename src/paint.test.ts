@@ -898,3 +898,72 @@ describe('Box alignContent', () => {
     expect(buf.get(0, 3).style.bg).toBeUndefined(); // line 2 bottom row
   });
 });
+
+describe('Box zIndex', () => {
+  test('higher zIndex paints on top within the absolute pass (overrides tree order)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Two absolutes at same (0,0). Without zIndex, tree order wins → blue (second) on top.
+    // With zIndex 5 on red (first) and default 0 on blue, red wins.
+    root.render(
+      createElement('flowtty-box', { width: 1, height: 1 },
+        createElement('flowtty-box', { position: 'absolute', top: 0, left: 0, width: 1, height: 1, backgroundColor: 'red', zIndex: 5 }),
+        createElement('flowtty-box', { position: 'absolute', top: 0, left: 0, width: 1, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 1, 1);
+    const buf = paint(container, 1, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red'); // higher zIndex wins
+  });
+
+  test('tree order is the tiebreaker when zIndex is equal', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Both zIndex 5 → second sibling wins (tree order tiebreaker).
+    root.render(
+      createElement('flowtty-box', { width: 1, height: 1 },
+        createElement('flowtty-box', { position: 'absolute', top: 0, left: 0, width: 1, height: 1, backgroundColor: 'red',  zIndex: 5 }),
+        createElement('flowtty-box', { position: 'absolute', top: 0, left: 0, width: 1, height: 1, backgroundColor: 'blue', zIndex: 5 }),
+      ),
+    );
+    computeLayout(container, 1, 1);
+    const buf = paint(container, 1, 1);
+    expect(buf.get(0, 0).style.bg).toBe('blue');
+  });
+
+  test('zIndex does NOT cross pass boundaries — absolute with zIndex 0 still paints on top of stack-flow with zIndex 999', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Stack-flow child fills the parent with red and has a huge zIndex.
+    // Absolute child overlays a single blue cell with default zIndex.
+    // Pass-boundary rule wins: absolute on top.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 1, height: 1 },
+        createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'red', zIndex: 999 }),
+        createElement('flowtty-box', { position: 'absolute', top: 0, left: 0, width: 1, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 1, 1);
+    const buf = paint(container, 1, 1);
+    expect(buf.get(0, 0).style.bg).toBe('blue'); // absolute pass wins regardless of zIndex
+  });
+
+  test('negative zIndex pushes a sibling below others in the same pass', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Stack-flow siblings overlapping via negative margin (M1 margin feature).
+    // First child red zIndex:-1, second child blue zIndex:0 — blue on top (default order),
+    // negative zIndex makes red go under EVEN IF it appeared later in tree.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 2, height: 1 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'blue' }),
+        createElement('flowtty-box', { width: 2, height: 1, marginLeft: -2, backgroundColor: 'red', zIndex: -1 }),
+      ),
+    );
+    computeLayout(container, 2, 1);
+    const buf = paint(container, 2, 1);
+    // Without zIndex, red (later) would overwrite blue. With zIndex:-1 on red, blue wins.
+    expect(buf.get(0, 0).style.bg).toBe('blue');
+    expect(buf.get(1, 0).style.bg).toBe('blue');
+  });
+});

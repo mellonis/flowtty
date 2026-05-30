@@ -127,14 +127,18 @@ function paintInstance(
   }
 
   // 3. Two-pass: stack-flow children first, then absolute children on top.
-  // (Multiple absolutes at the same depth paint in tree order — later siblings
-  // overlay earlier, giving implicit z-ordering without an explicit zIndex prop.)
+  // Within each pass, sort by zIndex (default 0). JS sort is stable per ES2019,
+  // so tree order is preserved as the natural tiebreaker. zIndex does NOT cross
+  // pass boundaries — absolutes always paint on top of stack-flow.
   const stackFlow: Instance[] = [];
   const absolutes: Instance[] = [];
   for (const child of inst.children) {
     if (child.type !== 'box') continue;
     (child.props.position === 'absolute' ? absolutes : stackFlow).push(child);
   }
+  const byZ = (a: Instance, b: Instance) => (a.props.zIndex ?? 0) - (b.props.zIndex ?? 0);
+  stackFlow.sort(byZ);
+  absolutes.sort(byZ);
   for (const child of stackFlow) paintInstance(child, buffer, box.left, box.top, effectiveBg);
   for (const child of absolutes) paintInstance(child, buffer, box.left, box.top, effectiveBg);
 }

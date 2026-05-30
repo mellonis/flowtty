@@ -73,6 +73,10 @@ export interface BoxProps {
   /** Cross-axis distribution of wrap lines. Only effective when flexWrap is 'wrap' or 'wrap-reverse'
    *  AND the parent has extra cross-axis space. Default 'flex-start'. */
   alignContent?: 'flex-start' | 'flex-end' | 'center' | 'space-between' | 'space-around' | 'space-evenly' | 'stretch';
+  /** Stacking order within the same paint pass. Higher values paint on top.
+   *  Default 0. Tree order is the tiebreaker. Does NOT cross pass boundaries:
+   *  absolutes always overlay stack-flow regardless of zIndex. */
+  zIndex?: number;
 }
 
 export interface Instance {
