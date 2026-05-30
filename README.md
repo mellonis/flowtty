@@ -114,6 +114,21 @@ When wrap is on, `rowGap` controls spacing between wrap lines (perpendicular to 
 
 CSS deviation: CSS3 defaults `align-content` to `'stretch'` for flex; flowtty defaults to `'flex-start'` (deterministic, doesn't reflow content unexpectedly).
 
+### zIndex
+
+`<Box zIndex>` is an integer; higher values paint on top of lower within the same paint pass. Default `0`. Tree order is the natural tiebreaker (later sibling wins).
+
+**Does NOT cross pass boundaries.** Stack-flow children paint first, then absolutes — an absolute with `zIndex={0}` still overlays a stack-flow with `zIndex={999}`. zIndex only reorders siblings within the same pass.
+
+### Overflow
+
+`<Box overflow>` controls whether descendants are clipped to this box's content rect. Default `'visible'`.
+
+- `'visible'` (default) — descendants may extend past this box (current behavior)
+- `'hidden'` — descendants clipped to content rect; ALL descendant writes (backgrounds, borders, own-text, nested children) are gated
+
+`'hidden'` does NOT clip the box's own background or border — those are this box's own area, not its descendants' writes. Clips are intersected across nested `overflow: 'hidden'` ancestors.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
