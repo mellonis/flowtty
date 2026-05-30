@@ -60,6 +60,13 @@ export interface BoxProps {
   gap?: number;
   rowGap?: number;
   columnGap?: number;
+  // Flex sizing. Defaults match Yoga (NOT CSS):
+  //   flexGrow:   0  (no expansion into leftover space)
+  //   flexShrink: 0  (no shrink under deficit — CSS default is 1)
+  //   flexBasis:  'auto'  (use width/height as initial size)
+  flexGrow?: number;
+  flexShrink?: number;
+  flexBasis?: number | 'auto' | `${number}%`;
 }
 
 export interface Instance {
@@ -149,6 +156,19 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   const cGap = props.columnGap ?? props.gap ?? 0;
   n.setGap(Gutter.Row, rGap);
   n.setGap(Gutter.Column, cGap);
+
+  // Flex sizing — always set (including defaults) so removing the prop re-renders correctly.
+  n.setFlexGrow(props.flexGrow ?? 0);
+  n.setFlexShrink(props.flexShrink ?? 0);
+
+  // flexBasis follows the width/height pattern: number → exact, '%' → percent, else auto.
+  if (typeof props.flexBasis === 'number') {
+    n.setFlexBasis(props.flexBasis);
+  } else if (typeof props.flexBasis === 'string' && props.flexBasis.endsWith('%')) {
+    n.setFlexBasisPercent(parseFloat(props.flexBasis));
+  } else {
+    n.setFlexBasisAuto();
+  }
 
   // Alignment.
   n.setJustifyContent(jcMap(props.justifyContent));

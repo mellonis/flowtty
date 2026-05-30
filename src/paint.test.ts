@@ -600,3 +600,121 @@ describe('Box gap', () => {
     expect(buf.get(2, 0).style.bg).toBe('blue');
   });
 });
+
+describe('Box flex sizing', () => {
+  test('flexGrow distributes leftover space equally between siblings', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 10×1 row flex; two children width:1 flexGrow:1 → each ends up 5 wide.
+    // Free space = 10 - (1+1) = 8; distributed 8/2 = 4 → each child 1+4 = 5.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 10, height: 1 },
+        createElement('flowtty-box', { width: 1, height: 1, flexGrow: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 1, height: 1, flexGrow: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 10, 1);
+    const buf = paint(container, 10, 1);
+    // Red at x=0..4
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(4, 0).style.bg).toBe('red');
+    // Blue at x=5..9
+    expect(buf.get(5, 0).style.bg).toBe('blue');
+    expect(buf.get(9, 0).style.bg).toBe('blue');
+  });
+
+  test('flexGrow asymmetric: 1:2 ratio splits leftover space 1/3 : 2/3', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 9×1 row flex; both children basis 0 (width=0) so total free space = 9.
+    // Distribute 9 × 1/3 = 3 and 9 × 2/3 = 6. Red x=0..2, blue x=3..8.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 9, height: 1 },
+        createElement('flowtty-box', { width: 0, height: 1, flexGrow: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 0, height: 1, flexGrow: 2, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 9, 1);
+    const buf = paint(container, 9, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBe('red');
+    expect(buf.get(3, 0).style.bg).toBe('blue');
+    expect(buf.get(8, 0).style.bg).toBe('blue');
+  });
+
+  test('flexShrink: equal-basis siblings shrink equally under deficit', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 4×1 row flex; two children width:4 flexShrink:1 → total basis 8, fit 4,
+    // overflow 4, each shrinks 4 × (4×1)/(4×1 + 4×1) = 2 → final width 2 each.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 4, height: 1 },
+        createElement('flowtty-box', { width: 4, height: 1, flexShrink: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 4, height: 1, flexShrink: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 1);
+    const buf = paint(container, 4, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBe('red');
+    expect(buf.get(2, 0).style.bg).toBe('blue');
+    expect(buf.get(3, 0).style.bg).toBe('blue');
+  });
+
+  test('flexBasis (number) overrides width as the initial size for grow/shrink calc', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 10×1 row flex. Two children width:2 flexBasis:4 — basis wins, so each
+    // starts at 4. Total 8; free space 2. First child flexGrow:1 → 4+2 = 6.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 10, height: 1 },
+        createElement('flowtty-box', { width: 2, height: 1, flexBasis: 4, flexGrow: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 2, height: 1, flexBasis: 4, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 10, 1);
+    const buf = paint(container, 10, 1);
+    // Red at x=0..5 (basis 4 + grow 2)
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(5, 0).style.bg).toBe('red');
+    // Blue at x=6..9 (basis 4, no grow)
+    expect(buf.get(6, 0).style.bg).toBe('blue');
+    expect(buf.get(9, 0).style.bg).toBe('blue');
+  });
+
+  test('flexBasis (percent string) sets the initial size as a fraction of parent', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 10×1 row flex. One child flexBasis:'50%' → child width 5.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 10, height: 1 },
+        createElement('flowtty-box', { height: 1, flexBasis: '50%', backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 10, 1);
+    const buf = paint(container, 10, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(4, 0).style.bg).toBe('red');
+    expect(buf.get(5, 0).style.bg).toBeUndefined(); // beyond the child
+  });
+
+  test('default flexShrink is 0 (Yoga convention, NOT CSS) — children overflow rather than shrink', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 4×1 row flex; two children width:4 with NO flexShrink set.
+    // CSS default would shrink them; Yoga keeps both at 4 → second overflows past parent.
+    // First child fills 0..3; second is positioned at x=4 (overflow, outside parent rect).
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 4, height: 1 },
+        createElement('flowtty-box', { width: 4, height: 1, backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 4, height: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 8, 1); // give the canvas room to render the overflow so we can read it
+    const buf = paint(container, 8, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(3, 0).style.bg).toBe('red');
+    expect(buf.get(4, 0).style.bg).toBe('blue');
+    expect(buf.get(7, 0).style.bg).toBe('blue');
+  });
+});
