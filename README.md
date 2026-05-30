@@ -214,6 +214,26 @@ first are ignored to avoid double-disposal. Process error listeners are removed
 when `handle.unmount()` is called, so multiple `render()` calls in sequence
 (e.g. in tests) don't leak listeners.
 
+**Logging errors to a file (development pattern):**
+
+flowtty intentionally doesn't bake file-logging into the default behavior — `onError` is the escape hatch. Common pattern for development:
+
+```tsx
+import { appendFileSync } from 'node:fs';
+
+await render(<App />, backend, {
+  onError: ({ error, source }) => {
+    const stamp = new Date().toISOString();
+    const trace = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    appendFileSync('./flowtty-errors.log', `[${stamp}] [${source}] ${trace}\n\n`);
+    console.error(error);
+    process.exit(1);
+  },
+});
+```
+
+Then `tail -f flowtty-errors.log` in a second terminal during development. Adjust path / format / rotation per your needs.
+
 Without this safety net, an unhandled error during render or in a useEffect would
 leave the terminal in alt-screen mode with raw input still enabled — recovery
 would require killing the shell or running `reset`.
