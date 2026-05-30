@@ -59,6 +59,17 @@ Boxes smaller than 2×2 silently skip the border.
 
 Values are integer cell counts. Padding and border combine — a `<Box border="single" padding={1}>` insets content by 2 cells on each side (1 border + 1 padding). `backgroundColor` fills the full rect including padding cells.
 
+### Margin
+
+`<Box>` accepts CSS-style margin props. Same precedence as padding (per-edge > axis > shorthand).
+
+- `margin={n}` — all four edges
+- `marginX={n}` — left + right
+- `marginY={n}` — top + bottom
+- `marginTop`, `marginRight`, `marginBottom`, `marginLeft` — per-edge override
+
+Values are integer cell counts. Negative values are allowed — Yoga supports them for overlap layouts (a child with `marginLeft={-1}` shifts one cell into its preceding sibling's space).
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
