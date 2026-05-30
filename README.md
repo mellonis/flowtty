@@ -90,6 +90,16 @@ Per-axis wins over shorthand. Gap applies BETWEEN siblings only — no extra spa
 
 **Defaults match Yoga, not CSS.** CSS sets `flex-shrink` to `1` by default — flowtty (via Yoga) leaves it at `0`, so children overflow rather than shrink unless `flexShrink={1}` is set explicitly. Useful when overflow is intentional; surprising if you're used to CSS.
 
+### Flex wrap
+
+`<Box flexWrap>` controls multi-line flex layouts. Default `'nowrap'`.
+
+- `flexWrap="nowrap"` (default) — single line; children overflow or shrink to fit
+- `flexWrap="wrap"` — children flow to additional lines when they exceed the main axis
+- `flexWrap="wrap-reverse"` — same as `wrap`, but wrap lines stack in reverse cross-axis order
+
+When wrap is on, `rowGap` controls spacing between wrap lines (perpendicular to the main axis); `columnGap` continues to control spacing between items on the same line.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
