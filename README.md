@@ -190,6 +190,34 @@ function App() {
 
 Returns the current terminal size; re-renders on `backend.onResize` (TTY) or initial-only (TestBackend / fixed-size). Useful for full-screen apps that own the terminal. For nested components, prefer `onLayout`.
 
+### Error handling
+
+flowtty wraps the user tree in a React error boundary AND registers process-level
+`uncaughtException` / `unhandledRejection` handlers. When ANY error is caught,
+flowtty calls `backend.dispose()` first (restores the terminal) and then either:
+
+- invokes the `onError` callback if provided in `render(element, backend, { onError })`, OR
+- prints the error to stderr and exits with code 1 (default).
+
+```tsx
+await render(<App />, backend, {
+  onError: ({ error, source }) => {
+    // source: 'react' | 'uncaughtException' | 'unhandledRejection'
+    console.error(`[${source}]`, error);
+    process.exit(1);
+  },
+});
+```
+
+The cleanup runs at most ONCE per render handle — subsequent errors after the
+first are ignored to avoid double-disposal. Process error listeners are removed
+when `handle.unmount()` is called, so multiple `render()` calls in sequence
+(e.g. in tests) don't leak listeners.
+
+Without this safety net, an unhandled error during render or in a useEffect would
+leave the terminal in alt-screen mode with raw input still enabled — recovery
+would require killing the shell or running `reset`.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
