@@ -50,4 +50,7 @@ export class TestBackend implements Backend {
   type(text: string): void {
     for (const ch of text) this.press({ name: ch, sequence: ch });
   }
+
+  // eslint-disable-next-line @typescript-eslint/no-empty-function
+  dispose(): void {}
 }

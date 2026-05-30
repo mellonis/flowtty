@@ -1,4 +1,6 @@
 export { render } from './render.js';
+export type { RenderOptions } from './render.js';
+export type { ErrorSource } from './error-boundary.js';
 export { useTerminalSize, type TerminalSize } from './terminal-size.js';
 export { Box, Text } from './components.js';
 export type { BoxProps } from './host.js';
