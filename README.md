@@ -11,56 +11,67 @@ buffer and draws it to the terminal (or captures it via the test backend).
 
 ## Status
 
-M1c.3 (Form + focus ring). Multi-field workflows compose via `<Form>` +
-`useField`:
+M1c.4 (embedded dialogs). Any descendant of `<DialogHost>` can pop a modal
+sub-prompt and await its result without unmounting the host:
 
-- `<Form onSubmit onCancel>` — owns the field registry, value aggregation, and
-  intra-form focus ring. **Tab** cycles focus forward, **Shift-Tab** backward
-  (via `ESC [ Z` on most terminals), **Esc** cancels.
-- `useField(name, { validate })` — registers a field, returns
-  `{ value, onChange, onSubmit, onCancel, isFocused, error }`. Per-field
-  `validate` blocks advance/submit and surfaces the error string for the
-  consumer to render.
-- **Advance vs submit:** each field's `onSubmit` (Enter inside the focused
-  prompt) advances focus to the next registered field; the LAST field's
-  `onSubmit` fires the form's `onSubmit(values)` with the aggregated record.
+- `useDialogHost()` → `{ openDialog(element): Promise<{status:'done',value}|{status:'cancelled'}> }`
+- `useDialog()` → `{ done(value), cancel() }` (called from inside a dialog component)
+- `<DialogHost>` swaps the `InputContext` source while a dialog is open so the
+  host subtree receives no keys; the dialog gets the outer source.
+
+`<MultiSelect>` gained an `onAddNew?` prop: when set, a `+ add new` row
+appears at the bottom; Enter on it triggers the callback (typically opens a
+`<TextInput>` dialog and appends the result to the items list).
+
+**Visual caveat:** flowtty's stack layout has no `position: absolute` / z-index,
+so the dialog renders **below** the host content in the cell buffer (behaviorally
+modal — keys gated + awaitable — but visually inline). A true centered overlay
+needs positioning primitives, planned for a later layout milestone.
 
 ### Usage
 
 ```tsx
-import { render, Form, useField, TextInput, Box, Text, TtyBackend } from 'flowtty';
+import {
+  render, DialogHost, useDialogHost, useDialog,
+  MultiSelect, TextInput, Box, Text, TtyBackend,
+} from 'flowtty';
 
-function SlugField() {
-  const f = useField('slug', { validate: (v) => /^[a-z-]+$/.test(v as string) ? null : 'kebab-case only' });
+function NameDialog() {
+  const { done, cancel } = useDialog();
+  const [v, setV] = useState('');
   return (
-    <Box flexDirection="column">
-      <Text>slug:</Text>
-      <TextInput value={(f.value as string) ?? ''} onChange={f.onChange} onSubmit={f.onSubmit} onCancel={f.onCancel} isFocused={f.isFocused} />
-      {f.error && <Text color="red">{f.error}</Text>}
+    <Box>
+      <Text>new label: </Text>
+      <TextInput value={v} onChange={setV} onSubmit={() => done(v)} onCancel={cancel} />
     </Box>
   );
 }
 
-await render(
-  <Form onSubmit={(v) => console.log(v)} onCancel={() => process.exit(0)}>
-    <SlugField />
-    {/* ...more useField-based fields... */}
-  </Form>,
-  new TtyBackend(),
-);
+function App() {
+  const host = useDialogHost();
+  const [items, setItems] = useState([{ label: 'apple', value: 'a' }]);
+  return (
+    <MultiSelect
+      items={items} value={[]} onChange={() => {}} onSubmit={() => {}}
+      onAddNew={async () => {
+        const r = await host.openDialog<string>(<NameDialog />);
+        if (r.status === 'done') setItems((p) => [...p, { label: r.value, value: r.value }]);
+      }}
+    />
+  );
+}
+
+await render(<DialogHost><App /></DialogHost>, new TtyBackend());
 ```
 
 ### Still deferred (later milestones)
 
-- Embedded `openDialog` + `useDialog` (modal sub-prompts that return a value
-  without unmounting the host) — M1c.4.
-- MultiSelect "+ add new" inline-dialog row — needs `openDialog` (M1c.4).
+- Stacked/nested dialogs (one at a time today).
+- True modal overlay positioning (absolute/z-index) — dialogs render below host inline.
 - Frame diffing — full TTY redraw each `draw()`.
 - Truecolor (`#rgb` / `rgb(…)`).
-- Cross-field validation (form-level validate hook).
-- Async validate.
-- Arrow-key focus navigation (Tab/Shift-Tab only today; arrows belong to the
-  focused field).
+- Async-rendered dialog components (Suspense).
+- Bracketed paste, mouse, Kitty keyboard protocol, modifier-encoded arrows.
 
 ### Usage with Zod
 
