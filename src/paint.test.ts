@@ -1142,6 +1142,73 @@ describe('Box min/max sizing', () => {
   });
 });
 
+describe('Box display', () => {
+  test('display="none" hides the box AND lets siblings take its space', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Parent 4×1 row flex; two children width:4 with flexShrink:1.
+    // If both visible: each shrinks to 2 (red x=0..1, blue x=2..3).
+    // With red hidden via display:'none': only blue is laid out → blue takes the full 4 cells.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 4, height: 1 },
+        createElement('flowtty-box', { width: 4, height: 1, flexShrink: 1, display: 'none', backgroundColor: 'red' }),
+        createElement('flowtty-box', { width: 4, height: 1, flexShrink: 1, backgroundColor: 'blue' }),
+      ),
+    );
+    computeLayout(container, 4, 1);
+    const buf = paint(container, 4, 1);
+    // Blue fills the full 4 cells (red contributes no layout)
+    expect(buf.get(0, 0).style.bg).toBe('blue');
+    expect(buf.get(3, 0).style.bg).toBe('blue');
+    // Red was hidden — no red cells anywhere
+    for (let x = 0; x < 4; x++) {
+      expect(buf.get(x, 0).style.bg).not.toBe('red');
+    }
+  });
+
+  test('display="none" on a parent hides the entire subtree (children also invisible)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Outer container has two children: a visible blue box at left, and a display:'none' parent
+    // (which contains a "would-have-been-visible" red child). The hidden parent's red child
+    // must NOT appear anywhere.
+    root.render(
+      createElement('flowtty-box', { flexDirection: 'row', width: 4, height: 1 },
+        createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'blue' }),
+        createElement('flowtty-box', { display: 'none', width: 2, height: 1 },
+          createElement('flowtty-box', { width: 2, height: 1, backgroundColor: 'red' }),
+        ),
+      ),
+    );
+    computeLayout(container, 4, 1);
+    const buf = paint(container, 4, 1);
+    // Blue at x=0..1
+    expect(buf.get(0, 0).style.bg).toBe('blue');
+    expect(buf.get(1, 0).style.bg).toBe('blue');
+    // Hidden parent's subtree: no red anywhere. The cells beyond blue are undefined (background).
+    for (let x = 0; x < 4; x++) {
+      expect(buf.get(x, 0).style.bg).not.toBe('red');
+    }
+    expect(buf.get(2, 0).style.bg).toBeUndefined();
+    expect(buf.get(3, 0).style.bg).toBeUndefined();
+  });
+
+  test('display="flex" (default) keeps the box visible (no-op vs. omitting the prop)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    // Explicit display:'flex' should match the default behavior — child paints normally.
+    root.render(
+      createElement('flowtty-box', { width: 2, height: 1 },
+        createElement('flowtty-box', { display: 'flex', width: 2, height: 1, backgroundColor: 'red' }),
+      ),
+    );
+    computeLayout(container, 2, 1);
+    const buf = paint(container, 2, 1);
+    expect(buf.get(0, 0).style.bg).toBe('red');
+    expect(buf.get(1, 0).style.bg).toBe('red');
+  });
+});
+
 describe('Box aspectRatio', () => {
   test('width given + aspectRatio derives height (ratio 2 → height = width/2)', async () => {
     const Yoga = await getYoga();

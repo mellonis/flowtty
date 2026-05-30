@@ -111,6 +111,12 @@ function paintInstance(
   inheritedBg: string | undefined = undefined,
   clip: Rect | null = null,
 ): void {
+  // display: 'none' removes the box from layout (Yoga gives it zero size) AND
+  // skips its entire subtree from paint. Without this short-circuit the existing
+  // code would loop zero times for own draws and recurse into zero-sized children,
+  // which is correct but wasteful in deep trees.
+  if (inst.props.display === 'none') return;
+
   const box: Rect = layoutOf(inst, offsetX, offsetY);
   const ownBg = inst.props.backgroundColor;
   const effectiveBg = ownBg ?? inheritedBg;

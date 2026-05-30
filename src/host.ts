@@ -1,4 +1,4 @@
-import { Align, Edge, FlexDirection, Gutter, Justify, MeasureMode, PositionType, Wrap, type Yoga, type YogaNode } from './yoga.js';
+import { Align, Display, Edge, FlexDirection, Gutter, Justify, MeasureMode, PositionType, Wrap, type Yoga, type YogaNode } from './yoga.js';
 import { wrapText, type WrapMode } from './wrap.js';
 import type { BorderStyle } from './borders.js';
 
@@ -82,6 +82,9 @@ export interface BoxProps {
   /** Width / height ratio. Yoga derives the missing dimension from the constrained one.
    *  CSS convention: `aspectRatio: 2` = twice as wide as tall; `0.5` = twice as tall as wide; `1` = square. */
   aspectRatio?: number;
+  /** 'none' removes this box and all descendants from layout (siblings don't reserve space for it,
+   *  and paint skips the subtree). Default 'flex'. Useful for conditional UI without unmounting. */
+  display?: 'flex' | 'none';
   /** Stacking order within the same paint pass. Higher values paint on top.
    *  Default 0. Tree order is the tiebreaker. Does NOT cross pass boundaries:
    *  absolutes always overlay stack-flow regardless of zIndex. */
@@ -200,6 +203,7 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   n.setMinHeight(props.minHeight);
   n.setMaxHeight(props.maxHeight);
   n.setAspectRatio(props.aspectRatio);
+  n.setDisplay(props.display === 'none' ? Display.None : Display.Flex);
 
   // flex-wrap → Yoga Wrap enum. Always set so removing the prop re-renders correctly.
   n.setFlexWrap(wrapMap(props.flexWrap));
