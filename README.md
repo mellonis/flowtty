@@ -80,6 +80,16 @@ Values are integer cell counts. Negative values are allowed — Yoga supports th
 
 Per-axis wins over shorthand. Gap applies BETWEEN siblings only — no extra space at the parent's leading or trailing edge. Often cleaner than per-child `marginRight`/`marginBottom` for evenly-spaced lists.
 
+### Flex sizing
+
+`<Box>` accepts the three flex sizing props:
+
+- `flexGrow={n}` — claim a share of leftover space (proportional weight; default `0`)
+- `flexShrink={n}` — claim a share of deficit when siblings overflow (proportional weight; default `0`)
+- `flexBasis={n | 'auto' | '50%'}` — initial size before grow/shrink applies (default `'auto'` — uses `width`/`height`)
+
+**Defaults match Yoga, not CSS.** CSS sets `flex-shrink` to `1` by default — flowtty (via Yoga) leaves it at `0`, so children overflow rather than shrink unless `flexShrink={1}` is set explicitly. Useful when overflow is intentional; surprising if you're used to CSS.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
