@@ -100,6 +100,20 @@ Per-axis wins over shorthand. Gap applies BETWEEN siblings only — no extra spa
 
 When wrap is on, `rowGap` controls spacing between wrap lines (perpendicular to the main axis); `columnGap` continues to control spacing between items on the same line.
 
+### Align content
+
+`<Box alignContent>` controls cross-axis distribution of wrap lines. Only effective when `flexWrap` is `'wrap'` or `'wrap-reverse'` AND the parent has more cross-axis space than the wrap lines need. Default `'flex-start'`.
+
+- `'flex-start'` (default) — lines packed at cross-axis start
+- `'flex-end'` — lines packed at cross-axis end
+- `'center'` — lines centered
+- `'space-between'` — first line at start, last at end, free space between
+- `'space-around'` — equal space around each line
+- `'space-evenly'` — equal space between all lines including edges
+- `'stretch'` — lines stretch to fill cross-axis space
+
+CSS deviation: CSS3 defaults `align-content` to `'stretch'` for flex; flowtty defaults to `'flex-start'` (deterministic, doesn't reflow content unexpectedly).
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
