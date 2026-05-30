@@ -70,6 +70,16 @@ Values are integer cell counts. Padding and border combine — a `<Box border="s
 
 Values are integer cell counts. Negative values are allowed — Yoga supports them for overlap layouts (a child with `marginLeft={-1}` shifts one cell into its preceding sibling's space).
 
+### Gap
+
+`<Box>` accepts CSS-style gap props for spacing between flex children.
+
+- `gap={n}` — both axes
+- `rowGap={n}` — vertical spacing (between rows / column-flex items)
+- `columnGap={n}` — horizontal spacing (between columns / row-flex items)
+
+Per-axis wins over shorthand. Gap applies BETWEEN siblings only — no extra space at the parent's leading or trailing edge. Often cleaner than per-child `marginRight`/`marginBottom` for evenly-spaced lists.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
