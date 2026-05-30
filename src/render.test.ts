@@ -1,8 +1,19 @@
-import { describe, expect, test, vi } from 'vitest';
+import { afterEach, describe, expect, test, vi } from 'vitest';
 import { createElement, useEffect, useState } from 'react';
 import { render, Box, Text } from './index.js';
 import { TestBackend, flush, flushAsync } from './testing.js';
 import { useInput } from './use-input.js';
+
+// Defensive cross-test cleanup: render() registers process listeners for
+// uncaughtException + unhandledRejection. If a test forgets handle.unmount()
+// (or unmount runs but a microtask leaves a listener around), the listener
+// persists and a LATER test's `process.emit('uncaughtException', ...)` would
+// route to the stale onError callback. Removing listeners between tests
+// protects against that whole class of bug regardless of unmount discipline.
+afterEach(() => {
+  process.removeAllListeners('uncaughtException');
+  process.removeAllListeners('unhandledRejection');
+});
 
 test('M0 acceptance: render(<Box><Text>hi</Text></Box>) captures "hi"', async () => {
   const backend = new TestBackend(5, 1);
