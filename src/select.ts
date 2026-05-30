@@ -1,6 +1,7 @@
 import { createElement, useState, type ReactNode } from 'react';
 import { Box, Text } from './components.js';
 import { useInput } from './use-input.js';
+import { useFocus } from './use-focus.js';
 import { reduce, visibleIndices, type SelectItem, type SelectState } from './select-reducer.js';
 
 export type { SelectItem } from './select-reducer.js';
@@ -15,12 +16,16 @@ export interface SelectProps<T> {
   onSubmit: (value: T) => void;
   /** Called on Escape. */
   onCancel?: () => void;
-  /** When false, the component does not handle keys. Default true. */
+  /** Override focus state. If unset (default), the component reads from the
+   *  enclosing FocusGroup. If set, this overrides — useful for forcing focus
+   *  outside the focus system. */
   isFocused?: boolean;
 }
 
 export function Select<T>(props: SelectProps<T>): ReactNode {
-  const { items, value, onChange, onSubmit, onCancel, isFocused = true } = props;
+  const { items, value, onChange, onSubmit, onCancel, isFocused: explicitFocus } = props;
+  const { isFocused: ctxFocused } = useFocus();
+  const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
 
   // Initial cursor: position of the controlled value in the (unfiltered) item list.
   const initialCursor = Math.max(0, items.findIndex((it) => it.value === value));

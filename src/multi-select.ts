@@ -1,6 +1,7 @@
 import { createElement, useState, type ReactNode } from 'react';
 import { Box, Text } from './components.js';
 import { useInput } from './use-input.js';
+import { useFocus } from './use-focus.js';
 import { reduce, type MultiSelectState } from './multi-select-reducer.js';
 import type { SelectItem } from './select-reducer.js';
 
@@ -13,13 +14,18 @@ export interface MultiSelectProps<T> {
   /** Called on Enter with the current value array (in original item order). */
   onSubmit: (value: T[]) => void;
   onCancel?: () => void;
+  /** Override focus state. If unset (default), the component reads from the
+   *  enclosing FocusGroup. If set, this overrides — useful for forcing focus
+   *  outside the focus system. */
   isFocused?: boolean;
   /** When provided, a "+ add new" row appears after items; Enter on it calls this callback. */
   onAddNew?: () => void;
 }
 
 export function MultiSelect<T>(props: MultiSelectProps<T>): ReactNode {
-  const { items, value, onChange, onSubmit, onCancel, onAddNew, isFocused = true } = props;
+  const { items, value, onChange, onSubmit, onCancel, onAddNew, isFocused: explicitFocus } = props;
+  const { isFocused: ctxFocused } = useFocus();
+  const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   const totalRows = items.length + (onAddNew ? 1 : 0);
   const [state, setState] = useState<MultiSelectState>({ cursor: 0 });
   const cursor = Math.max(0, Math.min(state.cursor, totalRows - 1));

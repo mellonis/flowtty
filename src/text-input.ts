@@ -1,6 +1,7 @@
 import { createElement, useRef, useState, type ReactNode } from 'react';
 import { Box, Text } from './components.js';
 import { useInput } from './use-input.js';
+import { useFocus } from './use-focus.js';
 import { reduce, type EditorState } from './editor.js';
 import type { Rect } from './layout.js';
 
@@ -17,7 +18,9 @@ export interface TextInputProps {
   validate?: (value: string) => string | null | undefined;
   /** When true, render U+2022 (•) per character instead of the actual value. */
   mask?: boolean;
-  /** When false, the input does not handle keys. Default true. */
+  /** Override focus state. If unset (default), the component reads from the
+   *  enclosing FocusGroup. If set, this overrides — useful for forcing focus
+   *  outside the focus system. */
   isFocused?: boolean;
 }
 
@@ -27,7 +30,9 @@ export interface TextInputProps {
 const CURSOR_AT_END = ' ';
 
 export function TextInput(props: TextInputProps): ReactNode {
-  const { value, onChange, onSubmit, onCancel, validate, mask, isFocused = true } = props;
+  const { value, onChange, onSubmit, onCancel, validate, mask, isFocused: explicitFocus } = props;
+  const { isFocused: ctxFocused } = useFocus();
+  const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   const [cursor, setCursor] = useState(value.length);
   const safeCursor = Math.max(0, Math.min(value.length, cursor));
   // Allocated cell width of the input's viewport — captured via onLayout. null
