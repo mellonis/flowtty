@@ -129,6 +129,17 @@ CSS deviation: CSS3 defaults `align-content` to `'stretch'` for flex; flowtty de
 
 `'hidden'` does NOT clip the box's own background or border — those are this box's own area, not its descendants' writes. Clips are intersected across nested `overflow: 'hidden'` ancestors.
 
+### Size constraints
+
+`<Box>` accepts four optional min/max size props that clamp Yoga's computed size:
+
+- `minWidth={n | '50%'}` — prevents flexShrink (and content) from shrinking below this
+- `maxWidth={n | '50%'}` — caps flexGrow (and explicit width) at this
+- `minHeight={n | '50%'}` — column-flex analog of `minWidth`
+- `maxHeight={n | '50%'}` — column-flex analog of `maxWidth`
+
+Each accepts a cell count or a percent string. Undefined = no constraint. Useful for responsive layouts (e.g. `maxWidth: '80%'` on a content panel) and for keeping flex-grow children from claiming all available space.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
