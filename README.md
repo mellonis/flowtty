@@ -21,6 +21,19 @@ This is a perf-only change — no public API additions. Interactive apps
 (counter, prompt, form) that repaint per keystroke now issue a handful of
 bytes per frame instead of the full ~hundreds-of-bytes redraw.
 
+### Truecolor
+
+`Style.fg` and `Style.bg` accept:
+
+- Named colors (`'red'`, `'blue'`, `'white'`, …) — emit standard 30-37 / 40-47 codes.
+- 3-digit hex `#rgb` (each digit doubled — `#f80` → `#ff8800`).
+- 6-digit hex `#rrggbb`.
+- CSS-style `rgb(R, G, B)` (each channel 0–255 integer).
+
+24-bit color (`#…` / `rgb(…)`) emits `\x1b[38;2;R;G;Bm` (fg) / `\x1b[48;2;R;G;Bm` (bg).
+Modern terminal required (iTerm2, Terminal.app, Windows Terminal, modern xterm).
+Unknown values are silently ignored.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
