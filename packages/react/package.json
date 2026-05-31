@@ -1,0 +1,32 @@
+{
+  "name": "@flowtty/react",
+  "version": "0.0.0",
+  "type": "module",
+  "license": "MIT",
+  "description": "React adapter for flowtty: yoga-backed layout, paint pipeline, components, hooks, DialogHost.",
+  "exports": {
+    ".": {
+      "types": "./src/index.ts",
+      "import": "./src/index.ts"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "scripts": {
+    "build": "tsup",
+    "prepublishOnly": "npm run build"
+  },
+  "peerDependencies": {
+    "react": "^19.0.0"
+  },
+  "dependencies": {
+    "@flowtty/core": "*",
+    "yoga-layout": "^3.2.1"
+  },
+  "devDependencies": {
+    "@types/react-reconciler": "^0.28.9",
+    "react-reconciler": "^0.31.0",
+    "tsup": "^8"
+  }
+}

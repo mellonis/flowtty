@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "lib": ["ES2022"],
+    "jsx": "react-jsx",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "ignoreDeprecations": "6.0",
+    "types": ["node", "vitest/globals"],
+    // Resolve @flowtty/* to package source so `tsc --noEmit` works without a
+    // prior build. tsup builds publish to dist/ and the package.json `exports`
+    // field points there for installed consumers.
+    "baseUrl": ".",
+    "paths": {
+      "@flowtty/core":          ["./packages/core/src/index.ts"],
+      "@flowtty/core/testing":  ["./packages/core/src/testing/index.ts"],
+      "@flowtty/react":         ["./packages/react/src/index.ts"],
+      "@flowtty/tty-backend":   ["./packages/tty-backend/src/index.ts"]
+    }
+  }
+}

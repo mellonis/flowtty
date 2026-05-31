@@ -1,0 +1,47 @@
+export { render } from './internal/render.js';
+export type { RenderOptions } from './internal/render.js';
+export type { ErrorSource } from './components/ErrorBoundary.js';
+export { useTerminalSize, type TerminalSize } from './hooks/useTerminalSize.js';
+export { Box } from './components/base/Box.js';
+export { Text } from './components/base/Text.js';
+export type { BoxProps } from './internal/host.js';
+export type { BorderStyle, BorderChars } from './internal/borders.js';
+// Re-export core types from @flowtty/core so consumers using only @flowtty/react
+// have a single import surface for everything they typically need.
+export { Buffer } from '@flowtty/core';
+export type { Backend, Cell, Style, Key } from '@flowtty/core';
+export { useInput } from './hooks/useInput.js';
+export type { UseInputOptions } from './hooks/useInput.js';
+export type { InputSource, KeySubscriber } from './context/inputContext.js';
+export { TextInput } from './components/TextInput.js';
+export type { TextInputProps } from './components/TextInput.js';
+export type { TextProps } from './components/base/Text.js';
+export type { WrapMode } from './internal/wrap.js';
+export { Select } from './components/Select.js';
+export type { SelectItem, SelectProps } from './components/Select.js';
+export { MultiSelect } from './components/MultiSelect.js';
+export type { MultiSelectProps } from './components/MultiSelect.js';
+export { Confirm } from './components/Confirm.js';
+export type { ConfirmProps } from './components/Confirm.js';
+export { Form } from './components/Form.js';
+export type { FormProps } from './components/Form.js';
+export { useField } from './hooks/useField.js';
+export type { UseFieldOptions, FieldControl } from './hooks/useField.js';
+export type { FormApi, FormFieldRegistration } from './context/formContext.js';
+export { DialogHost } from './components/DialogHost.js';
+export { useDialog, useDialogHost, useDialogIsTop } from './hooks/useDialog.js';
+export type {
+  DialogHostApi, DialogResultApi, DialogResult,
+} from './context/dialogContext.js';
+export { FocusGroup } from './components/FocusGroup.js';
+export type { FocusGroupProps } from './components/FocusGroup.js';
+export { useFocus } from './hooks/useFocus.js';
+export type { UseFocusResult } from './hooks/useFocus.js';
+export { Button } from './components/Button.js';
+export type { ButtonProps } from './components/Button.js';
+export { windowAround } from './utils/windowAround.js';
+export { splitVisualLines, type VisualLine } from './utils/visualLines.js';
+export { Title } from './components/Title.js';
+export { HRule } from './components/HRule.js';
+export { HelpBar } from './components/HelpBar.js';
+export { Menu, type MenuItem, type MenuProps } from './components/Menu.js';
