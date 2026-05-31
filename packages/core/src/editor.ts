@@ -1,4 +1,4 @@
-import type { Key } from '@flowtty/core';
+import type { Key } from './keys.js';
 
 export interface EditorState {
   value: string;

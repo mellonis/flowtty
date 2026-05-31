@@ -1,5 +1,5 @@
 import { createElement, type ReactNode } from 'react';
-import type { BoxProps } from '../../internal/host.js';
+import type { BoxProps } from '@flowtty/core';
 import { InputContext, type InputSource } from '../../context/inputContext.js';
 
 // Singleton muted input source. Subscribers never fire — used by `inert={true}`

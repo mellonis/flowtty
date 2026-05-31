@@ -1,5 +1,4 @@
-import type { Container } from './reconciler.js';
-import type { Instance } from './host.js';
+import type { Container, Instance } from './host.js';
 
 export interface Rect {
   left: number;

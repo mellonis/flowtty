@@ -1,10 +1,9 @@
 import { expect, test } from 'vitest';
 import { createElement } from 'react';
-import { getYoga } from '../internal/yoga.js';
+import { getYoga, type Key } from '@flowtty/core';
 import { createRoot } from '../internal/reconciler.js';
 import { useInput } from './useInput.js';
 import { InputContext, type KeySubscriber } from '../context/inputContext.js';
-import type { Key } from '@flowtty/core';
 
 test('useInput subscribes via context and receives dispatched keys', async () => {
   const subscribers = new Set<KeySubscriber>();

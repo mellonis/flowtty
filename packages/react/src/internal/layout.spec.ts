@@ -1,8 +1,7 @@
 import { expect, test } from 'vitest';
 import { createElement } from 'react';
-import { getYoga } from './yoga.js';
+import { getYoga, computeLayout, layoutOf } from '@flowtty/core';
 import { createRoot } from './reconciler.js';
-import { computeLayout, layoutOf } from './layout.js';
 
 test('row layout places two fixed-width boxes side by side', async () => {
   const Yoga = await getYoga();

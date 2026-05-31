@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 import ReactReconciler from 'react-reconciler';
 import { DefaultEventPriority } from 'react-reconciler/constants.js';
-import type { Yoga } from './yoga.js';
 import {
   appendChild,
   applyProps,
@@ -10,15 +9,14 @@ import {
   insertBefore,
   refreshMeasure,
   removeChild,
+  type Container,
   type HostType,
   type Instance,
   type TextInstance,
-} from './host.js';
+  type Yoga,
+} from '@flowtty/core';
 
-export interface Container {
-  children: Instance[];
-  Yoga: Yoga;
-}
+export type { Container } from '@flowtty/core';
 
 // `react-reconciler/constants.js` exports `NoEventPriority` (= 0) at runtime,
 // but `@types/react-reconciler@0.28.9`'s `constants.d.ts` does not re-export it.

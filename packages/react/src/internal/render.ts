@@ -1,9 +1,6 @@
 import { createElement, type ReactNode } from 'react';
-import { getYoga } from './yoga.js';
+import { getYoga, computeLayout, paint, type Backend } from '@flowtty/core';
 import { createRoot } from './reconciler.js';
-import { computeLayout } from './layout.js';
-import { paint } from './paint.js';
-import type { Backend } from '@flowtty/core';
 import { InputContext, type InputSource } from '../context/inputContext.js';
 import { TerminalSizeProvider } from '../hooks/useTerminalSize.js';
 import { ErrorBoundary, type ErrorSource } from '../components/ErrorBoundary.js';

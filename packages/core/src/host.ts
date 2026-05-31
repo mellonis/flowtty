@@ -120,6 +120,17 @@ export interface TextInstance {
   parent?: Instance;
 }
 
+/**
+ * Adapter-facing root container: a list of top-level Instances plus the loaded
+ * Yoga module. Each framework adapter (React reconciler, Vue, …) builds one of
+ * these and passes it to `computeLayout` + `paint`. Lives in host so layout /
+ * paint (in core) can depend on it without pulling in any adapter code.
+ */
+export interface Container {
+  children: Instance[];
+  Yoga: Yoga;
+}
+
 export function createInstance(type: HostType, props: BoxProps, Yoga: Yoga): Instance {
   // Single host type — 'flowtty-text' was removed; Text is sugar for Box.
   const node = Yoga.Node.create();

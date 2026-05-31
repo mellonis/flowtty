@@ -1,7 +1,7 @@
 import React from "react";
 import { describe, test, expect, vi } from 'vitest';
 import { createElement, useEffect } from 'react';
-import { getYoga } from '../internal/yoga.js';
+import { getYoga } from '@flowtty/core';
 import { createRoot } from '../internal/reconciler.js';
 import { ErrorBoundary } from './ErrorBoundary.js';
 import { flushAsync } from '@flowtty/core/testing';

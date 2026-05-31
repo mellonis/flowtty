@@ -4,8 +4,7 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
-import { reduce, type MultiSelectState } from '../internal/multiSelectReducer.js';
-import type { SelectItem } from '../internal/selectReducer.js';
+import { multiSelectReducer as reduce, type MultiSelectState, type SelectItem } from '@flowtty/core';
 
 export interface MultiSelectProps<T> {
   items: SelectItem<T>[];

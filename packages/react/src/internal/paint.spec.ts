@@ -1,11 +1,8 @@
 import { describe, expect, test } from 'vitest';
 import { vi } from 'vitest';
 import { createElement } from 'react';
-import { getYoga } from './yoga.js';
+import { getYoga, computeLayout, paint, BORDER_CHARS } from '@flowtty/core';
 import { createRoot } from './reconciler.js';
-import { computeLayout } from './layout.js';
-import { paint } from './paint.js';
-import { BORDER_CHARS } from './borders.js';
 
 test('paints text inside a box at the box origin', async () => {
   const Yoga = await getYoga();

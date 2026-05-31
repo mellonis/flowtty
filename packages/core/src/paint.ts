@@ -1,9 +1,8 @@
-import { Buffer, type Style } from '@flowtty/core';
-import { layoutOf, type Rect } from './layout.js';
-import { ownText, type Instance } from './host.js';
-import type { Container } from './reconciler.js';
+import { Buffer, type Style } from './cells.js';
 import { wrapText, type WrapMode } from './wrap.js';
 import { BORDER_CHARS } from './borders.js';
+import { layoutOf, type Rect } from './layout.js';
+import { ownText, type Instance, type Container } from './host.js';
 import { Edge } from './yoga.js';
 
 export function paint(container: Container, width: number, height: number): Buffer {

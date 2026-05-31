@@ -4,9 +4,9 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
-import { reduce, visibleIndices, type SelectItem, type SelectState } from '../internal/selectReducer.js';
+import { selectReducer as reduce, visibleIndices, type SelectItem, type SelectState } from '@flowtty/core';
 
-export type { SelectItem } from '../internal/selectReducer.js';
+export type { SelectItem } from '@flowtty/core';
 
 export interface SelectProps<T> {
   items: SelectItem<T>[];

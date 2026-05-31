@@ -21,8 +21,7 @@
     "react": "^19.0.0"
   },
   "dependencies": {
-    "@flowtty/core": "*",
-    "yoga-layout": "^3.2.1"
+    "@flowtty/core": "*"
   },
   "devDependencies": {
     "@types/react-reconciler": "^0.28.9",
