@@ -14,8 +14,34 @@ export interface DialogHostApi {
    * PUSHES a new dialog on top of the stack — previously open dialogs stay
    * alive, render behind the new one, and receive input again when the top
    * dialog is closed.
+   *
+   * Options:
+   *   - `title` — when set, the overlay wraps the element in a full-screen
+   *     bordered Box with `title` painted into the top border. Use when you
+   *     want a "window-frame" chrome the dialog content doesn't have to
+   *     render itself. The element fills the inside of the frame.
    */
-  openDialog<T = unknown>(element: ReactNode): Promise<DialogResult<T>>;
+  openDialog<T = unknown>(element: ReactNode, options?: OpenDialogOptions): Promise<DialogResult<T>>;
+}
+
+export interface OpenDialogOptions {
+  /** Painted into the top border line of the wrapper. Truncated with `…` if too long. */
+  title?: string;
+  /**
+   * When true, the wrapper is content-sized (with optional min/max constraints)
+   * and the DialogHost overlay centers it on the screen — i.e. a "floating"
+   * dialog. When false (default), the wrapper fills the overlay (full-screen
+   * windowed view).
+   */
+  floating?: boolean;
+  /** Minimum wrapper width. Effective in floating mode. */
+  minWidth?: number | string;
+  /** Maximum wrapper width. Defaults to '80%' in floating mode. */
+  maxWidth?: number | string;
+  /** Maximum wrapper height. Defaults to '80%' in floating mode. */
+  maxHeight?: number | string;
+  /** Padding (cells) inside the wrapper between border and content. */
+  padding?: number;
 }
 
 /** Dialog-side API: the dialog's own components call these to resolve. */
@@ -25,7 +51,7 @@ export interface DialogResultApi {
 }
 
 const noopHost: DialogHostApi = {
-  openDialog: <T = unknown>() =>
+  openDialog: <T = unknown>(_e?: unknown, _o?: OpenDialogOptions) =>
     Promise.resolve({ status: 'cancelled' } as DialogResult<T>),
 };
 const noopResult: DialogResultApi = { done() {}, cancel() {} };

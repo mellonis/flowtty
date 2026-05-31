@@ -38,6 +38,10 @@ export interface BoxProps {
   border?: BorderStyle;
   // Color for border glyphs — same string format as `color` (named or truecolor).
   borderColor?: string;
+  // Text painted into the top border line (after the corner + 1 edge piece).
+  // No-op unless `border` is set. Long titles are truncated with `…` to leave
+  // at least 1 edge piece on each side. Painted with the same color as the border.
+  borderTitle?: string;
   // Padding (cells). Per-edge wins over axis wins over shorthand.
   // E.g. paddingTop overrides paddingY which overrides padding.
   padding?: number;

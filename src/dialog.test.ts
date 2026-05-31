@@ -158,7 +158,7 @@ test('M1c.4 acceptance: MultiSelect+add-new opens dialog, dialog submit appends 
   expect(backend.lastFrame).toContain('+ add new');
 });
 
-test('M1f acceptance: dialog renders as a centered overlay ON TOP of the host content (frame fits in host row count)', async () => {
+test('M1f acceptance: dialog renders as an opaque centered overlay ON TOP of the host content (frame fits in host row count, host masked)', async () => {
   function HostApp() {
     const host = useDialogHost();
     useInput((key) => {
@@ -180,8 +180,9 @@ test('M1f acceptance: dialog renders as a centered overlay ON TOP of the host co
   // The dialog overlay sits INSIDE the 5-row frame; the dialog's "name: " prompt is visible.
   expect(backend.lastFrame.split('\n').length).toBeLessThanOrEqual(5);
   expect(backend.lastFrame).toContain('name:');
-  // Host content at the top and bottom rows is intact — the dialog did NOT paint over row 1
-  // (which would happen if the dialog rendered as a sibling at origin instead of a true overlay).
-  expect(backend.lastFrame).toContain('HOST CONTENT ROW 1');
-  expect(backend.lastFrame).toContain('HOST CONTENT ROW 5');
+  // Dialog is OPAQUE: every host content row is masked by the overlay fill.
+  // (Otherwise lower-stack cells bleed through gaps in the dialog content — see
+  // bleed-through bug we hit in a nested detail view.)
+  expect(backend.lastFrame).not.toContain('HOST CONTENT ROW 1');
+  expect(backend.lastFrame).not.toContain('HOST CONTENT ROW 5');
 });

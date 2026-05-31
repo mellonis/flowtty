@@ -38,3 +38,7 @@ export { useFocus } from './use-focus.js';
 export type { UseFocusResult } from './use-focus.js';
 export { Button } from './button.js';
 export type { ButtonProps } from './button.js';
+export { windowAround } from './window-around.js';
+export { splitVisualLines, type VisualLine } from './visual-lines.js';
+export { Title, HRule, HelpBar } from './chrome.js';
+export { Menu, type MenuItem, type MenuProps } from './menu.js';

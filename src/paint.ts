@@ -83,6 +83,24 @@ function paintBorder(inst: Instance, buffer: Buffer, box: Rect, clip: Rect | nul
     setClipped(buffer, x0, y, chars.l, cellStyle, clip);
     setClipped(buffer, x1, y, chars.r, cellStyle, clip);
   }
+
+  // borderTitle: overlay " title " on the top edge starting after the top-left
+  // corner + 1 edge piece, ending before 1 edge piece + top-right corner. So
+  // available width = box.width - 4 (corner+edge on each side). Truncate with
+  // an ellipsis cell if it doesn't fit; skip entirely if width < 5.
+  const title = inst.props.borderTitle;
+  if (title && title !== '') {
+    const avail = box.width - 4;
+    if (avail >= 1) {
+      const raw = ` ${title} `;
+      const titleChars = [...raw];
+      const drawN = Math.min(titleChars.length, avail);
+      for (let i = 0; i < drawN; i++) {
+        const ch = i === drawN - 1 && titleChars.length > avail ? '…' : titleChars[i]!;
+        setClipped(buffer, x0 + 2 + i, y0, ch, cellStyle, clip);
+      }
+    }
+  }
 }
 
 // Inner content rect (padding + border subtracted). Yoga's computed values are
@@ -155,7 +173,14 @@ function paintInstance(
       const chars = [...(lines[row] ?? '')];
       for (let col = 0; col < chars.length; col++) {
         if (col >= content.width) break;
-        setClipped(buffer, content.left + col, content.top + row, chars[col]!, textStyle, clip);
+        // Sanitize C0 control bytes (NUL..US): emitting them to a TTY moves /
+        // resets the cursor (e.g. \r → col 0, \b → back) and corrupts subsequent
+        // cells in the diff-emitted stream. Substitute a space so the cell is
+        // still occupied but inert. Tab/newline included — splitting is handled
+        // upstream by wrapText.
+        const ch = chars[col]!;
+        const safe = ch.charCodeAt(0) < 0x20 ? ' ' : ch;
+        setClipped(buffer, content.left + col, content.top + row, safe, textStyle, clip);
       }
     }
   }

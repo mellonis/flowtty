@@ -121,6 +121,15 @@ function csiName(final: string, params: string): string {
         case '4': return 'end';
         case '5': return 'pageup';
         case '6': return 'pagedown';
+        // Function keys F5..F12 (xterm/vt100 standard tilde form).
+        case '15': return 'f5';
+        case '17': return 'f6';
+        case '18': return 'f7';
+        case '19': return 'f8';
+        case '20': return 'f9';
+        case '21': return 'f10';
+        case '23': return 'f11';
+        case '24': return 'f12';
         default: return `csi-tilde-${params}`;
       }
     default: return `csi-${final}`;

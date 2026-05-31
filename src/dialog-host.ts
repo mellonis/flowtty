@@ -8,11 +8,13 @@ import {
   type DialogHostApi,
   type DialogResult,
   type DialogResultApi,
+  type OpenDialogOptions,
 } from './dialog-context.js';
 import { FocusGroup } from './focus-group.js';
 
 interface PendingDialog {
   element: ReactNode;
+  options?: OpenDialogOptions;
   resolve(result: DialogResult<unknown>): void;
 }
 
@@ -39,11 +41,11 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
   // Push a new dialog onto the top of the stack. Previous dialogs are NOT
   // cancelled — they stay open, just visually behind + input-muted until the
   // newly-opened dialog closes.
-  const openDialog = useCallback(<T,>(element: ReactNode): Promise<DialogResult<T>> => {
+  const openDialog = useCallback(<T,>(element: ReactNode, options?: OpenDialogOptions): Promise<DialogResult<T>> => {
     return new Promise<DialogResult<T>>((resolve) => {
       setStack((s) => [
         ...s,
-        { element, resolve: resolve as (r: DialogResult<unknown>) => void },
+        { element, options, resolve: resolve as (r: DialogResult<unknown>) => void },
       ]);
     });
   }, []);
@@ -74,6 +76,39 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
     // gets the real outerSource; lower dialogs get mutedSource.
     ...stack.map((d, i) => {
       const isTop = i === stack.length - 1;
+      // Wrap the element when title is set OR floating is requested. Two modes:
+      //   - default (full-screen): wrapper fills the overlay; inner element
+      //     can use width:'100%' / height:'100%' to span the inside.
+      //   - floating: wrapper is content-sized with optional min/max constraints;
+      //     the overlay's alignItems/justifyContent centers it.
+      const o = d.options;
+      let content: ReactNode = d.element;
+      if (o?.title != null || o?.floating) {
+        const wrapperProps: Record<string, unknown> = {
+          border: 'single',
+          flexDirection: 'column',
+          padding: o.padding,
+        };
+        if (o.title != null) wrapperProps.borderTitle = o.title;
+        if (o.floating) {
+          wrapperProps.maxWidth = o.maxWidth ?? '80%';
+          wrapperProps.maxHeight = o.maxHeight ?? '80%';
+          if (o.minWidth !== undefined) wrapperProps.minWidth = o.minWidth;
+          // Floating wrappers mask their OWN area only — the overlay around them
+          // stays transparent so the previous dialog (parent wizard etc.) shows
+          // through, matching desktop "floating dialog over parent" UX.
+          wrapperProps.backgroundColor = 'default';
+        } else {
+          wrapperProps.width = '100%';
+          wrapperProps.height = '100%';
+        }
+        content = createElement(Box, wrapperProps, d.element);
+      }
+      // Overlay opacity: full-screen wrappers (or unwrapped elements) get an
+      // OPAQUE overlay that masks everything underneath. Floating wrappers
+      // leave the surrounding overlay TRANSPARENT — the wrapper itself is the
+      // only opaque region, so lower stack entries remain visible around it.
+      const overlayBg = o?.floating ? undefined : 'default';
       return createElement(
         Box,
         {
@@ -82,6 +117,11 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
           top: 0, left: 0,
           width: '100%', height: '100%',
           justifyContent: 'center', alignItems: 'center',
+          // Backdrop: opaque ('default') for full-screen dialogs to mask
+          // everything underneath; transparent (undefined) for floating
+          // dialogs so the wrapper is the only opaque region and lower stack
+          // entries show around it. See `overlayBg` computed above.
+          backgroundColor: overlayBg,
         },
         createElement(
           InputContext.Provider,
@@ -92,7 +132,7 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
           // entry. Accept that constraint; flag in README if it bites.
           createElement(DialogResultContext.Provider, { value: dialogApi },
             createElement(DialogIsTopContext.Provider, { value: isTop },
-              createElement(FocusGroup, { isActive: isTop }, d.element),
+              createElement(FocusGroup, { isActive: isTop }, content),
             ),
           ),
         ),
