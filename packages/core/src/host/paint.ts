@@ -1,5 +1,5 @@
-import { Buffer, type Style } from './cells.js';
-import { wrapText, type WrapMode } from './wrap.js';
+import { Buffer, type Style } from '../cells.js';
+import { wrapText, type WrapMode } from '../wrap.js';
 import { BORDER_CHARS } from './borders.js';
 import { layoutOf, type Rect } from './layout.js';
 import { ownText, type Instance, type Container } from './host.js';

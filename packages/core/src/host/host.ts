@@ -1,5 +1,5 @@
 import { Align, Display, Edge, FlexDirection, Gutter, Justify, MeasureMode, PositionType, Wrap, type Yoga, type YogaNode } from './yoga.js';
-import { wrapText, type WrapMode } from './wrap.js';
+import { wrapText, type WrapMode } from '../wrap.js';
 import type { BorderStyle } from './borders.js';
 import type { Rect } from './layout.js';
 

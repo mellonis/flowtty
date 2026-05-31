@@ -1,7 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { vi } from 'vitest';
 import { createElement } from 'react';
-import { getYoga, computeLayout, paint, BORDER_CHARS } from '@flowtty/core';
+import { getYoga, computeLayout, paint, BORDER_CHARS } from '@flowtty/core/host';
 import { createRoot } from './reconciler.js';
 
 test('paints text inside a box at the box origin', async () => {

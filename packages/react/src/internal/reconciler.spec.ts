@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { createElement } from 'react';
-import { getYoga } from '@flowtty/core';
+import { getYoga } from '@flowtty/core/host';
 import { createRoot } from './reconciler.js';
 
 test('box with mixed text + box children mounts without crashing', async () => {

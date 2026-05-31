@@ -14,9 +14,9 @@ import {
   type Instance,
   type TextInstance,
   type Yoga,
-} from '@flowtty/core';
+} from '@flowtty/core/host';
 
-export type { Container } from '@flowtty/core';
+export type { Container } from '@flowtty/core/host';
 
 // `react-reconciler/constants.js` exports `NoEventPriority` (= 0) at runtime,
 // but `@types/react-reconciler@0.28.9`'s `constants.d.ts` does not re-export it.

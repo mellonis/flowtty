@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { createElement } from 'react';
-import { getYoga, computeLayout, layoutOf } from '@flowtty/core';
+import { getYoga, computeLayout, layoutOf } from '@flowtty/core/host';
 import { createRoot } from './reconciler.js';
 
 test('row layout places two fixed-width boxes side by side', async () => {

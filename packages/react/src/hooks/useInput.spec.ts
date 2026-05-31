@@ -1,6 +1,7 @@
 import { expect, test } from 'vitest';
 import { createElement } from 'react';
-import { getYoga, type Key } from '@flowtty/core';
+import { type Key } from '@flowtty/core';
+import { getYoga } from '@flowtty/core/host';
 import { createRoot } from '../internal/reconciler.js';
 import { useInput } from './useInput.js';
 import { InputContext, type KeySubscriber } from '../context/inputContext.js';

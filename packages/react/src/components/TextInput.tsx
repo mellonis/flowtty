@@ -4,7 +4,8 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
-import { editorReducer as reduce, type EditorState, type Rect } from '@flowtty/core';
+import { editorReducer as reduce, type EditorState } from '@flowtty/core';
+import { type Rect } from '@flowtty/core/host';
 
 export interface TextInputProps {
   /** Controlled value. Required (no defaultValue / uncontrolled mode in M1b). */

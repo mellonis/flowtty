@@ -10,6 +10,7 @@ export default defineConfig({
   test: { globals: true, environment: 'node' },
   resolve: {
     alias: {
+      '@flowtty/core/host':    here('./packages/core/src/host/index.ts'),
       '@flowtty/core/testing': here('./packages/core/src/testing/index.ts'),
       '@flowtty/core':         here('./packages/core/src/index.ts'),
       '@flowtty/react':        here('./packages/react/src/index.ts'),
