@@ -1,5 +1,5 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
-import type { Buffer, Style, Backend, Key } from '@flowtty/core';
+import { stringWidth, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
 import {
   decodeKeys,
   detectHyperlinkSupport,
@@ -220,6 +220,10 @@ export class InlineTtyBackend implements Backend {
           lineLink = cell.style.link;
         }
         line += cell.char;
+        // Interim wide-char handling (see TtyBackend.drawFull): back the cursor
+        // up one after an East Asian Wide/emoji glyph so the next cell overwrites
+        // its second column rather than shifting the row right.
+        if (stringWidth(cell.char) === 2) line += '\b';
       }
       if (lineLink !== undefined) line += OSC8_CLOSE;
       lines.push(line + RESET);

@@ -1,5 +1,5 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
-import type { Buffer, Style, Backend, Key } from '@flowtty/core';
+import { stringWidth, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
 import { ALT_SCREEN_OFF, ALT_SCREEN_ON, CLEAR, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, osc8Open, sgr } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
@@ -95,6 +95,12 @@ export class TtyBackend implements Backend {
           lineLink = cell.style.link;
         }
         line += cell.char;
+        // Interim wide-char handling: the grid is one cell per code point, but
+        // the terminal advances TWO columns for an East Asian Wide/emoji glyph.
+        // Back the cursor up one so the next cell overwrites the glyph's second
+        // column instead of the whole row shifting right. Accepts visual overlap
+        // (the glyph's right half gets clobbered) to keep column alignment.
+        if (stringWidth(cell.char) === 2) line += '\b';
       }
       if (lineLink !== undefined) line += OSC8_CLOSE;
       outStr += line + RESET + (y < buffer.height - 1 ? '\n' : '');
@@ -139,6 +145,10 @@ export class TtyBackend implements Backend {
           penLink = b.style.link;
         }
         out += b.char;
+        // See drawFull: back the cursor up one after a wide glyph. lastX stays
+        // `x` because \b leaves the cursor at physical x+1, so the adjacency
+        // check still skips cursor positioning for a changed cell at x+1.
+        if (stringWidth(b.char) === 2) out += '\b';
         lastX = x;
         lastY = y;
       }

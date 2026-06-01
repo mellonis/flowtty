@@ -341,6 +341,36 @@ test('TtyBackend.draw (diff): emits OSC 8 open/close around a newly-linked cell'
   back.dispose();
 });
 
+test('TtyBackend.draw (full): backs cursor one column after a wide glyph, not after ASCII', () => {
+  const { stub: out, writes } = makeStub(3, 1);
+  const back = new TtyBackend(out);
+  const buf = new Buffer(3, 1);
+  buf.set(0, 0, '日'); // East Asian Wide → stringWidth 2
+  buf.set(1, 0, 'x');
+  buf.set(2, 0, 'y');
+  back.draw(buf);
+  const drawWrite = writes[1]!;
+  // Wide glyph is immediately followed by a backspace so the next cell overwrites
+  // its second column; the ASCII cells are not.
+  expect(drawWrite).toContain('日\b');
+  expect(drawWrite).not.toContain('x\b');
+  back.dispose();
+});
+
+test('TtyBackend.draw (diff): backs cursor after a wide glyph and keeps row alignment', () => {
+  const { stub: out, writes } = makeStub(3, 1);
+  const back = new TtyBackend(out);
+  const buf1 = new Buffer(3, 1);
+  buf1.set(0, 0, 'a'); buf1.set(1, 0, 'b'); buf1.set(2, 0, 'c');
+  back.draw(buf1);
+  const buf2 = new Buffer(3, 1);
+  buf2.set(0, 0, '日'); buf2.set(1, 0, 'b'); buf2.set(2, 0, 'c');
+  back.draw(buf2);
+  const diff = writes[writes.length - 1]!;
+  expect(diff).toContain('日\b');
+  back.dispose();
+});
+
 test('TtyBackend: resize invalidates previousBuffer → next draw is a full redraw', () => {
   const { stub: out, writes } = makeStub(4, 1);
   const stdin = makeStdinStub();

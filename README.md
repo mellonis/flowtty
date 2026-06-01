@@ -500,8 +500,34 @@ only governs `<Link>` fallback (rendered-markdown links emit OSC 8 either way).
 The URL rides in the cell `Style.link`, so it threads through the same paint +
 frame-diff path as visual attributes.
 
+### Display width
+
+`stringWidth(str)` / `charWidth(codePoint)` measure how many terminal **cells**
+text occupies: 1 for most glyphs, 2 for East Asian Wide/Fullwidth and most emoji,
+0 for combining marks, zero-width formatters, and control bytes. The tables (the
+Markus Kuhn combining set + the East Asian Wide/Fullwidth blocks) are inlined —
+no dependency. Use it to align columns or budget a row's width when laying out
+your own content (it's the primitive the upcoming `<Table>` builds on).
+
+```ts
+import { stringWidth } from 'flowtty';
+
+stringWidth('café');  // 4  (combining accent adds 0)
+stringWidth('日本語'); // 6  (each ideograph is 2)
+stringWidth('a😀b');  // 4
+```
+
+Measurement is per-code-point, not grapheme-aware, so an emoji ZWJ sequence
+(👩‍👧) over-counts; pre-segment if you need cluster-exact widths. Expects plain
+text (styling lives in the cell, not the string).
+
 ### Still deferred (later milestones)
 
+- Wide-character **rendering**: the grid is still one cell per code point. The
+  backends back the cursor up one column after a double-width glyph (measured via
+  `stringWidth`) so the row stays column-aligned instead of shifting right — but
+  this overlaps the glyph's second column with the next cell. Cell-accurate
+  CJK/emoji layout waits on paint reserving the second cell.
 - Scrolling-region optimization for log-stream apps.
 - Column-only cursor moves (`CSI <col>G`) when row is unchanged — small extra perf nibble.
 - Truecolor (`#rgb` / `rgb(…)`).
