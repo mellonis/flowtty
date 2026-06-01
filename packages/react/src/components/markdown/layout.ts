@@ -58,20 +58,37 @@ function segsToChars(segs: InlineSeg[], base: SpanStyle = {}): StyledChar[] {
 // Greedy word-wrap over styled chars. Words are non-space runs; a single space
 // separates them. Over-long words are hard char-wrapped. Collapses space runs,
 // which is fine because paragraphs are already space-joined by parseMarkdown.
-function wrapChars(chars: StyledChar[], width: number): StyledChar[][] {
-  const words: StyledChar[][] = [];
-  let cur: StyledChar[] = [];
-  for (const c of chars) {
-    if (c.ch === ' ') { if (cur.length) { words.push(cur); cur = []; } }
-    else cur.push(c);
-  }
-  if (cur.length) words.push(cur);
+//
+// Each word remembers the style of the space that preceded it (`sep`), so an
+// interword space *inside* a styled run (e.g. the space in *bare state*) keeps
+// that run's style — an emphasis underline runs continuously across the space
+// instead of breaking on it.
+interface Word { chars: StyledChar[]; sep: SpanStyle }
 
-  if (width <= 0) return [words.flatMap((w, i) => (i ? [{ ch: ' ', style: {} }, ...w] : w))];
+function wrapChars(chars: StyledChar[], width: number): StyledChar[][] {
+  const words: Word[] = [];
+  let cur: StyledChar[] = [];
+  let curSep: SpanStyle = {};
+  let spaceStyle: SpanStyle | null = null; // style of the first space in the current run
+  for (const c of chars) {
+    if (c.ch === ' ') {
+      if (cur.length) { words.push({ chars: cur, sep: curSep }); cur = []; curSep = {}; }
+      if (spaceStyle === null) spaceStyle = c.style;
+    } else {
+      if (spaceStyle !== null) { curSep = spaceStyle; spaceStyle = null; }
+      cur.push(c);
+    }
+  }
+  if (cur.length) words.push({ chars: cur, sep: curSep });
+
+  if (width <= 0) {
+    return [words.flatMap((w, i) => (i ? [{ ch: ' ', style: w.sep }, ...w.chars] : w.chars))];
+  }
 
   const lines: StyledChar[][] = [];
   let line: StyledChar[] = [];
-  for (let word of words) {
+  for (const w of words) {
+    let word = w.chars;
     while (word.length > width) {
       if (line.length) { lines.push(line); line = []; }
       lines.push(word.slice(0, width));
@@ -82,7 +99,7 @@ function wrapChars(chars: StyledChar[], width: number): StyledChar[][] {
       if (line.length) lines.push(line);
       line = [...word];
     } else {
-      if (sep) line.push({ ch: ' ', style: {} });
+      if (sep) line.push({ ch: ' ', style: w.sep });
       line.push(...word);
     }
   }
@@ -158,10 +175,21 @@ export function layoutMarkdown(src: string, width: number): StyledLine[] {
       }
       case 'list':
         b.items.forEach((item, idx) => {
-          const marker = b.ordered ? `${idx + 1}. ` : '• ';
-          out.push(...wrapBlock(item, width, {
-            first: [{ text: marker, color: 'yellow' }],
-            cont: [{ text: ' '.repeat(marker.length) }],
+          const num = b.ordered ? `${idx + 1}. ` : '';
+          const first: StyledSpan[] = [];
+          if (item.checked === undefined) {
+            const bullet = b.ordered ? num : '• ';
+            first.push({ text: bullet, color: 'yellow' });
+          } else {
+            // GFM task item: `☑ ` (checked, green) / `☐ ` (unchecked). For an
+            // ordered list keep the number, then the box.
+            if (num) first.push({ text: num, color: 'yellow' });
+            first.push({ text: item.checked ? '☑ ' : '☐ ', color: item.checked ? 'green' : undefined });
+          }
+          const indent = first.reduce((n, s) => n + [...s.text].length, 0);
+          out.push(...wrapBlock(item.segs, width, {
+            first,
+            cont: [{ text: ' '.repeat(indent) }],
           }));
         });
         break;

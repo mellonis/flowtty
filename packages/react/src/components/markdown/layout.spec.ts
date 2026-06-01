@@ -59,6 +59,34 @@ describe('layoutMarkdown', () => {
     expect(link?.link).toBe('http://x');
   });
 
+  test('GFM task-list items render checkbox glyphs (☑ checked / ☐ unchecked)', () => {
+    const lines = layoutMarkdown('- [ ] todo\n- [x] done', 40);
+    expect(text(lines[0]!)).toBe('☐ todo');
+    expect(text(lines[1]!)).toBe('☑ done');
+    // Checked box is green; unchecked uses the default color.
+    const checked = lines[1]!.spans.find((s) => s.text.startsWith('☑'));
+    expect(checked?.color).toBe('green');
+  });
+
+  test('emphasis underline runs continuously across an interword space', () => {
+    const [line] = layoutMarkdown('*bare state*', 40);
+    // The whole run — including the space — is one underlined span, not
+    // "bare" + plain " " + "state".
+    const span = line!.spans.find((s) => s.text.includes('bare'));
+    expect(span?.text).toBe('bare state');
+    expect(span?.underline).toBe(true);
+    // No unstyled gap span splits the run.
+    expect(line!.spans.filter((s) => s.underline)).toHaveLength(1);
+  });
+
+  test('a multi-word link underlines continuously across its interword space', () => {
+    const [line] = layoutMarkdown('[bare state](http://x)', 40);
+    const span = line!.spans.find((s) => s.text.includes('bare'));
+    expect(span?.text).toBe('bare state'); // single span, space included
+    expect(span?.underline).toBe(true);
+    expect(span?.link).toBe('http://x');
+  });
+
   test('a code-labelled link renders as code (cyan), underlined + clickable, no backticks', () => {
     const lines = layoutMarkdown('[`pkg`](http://x)', 40);
     const span = lines.flatMap((l) => l.spans).find((s) => s.text === 'pkg');

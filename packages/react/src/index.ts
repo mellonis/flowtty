@@ -64,4 +64,4 @@ export { Markdown, type MarkdownProps } from './components/Markdown.js';
 export { layoutMarkdown, type StyledLine, type StyledSpan } from './components/markdown/layout.js';
 export { highlightMarkdownSource, type SourceLine } from './components/markdown/source.js';
 export { parseMarkdown, parseInline, highlightCode } from './components/markdown/parse.js';
-export type { MdBlock, InlineSeg, CodeSeg } from './components/markdown/parse.js';
+export type { MdBlock, MdListItem, InlineSeg, CodeSeg } from './components/markdown/parse.js';

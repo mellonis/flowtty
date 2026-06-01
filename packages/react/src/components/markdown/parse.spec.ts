@@ -64,9 +64,21 @@ describe('parseMarkdown', () => {
 
   test('unordered and ordered lists', () => {
     const ul = parseMarkdown('- a\n- b');
-    expect(ul).toEqual([{ kind: 'list', ordered: false, items: [[{ text: 'a' }], [{ text: 'b' }]] }]);
+    expect(ul).toEqual([{ kind: 'list', ordered: false, items: [{ segs: [{ text: 'a' }] }, { segs: [{ text: 'b' }] }] }]);
     const ol = parseMarkdown('1. a\n2. b');
-    expect(ol).toEqual([{ kind: 'list', ordered: true, items: [[{ text: 'a' }], [{ text: 'b' }]] }]);
+    expect(ol).toEqual([{ kind: 'list', ordered: true, items: [{ segs: [{ text: 'a' }] }, { segs: [{ text: 'b' }] }] }]);
+  });
+
+  test('GFM task-list items carry checked state; non-standard markers stay literal', () => {
+    const list = parseMarkdown('- [ ] todo\n- [x] done\n- [X] also\n- [v] literal');
+    expect(list).toEqual([{
+      kind: 'list', ordered: false, items: [
+        { segs: [{ text: 'todo' }], checked: false },
+        { segs: [{ text: 'done' }], checked: true },
+        { segs: [{ text: 'also' }], checked: true },
+        { segs: [{ text: '[v] literal' }] }, // [v] is not a GFM marker
+      ],
+    }]);
   });
 
   test('blockquote and hr', () => {

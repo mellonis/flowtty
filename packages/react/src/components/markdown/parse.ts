@@ -15,10 +15,16 @@ export interface InlineSeg {
   image?: boolean;
 }
 
+export interface MdListItem {
+  segs: InlineSeg[];
+  /** GFM task-list state: `undefined` = a plain item; `true`/`false` = a checkbox. */
+  checked?: boolean;
+}
+
 export type MdBlock =
   | { kind: 'heading'; level: number; segs: InlineSeg[] }
   | { kind: 'paragraph'; segs: InlineSeg[] }
-  | { kind: 'list'; ordered: boolean; items: InlineSeg[][] }
+  | { kind: 'list'; ordered: boolean; items: MdListItem[] }
   | { kind: 'blockquote'; segs: InlineSeg[] }
   | { kind: 'code'; lang: string; lines: string[] }
   | { kind: 'hr' };
@@ -63,6 +69,9 @@ const FENCE_RE = /^(```|~~~)\s*([\w-]*)\s*$/;
 const QUOTE_RE = /^>\s?(.*)$/;
 const ULIST_RE = /^\s*[-*+]\s+(.*)$/;
 const OLIST_RE = /^\s*\d+\.\s+(.*)$/;
+// GFM task-list marker at the start of a list item's content: `[ ]`, `[x]`, `[X]`.
+// Non-standard markers (e.g. `[v]`) intentionally don't match — they stay literal.
+const TASK_RE = /^\[([ xX])\]\s+(.*)$/;
 
 export function parseMarkdown(src: string): MdBlock[] {
   const lines = src.replace(/\r\n?/g, '\n').split('\n');
@@ -117,13 +126,17 @@ export function parseMarkdown(src: string): MdBlock[] {
     if (ul || ol) {
       flushParagraph(para); para = [];
       const ordered = !!ol;
-      const items: InlineSeg[][] = [];
+      const items: MdListItem[] = [];
       while (i < lines.length) {
         const u = ULIST_RE.exec(lines[i]!);
         const o = OLIST_RE.exec(lines[i]!);
-        if (ordered && o) items.push(parseInline(o[1]!));
-        else if (!ordered && u) items.push(parseInline(u[1]!));
+        let content: string;
+        if (ordered && o) content = o[1]!;
+        else if (!ordered && u) content = u[1]!;
         else break;
+        const tm = TASK_RE.exec(content);
+        if (tm) items.push({ segs: parseInline(tm[2]!), checked: tm[1]!.toLowerCase() === 'x' });
+        else items.push({ segs: parseInline(content) });
         i++;
       }
       blocks.push({ kind: 'list', ordered, items });
