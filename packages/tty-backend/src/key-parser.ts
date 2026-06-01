@@ -67,7 +67,7 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
           // is a bitmask: 1=Shift, 2=Alt/Meta, 4=Ctrl.
           const parts = params.split(';');
           const mod = parts.length > 1 ? decodeModifier(Number(parts[parts.length - 1])) : NO_MOD;
-          const name = final === '~' ? tildeName(parts[0] ?? '') : csiFinalName(final);
+          const name = final === '~' ? tildeName(parts[0] ?? '') : csiFinalName(final, parts);
           out.push({
             name,
             sequence: chars.slice(i, j + 1).join(''),
@@ -156,7 +156,7 @@ function decodeModifier(value: number): Modifier {
 }
 
 /** Name for a CSI sequence whose key is encoded in the final byte (arrows, Home/End). */
-function csiFinalName(final: string): string {
+function csiFinalName(final: string, parts: string[]): string {
   switch (final) {
     case 'A': return 'up';
     case 'B': return 'down';
@@ -164,14 +164,22 @@ function csiFinalName(final: string): string {
     case 'D': return 'left';
     case 'H': return 'home';
     case 'F': return 'end';
-    // vt220-style F1–F4: a modified F1–F4 arrives as CSI 1;<mod> P/Q/R/S
-    // (e.g. Ctrl+F1 = ESC[1;5P). Unmodified F1–F4 use the SS3 form (ESC O P..S).
-    case 'P': return 'f1';
-    case 'Q': return 'f2';
-    case 'R': return 'f3';
-    case 'S': return 'f4';
+    // vt220-style F1–F4 arrive ONLY as CSI 1;<mod> P/Q/R/S with mod ≥ 2 (e.g.
+    // Ctrl+F1 = ESC[1;5P); unmodified F1–F4 use the SS3 form (ESC O P..S). The
+    // 1;<mod> guard is what stops a cursor-position report (ESC[<row>;<col>R,
+    // the DSR reply) from being misread as F3 — its params are coordinates, not
+    // "1;<modifier>". flowtty never issues DSR, so the residual ESC[1;{2..16}R
+    // overlap with modified F3 is unreachable in practice.
+    case 'P': case 'Q': case 'R': case 'S':
+      if (!isVt220FunctionForm(parts)) return `csi-${final}`;
+      return final === 'P' ? 'f1' : final === 'Q' ? 'f2' : final === 'R' ? 'f3' : 'f4';
     default: return `csi-${final}`;
   }
+}
+
+/** True for the vt220 modified-F1–F4 param form: exactly "1;<mod>" with mod ≥ 2. */
+function isVt220FunctionForm(parts: string[]): boolean {
+  return parts.length === 2 && parts[0] === '1' && Number(parts[1]) >= 2;
 }
 
 /** Name for a CSI tilde-family sequence, keyed by the numeric code (ESC[<code>~). */

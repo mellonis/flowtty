@@ -126,6 +126,20 @@ test('CSI letter ESC[1;<mod>P..S → modified F1–F4 (vt220 form)', () => {
   expect(parseKeypress('\x1b[1;2P')[0]).toMatchObject({ name: 'f1', shift: true, ctrl: false });
 });
 
+test('cursor-position report (ESC[<row>;<col>R) is not misread as F3', () => {
+  // A DSR reply like ESC[10;25R shares the CSI-R final with vt220 F3, but its
+  // params are coordinates, not "1;<mod>". Only the 1;<mod≥2> form is a function key.
+  expect(parseKeypress('\x1b[10;25R')[0]!.name).toBe('csi-R');
+  // Row 1 col 1: first param is "1" but the modifier slot is 1 (= no modifier),
+  // which is never a real function-key encoding.
+  expect(parseKeypress('\x1b[1;1R')[0]!.name).toBe('csi-R');
+  // Bare CSI R (no params) is not a function key in any scheme either.
+  expect(parseKeypress('\x1b[R')[0]!.name).toBe('csi-R');
+  // The genuine modified-F3 form still resolves. Same guard applies to P/Q/S.
+  expect(parseKeypress('\x1b[1;5R')[0]).toMatchObject({ name: 'f3', ctrl: true });
+  expect(parseKeypress('\x1b[1;1P')[0]!.name).toBe('csi-P');
+});
+
 test('CSI tilde form ESC[11~..[14~ → f1..f4 (alongside existing f5..f12)', () => {
   expect(parseKeypress('\x1b[11~')[0]!.name).toBe('f1');
   expect(parseKeypress('\x1b[12~')[0]!.name).toBe('f2');
