@@ -20,7 +20,8 @@
       "@flowtty/core/host":     ["./packages/core/src/host/index.ts"],
       "@flowtty/core/testing":  ["./packages/core/src/testing/index.ts"],
       "@flowtty/react":         ["./packages/react/src/index.ts"],
-      "@flowtty/tty-backend":   ["./packages/tty-backend/src/index.ts"]
+      "@flowtty/tty-backend":   ["./packages/tty-backend/src/index.ts"],
+      "@flowtty/inline-tty-backend": ["./packages/inline-tty-backend/src/index.ts"]
     }
   }
 }

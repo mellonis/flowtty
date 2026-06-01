@@ -29,6 +29,7 @@ import { Box } from './base/Box.js';
 import { useInput } from '../hooks/useInput.js';
 import { useDialog, useDialogHost } from '../hooks/useDialog.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import { useFullScreenBackend } from '../hooks/useFullScreenBackend.js';
 
 export type MenuItem =
   | { key: string; label: string; render: () => ReactNode }
@@ -94,6 +95,12 @@ function itemsAtPath(root: MenuItem[], path: number[]): MenuItem[] {
 }
 
 export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuProps) {
+  // Capability check: Menu needs full-screen space for its cascading dropdowns.
+  // On a bounded-live-region backend (e.g. @flowtty/inline-tty-backend) the
+  // hook warns once and returns false. We still have to call every other hook
+  // to keep the order stable, so we early-return null below — after all hooks.
+  const isFullScreen = useFullScreenBackend('Menu');
+
   // openPath[i] = focused index in panel i that is currently OPEN; its submenu
   // is panel i+1. cursor lives in the DEEPEST visible panel (top bar if depth=0).
   const [openPath, setOpenPath] = useState<number[]>([]);
@@ -314,6 +321,10 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
   // while the menu is engaged (active=true), so list navigation inside the
   // page doesn't fight menu navigation. Press F10 to engage; Esc disengages.
   void helpHint;
+  // Refuse to render on backends that can't accommodate the cascade overlay.
+  // (The hook above already warned once.) Must come AFTER all other hooks
+  // to preserve hook-call order across renders.
+  if (!isFullScreen) return null;
   return (
     <Box flexDirection="column" width="100%" height="100%">
       {renderTopBar()}

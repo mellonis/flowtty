@@ -15,6 +15,7 @@ export default defineConfig({
       '@flowtty/core':         here('./packages/core/src/index.ts'),
       '@flowtty/react':        here('./packages/react/src/index.ts'),
       '@flowtty/tty-backend':  here('./packages/tty-backend/src/index.ts'),
+      '@flowtty/inline-tty-backend': here('./packages/inline-tty-backend/src/index.ts'),
     },
   },
 });

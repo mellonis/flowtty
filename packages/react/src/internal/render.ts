@@ -3,6 +3,7 @@ import { type Backend } from '@flowtty/core';
 import { getYoga, computeLayout, paint } from '@flowtty/core/host';
 import { createRoot } from './reconciler.js';
 import { InputContext, type InputSource } from '../context/inputContext.js';
+import { BackendContext } from '../context/backendContext.js';
 import { TerminalSizeProvider } from '../hooks/useTerminalSize.js';
 import { ErrorBoundary, type ErrorSource } from '../components/ErrorBoundary.js';
 
@@ -82,7 +83,10 @@ export async function render(
   const boundedTree = createElement(ErrorBoundary, {
     onError: ({ error, source }) => handleError(error, source),
   }, innerTree);
-  const tree = createElement(TerminalSizeProvider, { backend }, boundedTree);
+  // BackendContext exposes the backend to components that need to feature-detect
+  // optional capabilities (e.g. <Static> checks for printStatic).
+  const withBackend = createElement(BackendContext.Provider, { value: backend }, boundedTree);
+  const tree = createElement(TerminalSizeProvider, { backend }, withBackend);
 
   root.render(tree);
   // Wait for the initial scheduled paint (via resetAfterCommit → queueMicrotask).

@@ -1,7 +1,8 @@
 import React from 'react';
-import { useCallback, useContext, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { InputContext, type InputSource } from '../context/inputContext.js';
+import { BackendContext } from '../context/backendContext.js';
 import {
   DialogHostContext,
   DialogIsTopContext,
@@ -39,17 +40,39 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
     });
   }, []);
 
+  const backend = useContext(BackendContext);
+  // One-shot warning when a non-floating dialog is opened on a bounded-region
+  // backend — the dialog wrapper sizes to 100%×100% of the overlay, which is
+  // the live region (small). Content taller than that will be clipped. Suggest
+  // floating:true as the fix. NOT a hard refuse — small full-screen dialogs
+  // still work and the user might intend the clipping behavior.
+  const fullScreenWarned = useRef(false);
+
   // Push a new dialog onto the top of the stack. Previous dialogs are NOT
   // cancelled — they stay open, just visually behind + input-muted until the
   // newly-opened dialog closes.
   const openDialog = useCallback(<T,>(element: ReactNode, options?: OpenDialogOptions): Promise<DialogResult<T>> => {
+    if (
+      backend?.fullScreen === false &&
+      !options?.floating &&
+      !fullScreenWarned.current
+    ) {
+      fullScreenWarned.current = true;
+      // eslint-disable-next-line no-console
+      console.warn(
+        `[flowtty] openDialog: the current backend declares fullScreen=false ` +
+        `(e.g. @flowtty/inline-tty-backend), so dialog content will be ` +
+        `clipped to the live region. Pass { floating: true, minWidth, maxWidth } ` +
+        `to render as a content-sized floating dialog instead.`,
+      );
+    }
     return new Promise<DialogResult<T>>((resolve) => {
       setStack((s) => [
         ...s,
         { element, options, resolve: resolve as (r: DialogResult<unknown>) => void },
       ]);
     });
-  }, []);
+  }, [backend]);
 
   const hostApi = useMemo<DialogHostApi>(() => ({ openDialog }), [openDialog]);
   const dialogApi = useMemo<DialogResultApi>(

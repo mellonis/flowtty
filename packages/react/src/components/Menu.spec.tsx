@@ -11,6 +11,30 @@ function flushAsync(): Promise<void> {
 }
 
 describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () => {
+  test('refuses to render on backends declaring fullScreen=false (e.g. inline) and warns once', async () => {
+    const printStatic = vi.fn();
+    // Inline-style mock: TestBackend-like dims but declares the bounded-region capability.
+    const tb = new TestBackend(50, 4);
+    const inlineLike: any = Object.assign(tb, { fullScreen: false, printStatic });
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+    try {
+      const items: MenuItem[] = [{ key: 'a', label: 'Alpha', onSelect: () => {} }];
+      await render(createElement(DialogHost, null,
+        createElement(Menu, { items }),
+      ), inlineLike);
+      await flushAsync();
+      // Menu returned null → nothing rendered in the live region.
+      expect(tb.lastFrame.trim()).toBe('');
+      // Warning fired (exactly once, with the component name).
+      expect(warn).toHaveBeenCalled();
+      const msg = String(warn.mock.calls[0]?.[0] ?? '');
+      expect(msg).toContain('<Menu>');
+      expect(msg).toContain('full-screen');
+    } finally {
+      warn.mockRestore();
+    }
+  });
+
   test('top bar renders items horizontally (always inverse, idle by default)', async () => {
     const items: MenuItem[] = [
       { key: 'a', label: 'Alpha', onSelect: () => {} },

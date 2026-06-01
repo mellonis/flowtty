@@ -2,7 +2,8 @@ import type { Buffer } from './cells.js';
 import type { Key } from './keys.js';
 
 // The seam every renderer backend implements. Drawing is required; key input
-// is optional (a passive view backend may render without ever sending keys).
+// and the inline static-region API are optional capabilities — detect at
+// runtime via the optional methods rather than typing the backend.
 export interface Backend {
   size(): { width: number; height: number };
   draw(buffer: Buffer): void;
@@ -18,4 +19,27 @@ export interface Backend {
    */
   onResize?(handler: () => void): () => void;
   dispose?(): void;
+  /**
+   * Append plain (already-styled, ANSI-ready) lines ABOVE the live region.
+   * The lines scroll naturally into the terminal's scrollback. Backends
+   * that own the whole screen (alt-screen TTY) or are headless (TestBackend)
+   * may omit this; components like <Static> check for presence at runtime
+   * and degrade gracefully when absent.
+   */
+  printStatic?(lines: string[]): void;
+  /**
+   * Whether this backend owns the entire render area — i.e. components can
+   * use the full `size()` for layout and overlay larger panels (Menu cascade,
+   * full-screen DialogHost) on top.
+   *
+   *   true  — TtyBackend (alt-screen), TestBackend (full buffer)
+   *   false — @flowtty/inline-tty-backend (only the live region is yours;
+   *           scrollback above is append-only and out of layout control)
+   *
+   * Defaults to `true` when omitted — preserves the behavior of existing
+   * backends that don't declare the flag. Inline-style backends MUST set
+   * it to `false` so capability-sensitive components (e.g. <Menu>) can
+   * refuse to render rather than produce broken overflow UI.
+   */
+  fullScreen?: boolean;
 }

@@ -270,4 +270,73 @@ describe('DialogHost stack', () => {
 
     handle.unmount();
   });
+
+  describe('on a bounded-region backend (fullScreen=false)', () => {
+    test('warns once when openDialog is called WITHOUT floating, suggesting floating:true', async () => {
+      const tb = new TestBackend(40, 4);
+      const inlineLike: any = Object.assign(tb, { fullScreen: false });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        let host: { openDialog: (e: ReactNode, o?: any) => Promise<any> } | null = null;
+        function Inner() {
+          host = useDialogHost();
+          return null;
+        }
+        const handle = await render(createElement(DialogHost, null, createElement(Inner)), inlineLike);
+        await flushAsync();
+        void host!.openDialog(createElement(Box, null, 'x'));
+        // Same call signature → should NOT warn a second time.
+        void host!.openDialog(createElement(Box, null, 'y'));
+        await flushAsync();
+        expect(warn).toHaveBeenCalledTimes(1);
+        expect(String(warn.mock.calls[0]?.[0] ?? '')).toContain('floating: true');
+        handle.unmount();
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test('does NOT warn when openDialog is called WITH floating:true', async () => {
+      const tb = new TestBackend(40, 4);
+      const inlineLike: any = Object.assign(tb, { fullScreen: false });
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        let host: { openDialog: (e: ReactNode, o?: any) => Promise<any> } | null = null;
+        function Inner() {
+          host = useDialogHost();
+          return null;
+        }
+        const handle = await render(createElement(DialogHost, null, createElement(Inner)), inlineLike);
+        await flushAsync();
+        void host!.openDialog(createElement(Box, null, 'x'), { floating: true, minWidth: 10 });
+        await flushAsync();
+        expect(warn).not.toHaveBeenCalled();
+        handle.unmount();
+      } finally {
+        warn.mockRestore();
+      }
+    });
+
+    test('does NOT warn on a full-screen backend regardless of options', async () => {
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+      try {
+        let host: { openDialog: (e: ReactNode, o?: any) => Promise<any> } | null = null;
+        function Inner() {
+          host = useDialogHost();
+          return null;
+        }
+        const handle = await render(
+          createElement(DialogHost, null, createElement(Inner)),
+          new TestBackend(40, 4),
+        );
+        await flushAsync();
+        void host!.openDialog(createElement(Box, null, 'x'));
+        await flushAsync();
+        expect(warn).not.toHaveBeenCalled();
+        handle.unmount();
+      } finally {
+        warn.mockRestore();
+      }
+    });
+  });
 });
