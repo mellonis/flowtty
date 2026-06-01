@@ -128,4 +128,37 @@ describe('FocusGroup + useFocus', () => {
     // A unmounted; B should become focused.
     expect(backend.lastFrame).toContain('*B');
   });
+
+  test('unmounting a focused MIDDLE focusable moves focus to the next sibling, not the first', async () => {
+    const backend = new TestBackend(20, 4);
+
+    function Toggler({ onToggle }: { onToggle: () => void }) {
+      useInput((key) => { if (key.name === 'd') onToggle(); });
+      return null;
+    }
+
+    function App() {
+      const [showB, setShowB] = useState(true);
+      return createElement(Col, {},
+        createElement(FocusGroup, {},
+          createElement(Reporter, { label: 'A' }),
+          showB ? createElement(Reporter, { label: 'B' }) : null,
+          createElement(Reporter, { label: 'C' }),
+          createElement(Toggler, { onToggle: () => setShowB(false) }),
+        ),
+      );
+    }
+
+    await render(createElement(App), backend);
+    await flushAsync();
+    // Move focus to the middle item B.
+    backend.press({ name: 'tab' });
+    await flushAsync();
+    expect(backend.lastFrame).toContain('*B');
+    // Unmount B — focus must land on C (the next sibling), NOT back on A.
+    backend.press({ name: 'd' });
+    await flushAsync();
+    expect(backend.lastFrame).toContain('*C');
+    expect(backend.lastFrame).toContain(' A');
+  });
 });

@@ -30,11 +30,17 @@ export function FocusGroup({ isActive = true, children }: FocusGroupProps): Reac
   }, []);
 
   const unregister = useCallback((id: string) => {
-    idsRef.current = idsRef.current.filter((x) => x !== id);
+    const prev = idsRef.current;
+    const idx = prev.indexOf(id);
+    idsRef.current = prev.filter((x) => x !== id);
     setFocusedId((current) => {
       if (current !== id) return current;
-      // Focused item unmounted — move focus to first remaining, or null.
-      return idsRef.current[0] ?? null;
+      // Focused item unmounted — move focus to the sibling that slid into the
+      // vacated slot (the next one), not back to the first. If the removed item
+      // was last, fall back to the new last item; if none remain, clear focus.
+      const remaining = idsRef.current;
+      if (remaining.length === 0) return null;
+      return remaining[Math.min(idx, remaining.length - 1)] ?? null;
     });
   }, []);
 

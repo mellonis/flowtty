@@ -33,9 +33,18 @@ export function Form(props: FormProps): ReactNode {
   }, []);
 
   const unregister = useCallback((name: string) => {
-    order.current = order.current.filter((n) => n !== name);
+    const prev = order.current;
+    const idx = prev.indexOf(name);
+    order.current = prev.filter((n) => n !== name);
     validators.current.delete(name);
-    setFocusedField((current) => (current === name ? (order.current[0] ?? null) : current));
+    setFocusedField((current) => {
+      if (current !== name) return current;
+      // Move focus to the field that slid into the vacated slot (the next one),
+      // not back to the first; clamp to the new last field if it was last.
+      const remaining = order.current;
+      if (remaining.length === 0) return null;
+      return remaining[Math.min(idx, remaining.length - 1)] ?? null;
+    });
   }, []);
 
   const setValue = useCallback((name: string, value: unknown) => {

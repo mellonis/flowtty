@@ -122,6 +122,32 @@ test('Tab moves focus forward; Shift-Tab backward (and wraps)', async () => {
   expect(api!.focusedField).toBe('c');
 });
 
+test('unregistering the focused field moves focus to the next, not the first', async () => {
+  let api: FormApi | null = null;
+  function Probe() {
+    api = useContext(FormContext);
+    useEffect(() => {
+      api!.register('a');
+      api!.register('b');
+      api!.register('c');
+    }, []);
+    return null;
+  }
+  const backend = new TestBackend(20, 2);
+  await render(
+    createElement(Form, { onSubmit: () => {} }, createElement(Probe)),
+    backend,
+  );
+  await flushAsync();
+  api!.focus('b');
+  await flushAsync();
+  expect(api!.focusedField).toBe('b');
+  // Removing the focused middle field lands focus on 'c' (the next), not 'a'.
+  api!.unregister('b');
+  await flushAsync();
+  expect(api!.focusedField).toBe('c');
+});
+
 test('cancel() fires onCancel', async () => {
   let api: FormApi | null = null;
   let cancelled = false;
