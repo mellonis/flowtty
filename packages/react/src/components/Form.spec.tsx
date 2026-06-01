@@ -89,6 +89,39 @@ test('advance(name) moves focus to next; advance from LAST fires onSubmit(values
   expect(submitted).toEqual([{ a: 1, b: 2 }]);
 });
 
+test('Tab moves focus forward; Shift-Tab backward (and wraps)', async () => {
+  let api: FormApi | null = null;
+  function Probe() {
+    api = useContext(FormContext);
+    useEffect(() => {
+      api!.register('a');
+      api!.register('b');
+      api!.register('c');
+    }, []);
+    return null;
+  }
+  const backend = new TestBackend(20, 2);
+  await render(
+    createElement(Form, { onSubmit: () => {} }, createElement(Probe)),
+    backend,
+  );
+  await flushAsync();
+  expect(api!.focusedField).toBe('a');
+
+  backend.press({ name: 'tab' });
+  await flushAsync();
+  expect(api!.focusedField).toBe('b');
+
+  backend.press({ name: 'tab', shift: true });
+  await flushAsync();
+  expect(api!.focusedField).toBe('a');
+
+  // Shift-Tab from the first field wraps to the last.
+  backend.press({ name: 'tab', shift: true });
+  await flushAsync();
+  expect(api!.focusedField).toBe('c');
+});
+
 test('cancel() fires onCancel', async () => {
   let api: FormApi | null = null;
   let cancelled = false;

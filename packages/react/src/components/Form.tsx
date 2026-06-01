@@ -94,8 +94,7 @@ export function Form(props: FormProps): ReactNode {
   }), [values, errors, focusedField, register, unregister, setValue, setError, focus, focusNext, focusPrev, advance, cancel]);
 
   useInput((key) => {
-    if (key.name === 'tab') { focusNext(); return; }
-    if (key.name === 'csi-Z') { focusPrev(); return; }
+    if (key.name === 'tab') { key.shift ? focusPrev() : focusNext(); return; }
     if (key.name === 'escape') { cancel(); return; }
   }, { isActive: props.isFocused !== false });
 
