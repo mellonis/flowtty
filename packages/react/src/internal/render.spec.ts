@@ -117,6 +117,23 @@ describe('render error handling', () => {
     handle.unmount();
   });
 
+  test('custom onError that does not exit still detaches listeners (no leak)', async () => {
+    const backend = new TestBackend(10, 3);
+    const baseUncaught = process.listenerCount('uncaughtException');
+    const baseRejection = process.listenerCount('unhandledRejection');
+    const onError = vi.fn();
+    function Boom(): never { throw new Error('leak boom'); }
+    await render(createElement(Boom), backend, { onError });
+    await flushAsync();
+    expect(onError).toHaveBeenCalledTimes(1);
+    // render()'s listeners must be gone even though onError didn't exit the process.
+    expect(process.listenerCount('uncaughtException')).toBe(baseUncaught);
+    expect(process.listenerCount('unhandledRejection')).toBe(baseRejection);
+    // A later process error must not re-enter onError.
+    process.emit('uncaughtException', new Error('after'));
+    expect(onError).toHaveBeenCalledTimes(1);
+  });
+
   test('unmount removes process error listeners', async () => {
     const backend = new TestBackend(10, 3);
     const onError = vi.fn();

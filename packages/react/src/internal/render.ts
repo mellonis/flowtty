@@ -22,6 +22,9 @@ export async function render(
   const Yoga = await getYoga();
 
   let unmounted = false;
+  // Assigned once backend.onResize is wired below; referenced earlier by the
+  // teardown closures, so it's declared up here (undefined until then).
+  let unsubResize: (() => void) | undefined;
   const draw = () => {
     if (unmounted) return;
     const { width, height } = backend.size();
@@ -39,6 +42,20 @@ export async function render(
   // synchronously inside the handler — flush() then only needs microtask rounds
   // for the scheduled repaint instead of a macrotask for the Scheduler to drain.
   let cleanedUp = false;
+
+  const onUncaughtException = (error: unknown) => handleError(error, 'uncaughtException');
+  const onUnhandledRejection = (reason: unknown) => handleError(reason, 'unhandledRejection');
+
+  // Release everything render() acquired: the resize subscription and the two
+  // process listeners. Shared by the error path and the public unmount() so
+  // teardown stays in one place. Does NOT unmount the React root or dispose the
+  // backend — callers sequence those around this.
+  const detachListeners = () => {
+    unsubResize?.();
+    process.removeListener('uncaughtException', onUncaughtException);
+    process.removeListener('unhandledRejection', onUnhandledRejection);
+  };
+
   const handleError = (error: unknown, source: ErrorSource) => {
     if (cleanedUp) return;
     cleanedUp = true;
@@ -50,6 +67,14 @@ export async function render(
     // Restore terminal so any stderr that follows is readable.
     try { backend.dispose?.(); } catch { /* ignore — dispose must not mask the real error */ }
     if (options.onError) {
+      // A custom onError may not exit the process, so we must release what
+      // render() acquired — otherwise the resize + process listeners leak and
+      // the React tree stays mounted (and the public unmount() can't help,
+      // since `unmounted` is already set). root.unmount() is deferred to a
+      // microtask: the 'react' source path runs inside the ErrorBoundary's
+      // commit-phase componentDidCatch, where unmounting synchronously is unsafe.
+      detachListeners();
+      queueMicrotask(() => { try { root.unmount(); } catch { /* already torn down */ } });
       try { options.onError({ error, source }); } catch { /* user's onError can't break the path */ }
     } else {
       // Default: print to stderr (after dispose, so the trace is visible) + exit non-zero.
@@ -58,8 +83,6 @@ export async function render(
     }
   };
 
-  const onUncaughtException = (error: unknown) => handleError(error, 'uncaughtException');
-  const onUnhandledRejection = (reason: unknown) => handleError(reason, 'unhandledRejection');
   process.on('uncaughtException', onUncaughtException);
   process.on('unhandledRejection', onUnhandledRejection);
 
@@ -95,15 +118,15 @@ export async function render(
 
   // Repaint on terminal resize. Backends with fixed dimensions (e.g. the test
   // backend) omit onResize and this is a no-op.
-  const unsubResize = backend.onResize?.(draw);
+  unsubResize = backend.onResize?.(draw);
 
   return {
     unmount() {
       if (unmounted) return;
       unmounted = true;
-      unsubResize?.();
-      process.removeListener('uncaughtException', onUncaughtException);
-      process.removeListener('unhandledRejection', onUnhandledRejection);
+      // Block a later error path from re-running teardown on an already-torn tree.
+      cleanedUp = true;
+      detachListeners();
       root.unmount();
       backend.dispose?.();
     },
