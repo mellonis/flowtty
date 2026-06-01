@@ -32,7 +32,7 @@ test('useField registers + flows value/onChange through Form state', async () =>
   }
   const backend = new TestBackend(40, 2);
   await render(createElement(App), backend);
-  await flushAsync();  // wait for useField register effects + initial auto-focus
+  await flushAsync(backend);  // wait for useField register effects + initial auto-focus
   // First field auto-focused; type into it
   backend.type('hi');
   await flush();
@@ -63,7 +63,7 @@ test('Tab advances focus across registered fields (wrapping)', async () => {
   }
   const backend = new TestBackend(20, 1);
   await render(createElement(App), backend);
-  await flushAsync();
+  await flushAsync(backend);
   expect(focusLog[focusLog.length - 1]).toBe('a');
   backend.press({ name: 'tab' });
   await flush();
@@ -86,7 +86,7 @@ test('validate blocks advance + sets error (displayed below the field)', async (
   }
   const backend = new TestBackend(40, 3);
   await render(createElement(App), backend);
-  await flushAsync();
+  await flushAsync(backend);
   backend.type('hi');                    // 2 chars → validation fails
   await flush();
   backend.press({ name: 'return' });     // should NOT advance
@@ -115,7 +115,7 @@ test('Esc on any field fires the Form onCancel', async () => {
   }
   const backend = new TestBackend(20, 1);
   await render(createElement(App), backend);
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'escape' });
   await flush();
   expect(cancelled).toBe(true);
@@ -136,7 +136,7 @@ test('M1c.3 acceptance: 3-field form — type/Enter/validate/submit + separate m
 
   const backend = new TestBackend(40, 6);
   await render(createElement(SubmitApp), backend);
-  await flushAsync();
+  await flushAsync(backend);
 
   // Type a bad slug, press Enter — validation blocks, error appears
   backend.type('Foo Bar');
@@ -180,7 +180,7 @@ test('M1c.3 acceptance: 3-field form — type/Enter/validate/submit + separate m
   }
   const backend2 = new TestBackend(20, 1);
   await render(createElement(CancelApp), backend2);
-  await flushAsync();
+  await flushAsync(backend2);
   backend2.press({ name: 'escape' });
   await flush();
   expect(cancelled).toBe(true);

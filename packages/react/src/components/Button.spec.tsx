@@ -17,7 +17,7 @@ describe('Button', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('[ Open ]');
     expect(backend.lastFrame).toContain('(o)');
   });
@@ -31,9 +31,9 @@ describe('Button', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(onPress).toHaveBeenCalledTimes(1);
   });
 
@@ -50,10 +50,10 @@ describe('Button', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     // A is focused (auto-focused first), B is not. Press 'b' → B fires.
     backend.press({ name: 'b' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(aFn).not.toHaveBeenCalled();
     expect(bFn).toHaveBeenCalledTimes(1);
   });
@@ -71,16 +71,16 @@ describe('Button', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     // A is focused (auto-focused first). Press Enter → A fires.
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(aFn).toHaveBeenCalledTimes(1);
     // Tab → B is focused. Press Enter → B fires.
     backend.press({ name: 'tab' });
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(bFn).toHaveBeenCalledTimes(1);
   });
 });
