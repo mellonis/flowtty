@@ -404,6 +404,46 @@ optional `detail` (dimmed text after the label). `spinnerType` picks the spinner
 set used for running tasks. Running tasks animate via `<Spinner>` (and thus
 `useTicker`), so they stop cleanly on unmount / teardown.
 
+### Table
+
+`<Table>` draws a data grid: `data` rows × `columns` definitions, with
+box-drawing rules (`border`) or whitespace (`border="none"`).
+
+```tsx
+import { Table } from 'flowtty';
+
+<Table
+  data={[
+    { name: 'Ann', role: 'Engineer', age: 30 },
+    { name: 'Bo',  role: 'Designer', age: 27 },
+  ]}
+  columns={[
+    { accessor: 'name', header: 'Name' },
+    { accessor: 'role', header: 'Role' },
+    { accessor: 'age',  header: 'Age', align: 'right' },
+  ]}
+/>
+```
+
+Each `TableColumn` has an `accessor` (a row key, or `(row, i) => string`), an
+optional `header` (defaults to the key), `align` (`'left'` | `'right'` |
+`'center'`), and `width` / `minWidth` / `maxWidth` bounds. Table-level props:
+`border` (`'round'` default, `'single'`, `'double'`, `'bold'`, `'classic'`, or
+`'none'`), `borderColor`, `cellPadding` (default 1), `showHeader` (default
+`true`), `headerColor`, and `headerBold` (default `true`).
+
+**Fit-to-width.** With no `width` prop the table measures its container (via
+`onLayout`, falling back to the terminal width before the first layout) and
+shrinks the widest columns — truncating cells with `…` — so the grid never
+exceeds the available space. Pass `width` to fix the total budget. Columns are
+only shrunk, never stretched. Horizontal scroll for over-wide tables is a
+planned follow-up (it needs a focus + keyboard surface).
+
+> Column widths are measured in **code points**, matching flowtty's one-cell-
+> per-code-point grid, so rules stay aligned. Double-width CJK/emoji cells carry
+> the same visual overlap as the rest of flowtty until paint reserves the second
+> cell (see *Display width* and *Still deferred*).
+
 ### Markdown
 
 `<Markdown>` renders a markdown string as styled terminal text. It's a
