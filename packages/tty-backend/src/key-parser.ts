@@ -97,6 +97,15 @@ export function parseKeypress(input: string): Key[] {
       continue;
     }
 
+    // Collapse a CRLF pair into a single return. Some terminals and pasted
+    // text use \r\n line endings; without this each newline emits two Enter
+    // keys (e.g. a double form submit).
+    if (c === '\r' && chars[i + 1] === '\n') {
+      out.push({ name: 'return', sequence: '\r\n', ctrl: false, meta: false, shift: false });
+      i += 2;
+      continue;
+    }
+
     out.push(parseChar(c));
     i++;
   }

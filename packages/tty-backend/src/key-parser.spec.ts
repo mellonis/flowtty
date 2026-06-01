@@ -22,6 +22,13 @@ test('Return / newline / Tab / Backspace map to canonical names', () => {
   expect(parseKeypress('\x08')[0]!.name).toBe('backspace');
 });
 
+test('CRLF collapses into a single return key', () => {
+  const keys = parseKeypress('\r\n');
+  expect(keys).toEqual([{ name: 'return', sequence: '\r\n', ctrl: false, meta: false, shift: false }]);
+  // A bare LF and a bare CR each still produce one return.
+  expect(parseKeypress('\n\r').map((k) => k.name)).toEqual(['return', 'return']);
+});
+
 test('lone ESC at end of buffer → escape key', () => {
   expect(parseKeypress('\x1b')).toEqual([
     { name: 'escape', sequence: '\x1b', ctrl: false, meta: false, shift: false },
