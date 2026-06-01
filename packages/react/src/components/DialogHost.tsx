@@ -15,6 +15,9 @@ import {
 import { FocusGroup } from './FocusGroup.js';
 
 interface PendingDialog {
+  /** Stable identity for this stack entry, so its resolve/cancel targets THIS
+   *  dialog rather than whatever happens to be on top when it fires. */
+  id: number;
   element: ReactNode;
   options?: OpenDialogOptions;
   resolve(result: DialogResult<unknown>): void;
@@ -23,22 +26,44 @@ interface PendingDialog {
 export function DialogHost(props: { children?: ReactNode }): ReactNode {
   const outerSource = useContext(InputContext);
   const [stack, setStack] = useState<PendingDialog[]>([]);
+  const nextId = useRef(0);
+  // Per-entry result API, memoized by dialog id so a dialog's { done, cancel }
+  // keeps a stable identity across host re-renders (avoids re-rendering dialog
+  // content on every stack change via DialogResultContext).
+  const apiCache = useRef(new Map<number, DialogResultApi>());
 
   const mutedSource = useMemo<InputSource>(
     () => ({ subscribe: () => () => {} }),
     [],
   );
 
-  // Pop the top dialog, resolve it with the given result. Lower stack entries
-  // are untouched (still rendered, still pending their own resolution).
-  const close = useCallback((result: DialogResult<unknown>) => {
+  // Resolve a SPECIFIC dialog (by id) and remove it from the stack — not
+  // necessarily the top. A dialog may resolve asynchronously (timer, awaited
+  // work) after another has been pushed on top of it; popping the top would
+  // close the wrong one. Other entries are untouched (still pending).
+  const closeById = useCallback((id: number, result: DialogResult<unknown>) => {
     setStack((s) => {
-      if (s.length === 0) return s;
-      const top = s[s.length - 1]!;
-      top.resolve(result);
-      return s.slice(0, -1);
+      const idx = s.findIndex((d) => d.id === id);
+      if (idx === -1) return s;
+      s[idx]!.resolve(result);
+      return [...s.slice(0, idx), ...s.slice(idx + 1)];
     });
+    apiCache.current.delete(id);
   }, []);
+
+  // Stable per-entry { done, cancel }, bound to that entry's id.
+  const apiForEntry = useCallback((id: number): DialogResultApi => {
+    const cache = apiCache.current;
+    let api = cache.get(id);
+    if (!api) {
+      api = {
+        done: (value) => closeById(id, { status: 'done', value }),
+        cancel: () => closeById(id, { status: 'cancelled' }),
+      };
+      cache.set(id, api);
+    }
+    return api;
+  }, [closeById]);
 
   const backend = useContext(BackendContext);
   // One-shot warning when a non-floating dialog is opened on a bounded-region
@@ -67,21 +92,15 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
       );
     }
     return new Promise<DialogResult<T>>((resolve) => {
+      const id = nextId.current++;
       setStack((s) => [
         ...s,
-        { element, options, resolve: resolve as (r: DialogResult<unknown>) => void },
+        { id, element, options, resolve: resolve as (r: DialogResult<unknown>) => void },
       ]);
     });
   }, [backend]);
 
   const hostApi = useMemo<DialogHostApi>(() => ({ openDialog }), [openDialog]);
-  const dialogApi = useMemo<DialogResultApi>(
-    () => ({
-      done: (value) => close({ status: 'done', value }),
-      cancel: () => close({ status: 'cancelled' }),
-    }),
-    [close],
-  );
 
   const hasOpenDialog = stack.length > 0;
 
@@ -132,7 +151,7 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
       const overlayBg = o?.floating ? undefined : 'default';
       return (
         <Box
-          key={i}
+          key={d.id}
           position="absolute"
           top={0} left={0}
           width="100%" height="100%"
@@ -143,12 +162,11 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
           // entries show around it. See `overlayBg` computed above.
           backgroundColor={overlayBg}
         >
-          {/* dialogApi resolves the TOP — all dialogs share the same instance,
-              but only the top dialog can interact (input is gated), so calls
-              from lower dialogs (e.g. via async timers) would pop the wrong
-              entry. Accept that constraint; flag in README if it bites. */}
+          {/* Each dialog gets a result API bound to its OWN stack entry, so an
+              async done()/cancel() from a lower (input-muted) dialog resolves
+              that dialog rather than whatever is currently on top. */}
           <InputContext.Provider value={isTop ? outerSource : mutedSource}>
-            <DialogResultContext.Provider value={dialogApi}>
+            <DialogResultContext.Provider value={apiForEntry(d.id)}>
               <DialogIsTopContext.Provider value={isTop}>
                 <FocusGroup isActive={isTop}>{content}</FocusGroup>
               </DialogIsTopContext.Provider>

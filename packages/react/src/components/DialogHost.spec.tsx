@@ -75,6 +75,45 @@ describe('DialogHost stack', () => {
     handle.unmount();
   });
 
+  test('a lower (non-top) dialog resolving async closes ITS OWN entry, not the top', async () => {
+    const backend = new TestBackend(20, 5);
+    let openD!: <T>(el: ReactNode) => Promise<DialogResult<T>>;
+    let apiA: DialogResultApi | null = null;
+    let apiB: DialogResultApi | null = null;
+    function Host() {
+      const { openDialog } = useDialogHost();
+      openD = openDialog;
+      return null;
+    }
+    function Capture({ into }: { into: (api: DialogResultApi) => void }) {
+      into(useDialog());
+      return null;
+    }
+    const handle = await render(
+      createElement(DialogHost, {}, createElement(Host)),
+      backend,
+    );
+    await flushAsync();
+    // Stack: a (bottom), b (top). Each binds its own result API.
+    const a = openD<string>(createElement(Capture, { into: (api: DialogResultApi) => { apiA = api; } }));
+    await flushAsync();
+    const b = openD<string>(createElement(Capture, { into: (api: DialogResultApi) => { apiB = api; } }));
+    await flushAsync();
+    expect(apiA).not.toBeNull();
+    expect(apiB).not.toBeNull();
+    let aResult: DialogResult<string> | null = null;
+    let bResult: DialogResult<string> | null = null;
+    a.then((r) => { aResult = r; });
+    b.then((r) => { bResult = r; });
+    // Resolve the LOWER dialog (simulating an async timer in a non-top dialog).
+    // The old shared API would have popped b (the top); the per-entry API pops a.
+    apiA!.done('from-lower');
+    await flushAsync();
+    expect(aResult).toEqual({ status: 'done', value: 'from-lower' });
+    expect(bResult).toBeNull(); // top dialog stays open
+    handle.unmount();
+  });
+
   test('three-deep stack: pop one at a time in order', async () => {
     const backend = new TestBackend(20, 5);
     let openD!: <T>(el: ReactNode) => Promise<DialogResult<T>>;
