@@ -15,9 +15,11 @@ import type { Key } from '@flowtty/core';
  *  - control bytes: Tab, Return (CR/LF), Backspace (DEL/BS), Escape, Ctrl-A..Z
  *  - CSI sequences: ESC [ <params> <final> (arrows, Home, End, Delete, PageUp/Down, Insert)
  *  - SS3 sequences: ESC O <letter> (alternate arrow/Home/End encoding)
+ *  - Function keys F1..F12: SS3 (ESC O P..S) for unmodified F1–F4, CSI letter
+ *    (ESC[1;<mod>P..S) for modified F1–F4, and tilde form (ESC[11~..[24~) for all
  *  - Mac Option-as-Meta: ESC <char> → {name: <char>, meta: true}
  *
- * NOT handled (later): bracketed paste, mouse, Kitty protocol, F-keys beyond SS3.
+ * NOT handled (later): bracketed paste, mouse, Kitty protocol, F13+.
  */
 export function decodeKeys(input: string): { keys: Key[]; rest: string } {
   const out: Key[] = [];
@@ -162,6 +164,12 @@ function csiFinalName(final: string): string {
     case 'D': return 'left';
     case 'H': return 'home';
     case 'F': return 'end';
+    // vt220-style F1–F4: a modified F1–F4 arrives as CSI 1;<mod> P/Q/R/S
+    // (e.g. Ctrl+F1 = ESC[1;5P). Unmodified F1–F4 use the SS3 form (ESC O P..S).
+    case 'P': return 'f1';
+    case 'Q': return 'f2';
+    case 'R': return 'f3';
+    case 'S': return 'f4';
     default: return `csi-${final}`;
   }
 }
@@ -175,7 +183,12 @@ function tildeName(code: string): string {
     case '4': return 'end';
     case '5': return 'pageup';
     case '6': return 'pagedown';
-    // Function keys F5..F12 (xterm/vt100 standard tilde form).
+    // Function keys F1..F12 (xterm/vt100 standard tilde form). Note the gap:
+    // there is no code 16 or 22 in this scheme.
+    case '11': return 'f1';
+    case '12': return 'f2';
+    case '13': return 'f3';
+    case '14': return 'f4';
     case '15': return 'f5';
     case '17': return 'f6';
     case '18': return 'f7';

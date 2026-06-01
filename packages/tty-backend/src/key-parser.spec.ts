@@ -109,6 +109,35 @@ test('modifier-encoded arrows carry ctrl/shift/alt instead of decoding as plain 
   expect(parseKeypress('\x1b[1;7D')[0]).toMatchObject({ name: 'left', ctrl: true, meta: true, shift: false });
 });
 
+test('SS3 ESC O P/Q/R/S → f1/f2/f3/f4 (unmodified function keys)', () => {
+  expect(parseKeypress('\x1bOP')[0]!.name).toBe('f1');
+  expect(parseKeypress('\x1bOQ')[0]!.name).toBe('f2');
+  expect(parseKeypress('\x1bOR')[0]!.name).toBe('f3');
+  expect(parseKeypress('\x1bOS')[0]!.name).toBe('f4');
+});
+
+test('CSI letter ESC[1;<mod>P..S → modified F1–F4 (vt220 form)', () => {
+  // Ctrl+F1..F4
+  expect(parseKeypress('\x1b[1;5P')[0]).toMatchObject({ name: 'f1', ctrl: true, meta: false, shift: false });
+  expect(parseKeypress('\x1b[1;5Q')[0]).toMatchObject({ name: 'f2', ctrl: true });
+  expect(parseKeypress('\x1b[1;5R')[0]).toMatchObject({ name: 'f3', ctrl: true });
+  expect(parseKeypress('\x1b[1;5S')[0]).toMatchObject({ name: 'f4', ctrl: true });
+  // Shift+F1
+  expect(parseKeypress('\x1b[1;2P')[0]).toMatchObject({ name: 'f1', shift: true, ctrl: false });
+});
+
+test('CSI tilde form ESC[11~..[14~ → f1..f4 (alongside existing f5..f12)', () => {
+  expect(parseKeypress('\x1b[11~')[0]!.name).toBe('f1');
+  expect(parseKeypress('\x1b[12~')[0]!.name).toBe('f2');
+  expect(parseKeypress('\x1b[13~')[0]!.name).toBe('f3');
+  expect(parseKeypress('\x1b[14~')[0]!.name).toBe('f4');
+  // Boundary: f5..f12 still resolve (the f1-f4 addition must not shift these).
+  expect(parseKeypress('\x1b[15~')[0]!.name).toBe('f5');
+  expect(parseKeypress('\x1b[24~')[0]!.name).toBe('f12');
+  // Modified tilde-form F-keys carry the modifier.
+  expect(parseKeypress('\x1b[13;5~')[0]).toMatchObject({ name: 'f3', ctrl: true });
+});
+
 test('modifier-encoded Home/End and tilde-family carry modifiers', () => {
   expect(parseKeypress('\x1b[1;5H')[0]).toMatchObject({ name: 'home', ctrl: true });
   expect(parseKeypress('\x1b[1;5F')[0]).toMatchObject({ name: 'end', ctrl: true });
