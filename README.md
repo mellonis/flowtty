@@ -308,6 +308,102 @@ has no `.abort()` — only flowtty's private controller can fire it. A component
 deep in the tree can observe teardown (`.aborted`, `addEventListener('abort')`,
 `.throwIfAborted()`) or forward the signal, but it cannot abort the whole app.
 
+### Ticker (animation clock)
+
+`useTicker()` returns a frame counter that advances by one every `interval` ms.
+It's the base clock under `<Spinner>`, `<ProgressBar>`, and elapsed-time
+displays — anything that needs to repaint on a timer.
+
+```tsx
+import { useTicker, Text } from 'flowtty';
+
+function Clock() {
+  const tick = useTicker({ interval: 1000 });   // one tick per second
+  return <Text>elapsed: {tick}s</Text>;
+}
+```
+
+Options:
+
+- `interval` — milliseconds between ticks (default `80`, a common animation cadence).
+- `active` — when `false`, the ticker pauses and the count holds; flip back to
+  `true` to resume (it does not reset). Default `true`.
+
+The interval is torn down on unmount **and** the instant the
+[root abort signal](#root-abort-signal) fires, so an animation can never keep
+ticking — or keep the Node event loop alive — past the tree it belongs to. This
+is the reference implementation of "an interval that respects the root signal".
+
+### Spinner
+
+`<Spinner>` is an animated busy indicator built on `useTicker`. Mount it while
+work is in flight; unmount it when done (the animation stops on unmount and on
+whole-app teardown automatically).
+
+```tsx
+import { Spinner } from 'flowtty';
+
+<Spinner />                                  // default 'dots' set
+<Spinner type="line" label="Building" />     // named set + trailing label
+<Spinner frames={['🌑','🌒','🌓','🌔','🌕']} interval={120} color="cyan" />
+```
+
+Props:
+
+- `type` — named frame set: `'dots'` (default), `'line'`, `'simpleDots'`, `'arc'`, `'circle'`.
+- `frames` — a custom frame list (overrides `type`); keep frames equal-width to avoid jitter.
+- `interval` — ms per frame (defaults to the chosen set's natural cadence).
+- `label` — optional text rendered one space after the glyph.
+- `color` — applied to the spinner glyph (named / `#rrggbb` / `rgb(...)`).
+
+The frame sets are a curated subset of the cli-spinners catalogue, inlined so
+the package stays dependency-free.
+
+### ProgressBar
+
+`<ProgressBar>` is a determinate bar driven entirely by props — re-render with a
+new `value` to advance it (it does not self-animate).
+
+```tsx
+import { ProgressBar } from 'flowtty';
+
+<ProgressBar value={0.5} />                          // fills the row, 50%
+<ProgressBar value={3} total={4} width={20} showPercent />
+<ProgressBar value={done} total={files} color="green" />
+```
+
+Props:
+
+- `value` — progress; a 0..1 fraction unless `total` is set, then it's `value / total`.
+- `total` — optional denominator; the fraction is clamped to 0..1.
+- `width` — fixed cell width. Omit to **fill the row** (measured via `onLayout`).
+- `char` / `emptyChar` — filled / empty glyphs (default `█` / `░`).
+- `color` — color of the filled portion.
+- `showPercent` — append a ` NN%` readout; in fill mode it reserves its own space
+  so the bar measures the remainder.
+
+### TaskList
+
+`<TaskList>` renders a vertical checklist where each task shows a state icon —
+`◌` pending, an animated spinner while running, `✓` success, `✗` error, `↓`
+skipped. It's data-driven: update a task's `state` and re-render to advance it.
+
+```tsx
+import { TaskList } from 'flowtty';
+
+<TaskList tasks={[
+  { label: 'Install deps', state: 'success' },
+  { label: 'Compile',      state: 'running' },
+  { label: 'Test',         state: 'error', detail: '2 failing' },
+  { label: 'Deploy',       state: 'pending' },
+]} />
+```
+
+Each `TaskItem` has a `label`, an optional `state` (default `'pending'`), and an
+optional `detail` (dimmed text after the label). `spinnerType` picks the spinner
+set used for running tasks. Running tasks animate via `<Spinner>` (and thus
+`useTicker`), so they stop cleanly on unmount / teardown.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
