@@ -404,6 +404,61 @@ optional `detail` (dimmed text after the label). `spinnerType` picks the spinner
 set used for running tasks. Running tasks animate via `<Spinner>` (and thus
 `useTicker`), so they stop cleanly on unmount / teardown.
 
+### Markdown
+
+`<Markdown>` renders a markdown string as styled terminal text. It's a
+best-effort, line-based renderer — not a CommonMark implementation — covering
+the subset that reads well in a cell grid:
+
+```tsx
+import { Markdown } from 'flowtty';
+
+<Markdown>{`
+# Heading
+
+A paragraph with **bold**, *emphasis*, \`inline code\` and a [link](https://x).
+
+- bullet one
+- bullet two
+
+> a blockquote
+
+\`\`\`ts
+const x: number = 1;
+\`\`\`
+`}</Markdown>
+```
+
+Style mapping (the terminal cell model has no italic — see [Text](#text)):
+
+| Markdown            | Rendered as                                  |
+|---------------------|----------------------------------------------|
+| `# … ######`        | bold + a per-level color, dim `#` prefix kept |
+| `**bold**`          | bold                                         |
+| `*emphasis*`        | underline (no italic in a cell grid)         |
+| `` `code` ``        | cyan                                         |
+| `[text](url)`       | blue + underline (text only; url is dropped) |
+| `![alt](src)`       | dim `alt` text (images can't render in a TTY)|
+| `> quote`           | dim, with a `│ ` gutter                      |
+| `- ` / `1. ` lists  | colored marker + hanging indent on wrap      |
+| ` ```lang ` fences  | per-language token colors (js/ts, json)      |
+| `---`               | a dim horizontal rule                        |
+
+Emphasis is **asterisk-only** on purpose: `_` is left alone so `snake_case`
+identifiers in prose aren't mangled.
+
+**Why pre-wrap instead of leaning on Yoga's `flexWrap`?** The component lays the
+markdown out into a flat list of styled *visual lines* (`layoutMarkdown(src,
+width)`), each a run of styled spans, pre-wrapped to the resolved width. That
+gives a stable line count, so a host that paginates by row — slicing the body by terminal height — can page
+through rendered markdown exactly the way it pages raw text. `layoutMarkdown` is
+exported for that use; `<Markdown>` itself just measures its width (via
+`onLayout`) and renders every line. Pass an explicit `width` to skip the
+measure-and-relayout paint.
+
+> A host can open article `.md` files rendered this way by default and flip
+> to a raw source view.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.

@@ -56,3 +56,7 @@ export { Menu, type MenuItem, type MenuProps } from './components/Menu.js';
 export { Spinner, type SpinnerProps, type SpinnerType } from './components/Spinner.js';
 export { ProgressBar, type ProgressBarProps } from './components/ProgressBar.js';
 export { TaskList, type TaskListProps, type TaskItem, type TaskState } from './components/TaskList.js';
+export { Markdown, type MarkdownProps } from './components/Markdown.js';
+export { layoutMarkdown, type StyledLine, type StyledSpan } from './components/markdown/layout.js';
+export { parseMarkdown, parseInline, highlightCode } from './components/markdown/parse.js';
+export type { MdBlock, InlineSeg, CodeSeg } from './components/markdown/parse.js';
