@@ -1,9 +1,17 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import type { Buffer, Style, Backend, Key } from '@flowtty/core';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, CLEAR, HIDE_CURSOR, RESET, SHOW_CURSOR, cellsEqual, cursorTo, sgr } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, CLEAR, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, osc8Open, sgr } from './ansi.js';
+import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
 
 export class TtyBackend implements Backend {
+  /** Capability flag — whether the *terminal* honors the OSC 8 hyperlinks this
+   *  backend emits, so <Link> renders clickable instead of falling back to a
+   *  printed URL. Sniffed from the environment (Apple Terminal.app, e.g., emits
+   *  the bytes but never makes them clickable). The painter writes OSC 8
+   *  unconditionally regardless of this flag — it only governs <Link> fallback. */
+  readonly hyperlinks = detectHyperlinkSupport();
+
   private readonly subscribers = new Set<(key: Key) => void>();
   // Carries an incomplete escape sequence from one stdin chunk to the next, so
   // a sequence split across reads decodes as one key rather than a stray Escape.
@@ -73,15 +81,22 @@ export class TtyBackend implements Backend {
     for (let y = 0; y < buffer.height; y++) {
       let line = '';
       let last: Style | null = null;
+      // Active OSC 8 link for the current run. RESET doesn't close a hyperlink,
+      // so we track it separately and close/reopen only on link transitions,
+      // and force-close at end of line so it never bleeds into the next row.
+      let lineLink: string | undefined;
       for (let x = 0; x < buffer.width; x++) {
         const cell = buffer.get(x, y);
-        const styleStr = sgr(cell.style);
         if (JSON.stringify(cell.style) !== JSON.stringify(last)) {
-          line += RESET + styleStr;
+          if (lineLink !== undefined && lineLink !== cell.style.link) line += OSC8_CLOSE;
+          line += RESET + sgr(cell.style);
+          if (cell.style.link !== undefined && cell.style.link !== lineLink) line += osc8Open(cell.style.link);
           last = cell.style;
+          lineLink = cell.style.link;
         }
         line += cell.char;
       }
+      if (lineLink !== undefined) line += OSC8_CLOSE;
       outStr += line + RESET + (y < buffer.height - 1 ? '\n' : '');
     }
     this.out.write(outStr);
@@ -97,6 +112,11 @@ export class TtyBackend implements Backend {
     // (both end with a trailing RESET). Initialize the pen to the default/reset
     // style so we skip needless RESET+sgr for cells that carry an empty style.
     let penStyle: Style = {};
+    // Active OSC 8 link on the pen. Each draw call starts with no open link
+    // (prior calls force-close before their trailing RESET), so we open/close
+    // only the links touched by changed cells; already-painted linked cells
+    // keep their association in the terminal and aren't disturbed.
+    let penLink: string | undefined;
     let lastX = -2;
     let lastY = -2;
 
@@ -112,8 +132,11 @@ export class TtyBackend implements Backend {
         }
         // Style change iff the pen's style doesn't already match.
         if (JSON.stringify(b.style) !== JSON.stringify(penStyle)) {
+          if (penLink !== undefined && penLink !== b.style.link) out += OSC8_CLOSE;
           out += RESET + sgr(b.style);
+          if (b.style.link !== undefined && b.style.link !== penLink) out += osc8Open(b.style.link);
           penStyle = b.style;
+          penLink = b.style.link;
         }
         out += b.char;
         lastX = x;
@@ -122,6 +145,7 @@ export class TtyBackend implements Backend {
     }
 
     if (out !== '') {
+      if (penLink !== undefined) out += OSC8_CLOSE;
       this.out.write(out + RESET);
     }
   }

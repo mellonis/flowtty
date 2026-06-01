@@ -2,7 +2,9 @@ import { Buffer as NodeBuffer } from 'node:buffer';
 import type { Buffer, Style, Backend, Key } from '@flowtty/core';
 import {
   decodeKeys,
+  detectHyperlinkSupport,
   RESET, HIDE_CURSOR, SHOW_CURSOR,
+  OSC8_CLOSE, osc8Open,
   sgr,
 } from '@flowtty/tty-backend';
 
@@ -36,6 +38,12 @@ export class InlineTtyBackend implements Backend {
   /** Capability flag — signals components that need to overlay larger panels
    *  (Menu cascade, full-screen DialogHost) to refuse to render. */
   readonly fullScreen = false;
+
+  /** Capability flag — whether the terminal honors the OSC 8 hyperlinks this
+   *  backend emits (it's a real TTY, just inline), so <Link> renders clickable
+   *  instead of printing a fallback URL. Sniffed from the environment; the
+   *  painter writes OSC 8 unconditionally regardless. */
+  readonly hyperlinks = detectHyperlinkSupport();
 
   private readonly out: NodeJS.WriteStream;
   private readonly input: NodeJS.ReadStream;
@@ -199,14 +207,21 @@ export class InlineTtyBackend implements Backend {
     for (let y = 0; y < buffer.height; y++) {
       let line = '';
       let last: Style | null = null;
+      // OSC 8 link state for the current run. RESET doesn't close a hyperlink,
+      // so track it separately and force-close at end of each line.
+      let lineLink: string | undefined;
       for (let x = 0; x < buffer.width; x++) {
         const cell = buffer.get(x, y);
         if (JSON.stringify(cell.style) !== JSON.stringify(last)) {
+          if (lineLink !== undefined && lineLink !== cell.style.link) line += OSC8_CLOSE;
           line += RESET + sgr(cell.style);
+          if (cell.style.link !== undefined && cell.style.link !== lineLink) line += osc8Open(cell.style.link);
           last = cell.style;
+          lineLink = cell.style.link;
         }
         line += cell.char;
       }
+      if (lineLink !== undefined) line += OSC8_CLOSE;
       lines.push(line + RESET);
     }
     return lines;

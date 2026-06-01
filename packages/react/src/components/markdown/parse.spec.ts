@@ -32,6 +32,15 @@ describe('parseInline', () => {
   test('image with empty alt falls back to the src', () => {
     expect(parseInline('![](/x.png)')).toEqual([{ text: '/x.png', image: true }]);
   });
+
+  test('parses inline markup inside a link label (markers not leaked literally)', () => {
+    expect(parseInline('[`pkg`](http://x)')).toEqual([
+      { text: 'pkg', code: true, link: 'http://x' },
+    ]);
+    expect(parseInline('[**bold**](http://x)')).toEqual([
+      { text: 'bold', bold: true, link: 'http://x' },
+    ]);
+  });
 });
 
 describe('parseMarkdown', () => {

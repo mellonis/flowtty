@@ -11,6 +11,9 @@ export interface StyledSpan {
   dim?: boolean;
   underline?: boolean;
   color?: string;
+  /** OSC 8 hyperlink target — set on link spans so a renderer can make them
+   *  clickable on capable backends. Carried through wrapping like any style. */
+  link?: string;
 }
 
 /** One rendered row. Empty `spans` is a blank spacer line (height 1). */
@@ -18,22 +21,29 @@ export interface StyledLine {
   spans: StyledSpan[];
 }
 
-type SpanStyle = Omit<StyledSpan, 'text'>;
-interface StyledChar { ch: string; style: SpanStyle }
+export type SpanStyle = Omit<StyledSpan, 'text'>;
+export interface StyledChar { ch: string; style: SpanStyle }
 
 function styleForSeg(s: InlineSeg): SpanStyle {
-  if (s.code) return { color: 'cyan' };
-  if (s.image) return { dim: true };
-  if (s.link) return { color: 'blue', underline: true };
   const st: SpanStyle = {};
+  if (s.code) st.color = 'cyan';
+  else if (s.image) st.dim = true;
+  else if (s.link) st.color = 'blue'; // plain-text link label
   if (s.bold) st.bold = true;
   if (s.emphasis) st.underline = true;
+  // A link can wrap any inner kind (code/bold/plain). Keep the inner color but
+  // always mark it underlined + clickable so the affordance survives.
+  if (s.link) {
+    st.link = s.link;
+    st.underline = true;
+  }
   return st;
 }
 
 function sameStyle(a: SpanStyle, b: SpanStyle): boolean {
   return !!a.bold === !!b.bold && !!a.dim === !!b.dim
-    && !!a.underline === !!b.underline && (a.color ?? '') === (b.color ?? '');
+    && !!a.underline === !!b.underline && (a.color ?? '') === (b.color ?? '')
+    && (a.link ?? '') === (b.link ?? '');
 }
 
 function segsToChars(segs: InlineSeg[], base: SpanStyle = {}): StyledChar[] {
@@ -80,7 +90,7 @@ function wrapChars(chars: StyledChar[], width: number): StyledChar[][] {
   return lines;
 }
 
-function charsToSpans(chars: StyledChar[]): StyledSpan[] {
+export function charsToSpans(chars: StyledChar[]): StyledSpan[] {
   const spans: StyledSpan[] = [];
   for (const c of chars) {
     const last = spans[spans.length - 1];

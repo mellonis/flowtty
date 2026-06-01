@@ -19,7 +19,7 @@ function MdLine({ line }: { line: StyledLine }) {
   return (
     <Box flexDirection="row">
       {line.spans.map((s, i) => (
-        <Text key={i} color={s.color} bold={s.bold} dim={s.dim} underline={s.underline}>
+        <Text key={i} color={s.color} bold={s.bold} dim={s.dim} underline={s.underline} link={s.link}>
           {s.text}
         </Text>
       ))}

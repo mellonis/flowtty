@@ -8,6 +8,8 @@ export interface TextProps {
   underline?: boolean;
   inverse?: boolean;
   strikethrough?: boolean;
+  /** OSC 8 hyperlink target. Rendered clickable by backends that support it. */
+  link?: string;
   /** Default 'none' (no wrap). 'wrap' = word-wrap with char-wrap fallback. 'truncate' = single-cell ellipsis. */
   wrap?: 'wrap' | 'truncate' | 'none';
 }

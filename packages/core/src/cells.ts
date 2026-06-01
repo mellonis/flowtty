@@ -6,6 +6,13 @@ export interface Style {
   underline?: boolean;
   inverse?: boolean;
   strikethrough?: boolean;
+  /**
+   * Target URL for an OSC 8 terminal hyperlink. Backends that can emit
+   * clickable links (TTY / inline TTY) wrap this cell's char in the hyperlink
+   * escape; backends that can't (headless test surface) ignore it. Carried in
+   * Style so it threads through the same paint + diff path as visual attrs.
+   */
+  link?: string;
 }
 
 export interface Cell {

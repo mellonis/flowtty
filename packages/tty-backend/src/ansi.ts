@@ -90,6 +90,20 @@ export const HIDE_CURSOR = '\x1b[?25l';
 export const SHOW_CURSOR = '\x1b[?25h';
 export const CLEAR = '\x1b[2J\x1b[H';
 
+// OSC 8 hyperlink. `osc8Open(url)` starts a clickable region pointing at url;
+// OSC8_CLOSE ends it. Cells written between the two become one hyperlink (the
+// terminal coalesces adjacent cells sharing a URI). Unlike SGR, OSC 8 state is
+// NOT cleared by RESET — callers must emit OSC8_CLOSE explicitly. The url is
+// sanitized: control bytes (which could terminate the sequence early or inject
+// a second escape) are stripped, since the ST/BEL terminator and any embedded
+// ESC would corrupt the stream.
+export const OSC8_CLOSE = '\x1b]8;;\x1b\\';
+export function osc8Open(url: string): string {
+  // eslint-disable-next-line no-control-regex -- intentionally stripping C0/DEL
+  const safe = url.replace(/[\x00-\x1f\x7f]/gu, '');
+  return `\x1b]8;;${safe}\x1b\\`;
+}
+
 // Alternate screen buffer — enter on mount, exit on dispose. Without this,
 // every full-frame redraw pushes the previous frame into the terminal's
 // scrollback, so a long-running app polluting history with hundreds of

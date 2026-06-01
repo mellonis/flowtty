@@ -31,6 +31,9 @@ export interface BoxProps {
   underline?: boolean;
   inverse?: boolean;
   strikethrough?: boolean;
+  // OSC 8 hyperlink target for this box's text. Emitted as a clickable link by
+  // backends that support it; ignored (text still renders) by those that don't.
+  link?: string;
   // Box background fill:
   backgroundColor?: string;
   // Border drawn around the box (one cell on each side). When set, Yoga

@@ -42,4 +42,17 @@ export interface Backend {
    * refuse to render rather than produce broken overflow UI.
    */
   fullScreen?: boolean;
+  /**
+   * Whether this backend can emit OSC 8 terminal hyperlinks (clickable links).
+   *
+   *   true      — TTY backends (alt-screen + inline) wrap linked cells in the
+   *               OSC 8 escape, so a `<Link>` is clickable in supporting terminals.
+   *   omitted   — treated as false. The headless TestBackend and any output that
+   *     /false    can't render clickable links leave them out, so `<Link>` should
+   *               degrade to styled text plus a visible URL.
+   *
+   * Feature-detected like `fullScreen`: components read it (via useBackend())
+   * rather than assuming a capability.
+   */
+  hyperlinks?: boolean;
 }

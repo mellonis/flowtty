@@ -51,10 +51,20 @@ describe('layoutMarkdown', () => {
     expect(lines.map(text)).toEqual(['# H', '', 'para']);
   });
 
-  test('links are blue + underlined', () => {
+  test('links are blue + underlined and carry the OSC 8 target', () => {
     const lines = layoutMarkdown('see [docs](http://x)', 40);
     const link = lines.flatMap((l) => l.spans).find((s) => s.text.includes('docs'));
     expect(link?.color).toBe('blue');
     expect(link?.underline).toBe(true);
+    expect(link?.link).toBe('http://x');
+  });
+
+  test('a code-labelled link renders as code (cyan), underlined + clickable, no backticks', () => {
+    const lines = layoutMarkdown('[`pkg`](http://x)', 40);
+    const span = lines.flatMap((l) => l.spans).find((s) => s.text === 'pkg');
+    expect(span).toBeDefined();           // backticks consumed, not shown literally
+    expect(span?.color).toBe('cyan');
+    expect(span?.underline).toBe(true);
+    expect(span?.link).toBe('http://x');
   });
 });

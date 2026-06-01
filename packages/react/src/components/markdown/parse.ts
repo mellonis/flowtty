@@ -45,7 +45,10 @@ export function parseInline(text: string): InlineSeg[] {
     else if (m[4]) segs.push({ text: tok.slice(1, -1), emphasis: true });
     else if (m[5]) {
       const lm = LINK_RE.exec(tok);
-      if (lm) segs.push({ text: lm[1]!, link: lm[2]! });
+      // Recursively parse the label so inline markup inside a link (e.g.
+      // [`code`](url) or [**bold**](url)) renders styled instead of leaking its
+      // literal markers, and attach the href to every resulting sub-segment.
+      if (lm) for (const sub of parseInline(lm[1]!)) segs.push({ ...sub, link: lm[2]! });
       else segs.push({ text: tok });
     }
     last = idx + tok.length;

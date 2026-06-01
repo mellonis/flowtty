@@ -22,6 +22,7 @@ function textStyleOf(inst: Instance): Style {
   if (p.underline) style.underline = true;
   if (p.inverse) style.inverse = true;
   if (p.strikethrough) style.strikethrough = true;
+  if (p.link !== undefined) style.link = p.link;
   if (p.backgroundColor !== undefined) style.bg = p.backgroundColor;
   return style;
 }

@@ -30,6 +30,22 @@ describe('Markdown', () => {
     r.unmount();
   });
 
+  test('a markdown link threads its URL into the painted cell style (OSC 8)', async () => {
+    const backend = new TestBackend(40, 3);
+    const r = await render(<Markdown width={38}>{'see [docs](http://x.dev)'}</Markdown>, backend);
+    await flushAsync(backend);
+    const buf = backend.lastBuffer!;
+    let linkCell: string | undefined;
+    for (let y = 0; y < buf.height && linkCell === undefined; y++) {
+      for (let x = 0; x < buf.width; x++) {
+        const s = buf.get(x, y).style;
+        if (s.link) { linkCell = s.link; break; }
+      }
+    }
+    expect(linkCell).toBe('http://x.dev');
+    r.unmount();
+  });
+
   test('renders fenced code', async () => {
     const backend = new TestBackend(40, 6);
     const r = await render(<Markdown width={38}>{'```ts\nconst x = 1;\n```'}</Markdown>, backend);

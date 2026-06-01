@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { Buffer } from '@flowtty/core';
 import { TtyBackend } from './tty.js';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open } from './ansi.js';
 
 function makeStdinStub() {
   const emitter = new EventEmitter() as EventEmitter & {
@@ -280,6 +280,64 @@ test('TtyBackend.draw: first frame still does a full redraw (CLEAR + full conten
   expect(drawWrite.startsWith(CLEAR)).toBe(true);
   expect(drawWrite).toContain('abc');
   expect(drawWrite.endsWith(RESET)).toBe(true);
+  back.dispose();
+});
+
+test('TtyBackend.hyperlinks reflects detected terminal support (override)', () => {
+  const { stub } = makeStub();
+  const prev = process.env.FORCE_HYPERLINKS;
+  try {
+    process.env.FORCE_HYPERLINKS = '1';
+    expect(new TtyBackend(stub).hyperlinks).toBe(true);
+    process.env.FORCE_HYPERLINKS = '0';
+    expect(new TtyBackend(stub).hyperlinks).toBe(false);
+  } finally {
+    if (prev === undefined) delete process.env.FORCE_HYPERLINKS;
+    else process.env.FORCE_HYPERLINKS = prev;
+  }
+});
+
+test('TtyBackend.draw (full): wraps a linked cell in OSC 8 open/close', () => {
+  const { stub: out, writes } = makeStub(3, 1);
+  const back = new TtyBackend(out);
+  const buf = new Buffer(3, 1);
+  buf.set(0, 0, 'a');
+  buf.set(1, 0, 'b', { link: 'http://x' });
+  buf.set(2, 0, 'c');
+  back.draw(buf);
+  const drawWrite = writes[1]!;
+  expect(drawWrite).toContain(osc8Open('http://x') + 'b');
+  // The link is closed before the next (unlinked) cell and again at line end.
+  expect(drawWrite).toContain(OSC8_CLOSE);
+  back.dispose();
+});
+
+test('TtyBackend.draw (full): does not leave a hyperlink open past end of line', () => {
+  const { stub: out, writes } = makeStub(2, 1);
+  const back = new TtyBackend(out);
+  const buf = new Buffer(2, 1);
+  buf.set(0, 0, 'a');
+  buf.set(1, 0, 'b', { link: 'http://x' }); // link runs to the last cell
+  back.draw(buf);
+  const drawWrite = writes[1]!;
+  // Must close the link before the trailing RESET that ends the row.
+  expect(drawWrite.endsWith(OSC8_CLOSE + RESET)).toBe(true);
+  back.dispose();
+});
+
+test('TtyBackend.draw (diff): emits OSC 8 open/close around a newly-linked cell', () => {
+  const { stub: out, writes } = makeStub(3, 1);
+  const back = new TtyBackend(out);
+  const buf1 = new Buffer(3, 1);
+  buf1.set(0, 0, 'a'); buf1.set(1, 0, 'b'); buf1.set(2, 0, 'c');
+  back.draw(buf1);
+  const buf2 = new Buffer(3, 1);
+  buf2.set(0, 0, 'a'); buf2.set(1, 0, 'b', { link: 'http://x' }); buf2.set(2, 0, 'c');
+  back.draw(buf2);
+  const diff = writes[writes.length - 1]!;
+  expect(diff).toContain(osc8Open('http://x'));
+  // The diff ends by closing the link (before the trailing RESET).
+  expect(diff.endsWith(OSC8_CLOSE + RESET)).toBe(true);
   back.dispose();
 });
 

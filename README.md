@@ -437,7 +437,7 @@ Style mapping (the terminal cell model has no italic — see [Text](#text)):
 | `**bold**`          | bold                                         |
 | `*emphasis*`        | underline (no italic in a cell grid)         |
 | `` `code` ``        | cyan                                         |
-| `[text](url)`       | blue + underline (text only; url is dropped) |
+| `[text](url)`       | blue + underline; url emitted as an OSC 8 hyperlink (clickable on capable backends) — see [Link](#link) |
 | `![alt](src)`       | dim `alt` text (images can't render in a TTY)|
 | `> quote`           | dim, with a `│ ` gutter                      |
 | `- ` / `1. ` lists  | colored marker + hanging indent on wrap      |
@@ -457,7 +457,48 @@ exported for that use; `<Markdown>` itself just measures its width (via
 measure-and-relayout paint.
 
 > A host can open article `.md` files rendered this way by default and flip
-> to a raw source view.
+> to a **raw source view** — the markdown source
+> shown verbatim but syntax-highlighted in place (markers kept and dimmed,
+> headings/lists/links/fences colored, fenced-code token-colored). That view
+> uses `highlightMarkdownSource(src, width, wrap)`, the source-preserving
+> counterpart to `layoutMarkdown` (it never collapses whitespace, so code
+> indentation survives, and it hard-wraps rather than word-wraps).
+
+### Link
+
+`<Link href>` renders a terminal hyperlink. On a backend that advertises the
+`hyperlinks` capability (the TTY backends, when the terminal supports it), the
+label is emitted as an [OSC 8](https://gist.github.com/egmontkob/eb114294efbcd5adb1944c9f3cb5feda)
+hyperlink — clickable (or ⌘/Ctrl-click) in supporting terminals. Where it can't
+(a plain pipe, the headless test surface, or a terminal that ignores OSC 8 such
+as Apple Terminal.app), it degrades to the styled label followed by a dim
+`(url)` so the address is still reachable.
+
+```tsx
+import { Link } from 'flowtty';
+
+<Link href="https://example.com">the docs</Link>
+// capable terminal:  the docs        (clickable)
+// otherwise:         the docs (https://example.com)
+```
+
+| Prop              | Default  | Notes                                                        |
+|-------------------|----------|--------------------------------------------------------------|
+| `href`            | —        | Target URL. Control bytes are stripped before emission.      |
+| `children`        | `href`   | Visible label; falls back to the URL itself.                 |
+| `color`           | `'blue'` | Label color (always underlined).                             |
+| `showUrlFallback` | `true`   | Append ` (url)` when the backend can't render a clickable link and the label differs from the URL. |
+
+`hyperlinks` is a backend **capability flag** (like `fullScreen`): omitted means
+"can't", so `<Link>` degrades gracefully rather than promising a clickable link
+the terminal won't honor. OSC 8 support is a property of the *terminal*, not of
+stdout being a TTY, and there's no escape-sequence query for it — so the TTY
+backends sniff the environment (`TERM_PROGRAM` allowlist, `VTE_VERSION`,
+`WT_SESSION`, …; Apple Terminal.app is excluded). Override with
+`FORCE_HYPERLINKS=1` / `=0`. The painter always emits the OSC 8 bytes; the flag
+only governs `<Link>` fallback (rendered-markdown links emit OSC 8 either way).
+The URL rides in the cell `Style.link`, so it threads through the same paint +
+frame-diff path as visual attributes.
 
 ### Still deferred (later milestones)
 

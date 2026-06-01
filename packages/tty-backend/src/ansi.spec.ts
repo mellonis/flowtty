@@ -1,5 +1,27 @@
 import { expect, test, describe } from 'vitest';
-import { sgr, RESET, cursorTo, cellsEqual, parseColor } from './ansi.js';
+import { sgr, RESET, cursorTo, cellsEqual, parseColor, OSC8_CLOSE, osc8Open } from './ansi.js';
+
+describe('OSC 8 hyperlinks', () => {
+  test('osc8Open wraps the URL in the OSC 8 open sequence with an ST terminator', () => {
+    expect(osc8Open('https://x.dev')).toBe('\x1b]8;;https://x.dev\x1b\\');
+  });
+
+  test('OSC8_CLOSE is the empty-URL close sequence', () => {
+    expect(OSC8_CLOSE).toBe('\x1b]8;;\x1b\\');
+  });
+
+  test('osc8Open strips control bytes so an embedded ESC/BEL cannot terminate early', () => {
+    expect(osc8Open('http://x\x1b\x07/\x00y')).toBe('\x1b]8;;http://x/y\x1b\\');
+  });
+
+  test('cellsEqual treats a link difference as a change (link rides in Style)', () => {
+    const a = { char: 'a', style: { link: 'http://x' } };
+    const b = { char: 'a', style: { link: 'http://y' } };
+    const c = { char: 'a', style: { link: 'http://x' } };
+    expect(cellsEqual(a, b)).toBe(false);
+    expect(cellsEqual(a, c)).toBe(true);
+  });
+});
 
 test('sgr emits nothing for an empty style', () => {
   expect(sgr({})).toBe('');
