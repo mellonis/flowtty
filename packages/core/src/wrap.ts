@@ -66,5 +66,4 @@ function wrapLine(line: string, width: number, out: string[]): void {
     }
   }
   if (current) out.push(current);
-  if (out.length === 0) out.push('');
 }

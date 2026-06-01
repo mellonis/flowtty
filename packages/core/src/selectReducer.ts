@@ -36,7 +36,7 @@ export function reduce<T>(items: SelectItem<T>[], state: SelectState, key: Key):
 
   if (key.name === 'escape') return { kind: 'cancel' };
 
-  if (key.name === 'return' || key.name === 'enter') {
+  if (key.name === 'return') {
     if (n === 0) return { kind: 'noop' };
     const cursor = Math.min(state.cursor, n - 1);
     return { kind: 'submit', index: visible[cursor]! };

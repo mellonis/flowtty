@@ -32,9 +32,8 @@ test('space clamps an out-of-range cursor to the last item', () => {
   });
 });
 
-test('enter submits', () => {
+test('return submits', () => {
   expect(reduce(items(3), { cursor: 0 }, key({ name: 'return' }))).toEqual({ kind: 'submit' });
-  expect(reduce(items(3), { cursor: 0 }, key({ name: 'enter' }))).toEqual({ kind: 'submit' });
 });
 
 test('escape cancels', () => {

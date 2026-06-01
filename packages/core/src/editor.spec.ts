@@ -98,9 +98,8 @@ test('NBSP (U+00A0) inserts byte-exact (the value contains U+00A0, not space)', 
   }
 });
 
-test('Enter / return → submit', () => {
+test('return → submit', () => {
   expect(reduce(s('hello', 5), key({ name: 'return' }))).toEqual({ kind: 'submit' });
-  expect(reduce(s('hello', 5), key({ name: 'enter' }))).toEqual({ kind: 'submit' });
 });
 
 test('Escape → cancel', () => {

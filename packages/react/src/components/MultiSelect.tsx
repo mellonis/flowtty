@@ -35,7 +35,7 @@ export function MultiSelect<T>(props: MultiSelectProps<T>): ReactNode {
   useInput((key) => {
     // Add-new-row specific routing BEFORE reducer.
     if (onAddRow) {
-      if (key.name === 'return' || key.name === 'enter') { onAddNew!(); return; }
+      if (key.name === 'return') { onAddNew!(); return; }
       if (key.name === ' ') return;   // Space is noop on the add row
       // (Up/Down/k/j fall through to the reducer for navigation.)
     }

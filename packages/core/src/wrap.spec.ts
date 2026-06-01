@@ -45,6 +45,13 @@ test('edge: width 0 in wrap mode returns an empty line per source line', () => {
   expect(wrapText('hello', 0, 'wrap')).toEqual(['']);
 });
 
+test('wrap mode: a whitespace-only source line collapses, regardless of position', () => {
+  // Spaces are word separators with no content, so a spaces-only line yields
+  // nothing — consistently, whether it's first, middle, or last.
+  expect(wrapText(' \na', 6, 'wrap')).toEqual(['a']);
+  expect(wrapText('a\n ', 6, 'wrap')).toEqual(['a']);
+});
+
 test('edge: empty input returns a single empty line (matches measureText height=1)', () => {
   expect(wrapText('', 10, 'wrap')).toEqual(['']);
   expect(wrapText('', 10, 'truncate')).toEqual(['']);

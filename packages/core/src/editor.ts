@@ -102,7 +102,7 @@ export function reduce(state: EditorState, key: Key): EditorAction {
   }
 
   // Submit / cancel
-  if (key.name === 'return' || key.name === 'enter') return { kind: 'submit' };
+  if (key.name === 'return') return { kind: 'submit' };
   if (key.name === 'escape') return { kind: 'cancel' };
 
   // Printable insertion — single-character name only, no modifiers.

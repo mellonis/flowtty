@@ -16,7 +16,7 @@ export function reduce<T>(items: SelectItem<T>[], state: MultiSelectState, key: 
   const n = items.length;
 
   if (key.name === 'escape') return { kind: 'cancel' };
-  if (key.name === 'return' || key.name === 'enter') return { kind: 'submit' };
+  if (key.name === 'return') return { kind: 'submit' };
 
   if (n === 0) return { kind: 'noop' };
 
