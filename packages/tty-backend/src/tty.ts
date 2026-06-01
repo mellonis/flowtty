@@ -1,15 +1,19 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import type { Buffer, Style, Backend, Key } from '@flowtty/core';
 import { ALT_SCREEN_OFF, ALT_SCREEN_ON, CLEAR, HIDE_CURSOR, RESET, SHOW_CURSOR, cellsEqual, cursorTo, sgr } from './ansi.js';
-import { parseKeypress } from './key-parser.js';
+import { decodeKeys } from './key-parser.js';
 
 export class TtyBackend implements Backend {
   private readonly subscribers = new Set<(key: Key) => void>();
+  // Carries an incomplete escape sequence from one stdin chunk to the next, so
+  // a sequence split across reads decodes as one key rather than a stray Escape.
+  private pendingInput = '';
   // Arrow-property so `removeListener` finds the same reference we added.
   // `NodeBuffer` avoids the name-clash with our cells `Buffer` import.
   private readonly inputDataHandler = (chunk: NodeBuffer | string): void => {
-    const s = typeof chunk === 'string' ? chunk : chunk.toString('utf-8');
-    const keys = parseKeypress(s);
+    const s = this.pendingInput + (typeof chunk === 'string' ? chunk : chunk.toString('utf-8'));
+    const { keys, rest } = decodeKeys(s);
+    this.pendingInput = rest;
     for (const key of keys) {
       // Ctrl-C / Ctrl-D in raw mode are delivered as keypresses (NOT signals —
       // raw mode swallows SIGINT). Default-handle them as "exit with restore"
@@ -156,6 +160,7 @@ export class TtyBackend implements Backend {
       if (this.input.isTTY) this.input.setRawMode(false);
       this.input.pause();
       this.inputAttached = false;
+      this.pendingInput = '';
     }
     if (this.resizeAttached) {
       this.out.removeListener('resize', this.resizeNotify);

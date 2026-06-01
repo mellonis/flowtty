@@ -1,5 +1,5 @@
 import { expect, test } from 'vitest';
-import { parseKeypress } from './key-parser.js';
+import { decodeKeys, parseKeypress } from './key-parser.js';
 
 test('printable ASCII becomes one key per char (name === char, no modifiers)', () => {
   expect(parseKeypress('hi')).toEqual([
@@ -114,4 +114,47 @@ test('modifier-encoded Home/End and tilde-family carry modifiers', () => {
   expect(parseKeypress('\x1b[1;5F')[0]).toMatchObject({ name: 'end', ctrl: true });
   expect(parseKeypress('\x1b[3;5~')[0]).toMatchObject({ name: 'delete', ctrl: true });
   expect(parseKeypress('\x1b[5;2~')[0]).toMatchObject({ name: 'pageup', shift: true });
+});
+
+test('decodeKeys hands an incomplete trailing CSI back as rest (not a stray escape)', () => {
+  const r = decodeKeys('a\x1b[');
+  expect(r.keys.map((k) => k.name)).toEqual(['a']);
+  expect(r.rest).toBe('\x1b[');
+});
+
+test('decodeKeys hands an incomplete trailing SS3 back as rest', () => {
+  const r = decodeKeys('\x1bO');
+  expect(r.keys).toEqual([]);
+  expect(r.rest).toBe('\x1bO');
+});
+
+test('a CSI split across two reads decodes as one key when rest is prepended', () => {
+  const first = decodeKeys('\x1b[');
+  expect(first.keys).toEqual([]);
+  expect(first.rest).toBe('\x1b[');
+  // Next read carries the final byte; caller prepends the leftover.
+  const second = decodeKeys(first.rest + 'A');
+  expect(second.keys.map((k) => k.name)).toEqual(['up']);
+  expect(second.rest).toBe('');
+});
+
+test('an SS3 split across reads (ESC O | F) decodes as end', () => {
+  const first = decodeKeys('\x1bO');
+  const second = decodeKeys(first.rest + 'F');
+  expect(second.keys.map((k) => k.name)).toEqual(['end']);
+  expect(second.rest).toBe('');
+});
+
+test('a modifier-encoded CSI split mid-params decodes correctly once completed', () => {
+  const first = decodeKeys('x\x1b[1;5');
+  expect(first.keys.map((k) => k.name)).toEqual(['x']);
+  expect(first.rest).toBe('\x1b[1;5');
+  const second = decodeKeys(first.rest + 'D');
+  expect(second.keys[0]).toMatchObject({ name: 'left', ctrl: true });
+});
+
+test('decodeKeys does NOT buffer a lone trailing ESC — surfaces it as escape', () => {
+  const r = decodeKeys('\x1b');
+  expect(r.keys.map((k) => k.name)).toEqual(['escape']);
+  expect(r.rest).toBe('');
 });

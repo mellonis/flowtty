@@ -1,5 +1,5 @@
 export { TtyBackend } from './tty.js';
-export { parseKeypress } from './key-parser.js';
+export { parseKeypress, decodeKeys } from './key-parser.js';
 // ANSI helpers — exposed so sibling TTY backends (e.g. @flowtty/inline-tty-backend)
 // can reuse the SGR / cursor / screen-control sequences instead of duplicating.
 // App code typically should not assemble escape sequences itself.

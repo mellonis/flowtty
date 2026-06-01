@@ -1,7 +1,7 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import type { Buffer, Style, Backend, Key } from '@flowtty/core';
 import {
-  parseKeypress,
+  decodeKeys,
   RESET, HIDE_CURSOR, SHOW_CURSOR,
   sgr,
 } from '@flowtty/tty-backend';
@@ -42,9 +42,12 @@ export class InlineTtyBackend implements Backend {
   private readonly liveHeight: number;
 
   private readonly subscribers = new Set<(key: Key) => void>();
+  // Carries an incomplete escape sequence between stdin chunks (see decodeKeys).
+  private pendingInput = '';
   private readonly inputDataHandler = (chunk: NodeBuffer | string): void => {
-    const s = typeof chunk === 'string' ? chunk : chunk.toString('utf-8');
-    const keys = parseKeypress(s);
+    const s = this.pendingInput + (typeof chunk === 'string' ? chunk : chunk.toString('utf-8'));
+    const { keys, rest } = decodeKeys(s);
+    this.pendingInput = rest;
     for (const key of keys) {
       if (key.ctrl && (key.name === 'c' || key.name === 'd')) {
         this.dispose();
@@ -138,6 +141,7 @@ export class InlineTtyBackend implements Backend {
       if (this.input.isTTY) this.input.setRawMode(false);
       this.input.pause();
       this.inputAttached = false;
+      this.pendingInput = '';
     }
     if (this.resizeAttached) {
       this.out.removeListener('resize', this.resizeNotify);

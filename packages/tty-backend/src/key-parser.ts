@@ -1,7 +1,14 @@
 import type { Key } from '@flowtty/core';
 
 /**
- * Parse a chunk of input bytes (utf-8 string from stdin) into normalized Key events.
+ * Decode a chunk of input bytes (utf-8 string from stdin) into normalized Key
+ * events, returning any trailing bytes that form an incomplete escape sequence.
+ *
+ * Callers that read stdin in chunks must prepend `rest` to the next chunk so a
+ * sequence split across reads (e.g. ESC[ in one read, A in the next) decodes as
+ * one key instead of surfacing as a stray Escape. A lone trailing ESC is NOT
+ * buffered — without a timer we can't tell "Escape pressed" from "start of a
+ * sequence", and treating it as Escape is the more useful default.
  *
  * Handles:
  *  - printable ASCII / Unicode (one Key per code point; `name === sequence`)
@@ -10,10 +17,9 @@ import type { Key } from '@flowtty/core';
  *  - SS3 sequences: ESC O <letter> (alternate arrow/Home/End encoding)
  *  - Mac Option-as-Meta: ESC <char> → {name: <char>, meta: true}
  *
- * NOT handled (later): bracketed paste, mouse, Kitty protocol,
- * modifier-encoded arrows (CSI 1;5A etc.), F-keys beyond SS3.
+ * NOT handled (later): bracketed paste, mouse, Kitty protocol, F-keys beyond SS3.
  */
-export function parseKeypress(input: string): Key[] {
+export function decodeKeys(input: string): { keys: Key[]; rest: string } {
   const out: Key[] = [];
   // Iterate by Unicode code point so astral characters (emoji, etc.) stay
   // intact instead of splitting into UTF-16 surrogate halves. Every byte of an
@@ -68,9 +74,9 @@ export function parseKeypress(input: string): Key[] {
           i = j + 1;
           continue;
         }
-        out.push({ name: 'escape', sequence: '\x1b', ctrl: false, meta: false, shift: false });
-        i = chars.length;
-        continue;
+        // No final byte yet — the CSI is split across reads. Hand it back as
+        // `rest` so the next chunk can complete it.
+        return { keys: out, rest: chars.slice(i).join('') };
       }
 
       // SS3: ESC O <letter>
@@ -85,9 +91,8 @@ export function parseKeypress(input: string): Key[] {
           i += 3;
           continue;
         }
-        out.push({ name: 'escape', sequence: '\x1b', ctrl: false, meta: false, shift: false });
-        i = chars.length;
-        continue;
+        // Missing the SS3 final letter — split across reads; buffer it.
+        return { keys: out, rest: chars.slice(i).join('') };
       }
 
       // Meta-prefix: ESC + <char> → that char with meta=true.
@@ -109,7 +114,20 @@ export function parseKeypress(input: string): Key[] {
     out.push(parseChar(c));
     i++;
   }
-  return out;
+  return { keys: out, rest: '' };
+}
+
+/**
+ * One-shot decode for callers that don't buffer across reads (and for tests).
+ * An incomplete trailing sequence surfaces as a bare Escape — the historical
+ * behavior — rather than being silently dropped.
+ */
+export function parseKeypress(input: string): Key[] {
+  const { keys, rest } = decodeKeys(input);
+  if (rest.length > 0) {
+    keys.push({ name: 'escape', sequence: '\x1b', ctrl: false, meta: false, shift: false });
+  }
+  return keys;
 }
 
 function parseChar(c: string): Key {
