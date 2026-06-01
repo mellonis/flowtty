@@ -85,3 +85,18 @@ test('Shift+Tab (CSI Z) parses as tab with shift=true', () => {
   const keys = parseKeypress('\x1b[Z');
   expect(keys).toEqual([{ name: 'tab', sequence: '\x1b[Z', ctrl: false, meta: false, shift: true }]);
 });
+
+test('modifier-encoded arrows carry ctrl/shift/alt instead of decoding as plain arrows', () => {
+  expect(parseKeypress('\x1b[1;5D')[0]).toMatchObject({ name: 'left', ctrl: true, meta: false, shift: false });
+  expect(parseKeypress('\x1b[1;2A')[0]).toMatchObject({ name: 'up', ctrl: false, meta: false, shift: true });
+  expect(parseKeypress('\x1b[1;3C')[0]).toMatchObject({ name: 'right', ctrl: false, meta: true, shift: false });
+  // mod 7: (7-1)=6 = Alt(2)|Ctrl(4) → Ctrl+Alt+Left
+  expect(parseKeypress('\x1b[1;7D')[0]).toMatchObject({ name: 'left', ctrl: true, meta: true, shift: false });
+});
+
+test('modifier-encoded Home/End and tilde-family carry modifiers', () => {
+  expect(parseKeypress('\x1b[1;5H')[0]).toMatchObject({ name: 'home', ctrl: true });
+  expect(parseKeypress('\x1b[1;5F')[0]).toMatchObject({ name: 'end', ctrl: true });
+  expect(parseKeypress('\x1b[3;5~')[0]).toMatchObject({ name: 'delete', ctrl: true });
+  expect(parseKeypress('\x1b[5;2~')[0]).toMatchObject({ name: 'pageup', shift: true });
+});

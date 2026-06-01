@@ -49,10 +49,17 @@ export function parseKeypress(input: string): Key[] {
             i = j + 1;
             continue;
           }
+          // Modifier-encoded sequences carry the modifier as a trailing param:
+          // letters → "1;<mod>" + final (ESC[1;5D = Ctrl+Left); tilde-family →
+          // "<code>;<mod>~" (ESC[3;5~ = Ctrl+Delete). The modifier value minus 1
+          // is a bitmask: 1=Shift, 2=Alt/Meta, 4=Ctrl.
+          const parts = params.split(';');
+          const mod = parts.length > 1 ? decodeModifier(Number(parts[parts.length - 1])) : NO_MOD;
+          const name = final === '~' ? tildeName(parts[0] ?? '') : csiFinalName(final);
           out.push({
-            name: csiName(final, params),
+            name,
             sequence: input.slice(i, j + 1),
-            ctrl: false, meta: false, shift: false,
+            ctrl: mod.ctrl, meta: mod.meta, shift: mod.shift,
           });
           i = j + 1;
           continue;
@@ -105,7 +112,18 @@ function parseChar(c: string): Key {
   return { name: c, sequence: c, ctrl: false, meta: false, shift: false };
 }
 
-function csiName(final: string, params: string): string {
+interface Modifier { ctrl: boolean; meta: boolean; shift: boolean; }
+const NO_MOD: Modifier = { ctrl: false, meta: false, shift: false };
+
+/** Decode an xterm CSI modifier param (1-based) into modifier flags. */
+function decodeModifier(value: number): Modifier {
+  if (!Number.isFinite(value) || value < 2) return NO_MOD;
+  const m = value - 1;
+  return { shift: (m & 1) !== 0, meta: (m & 2) !== 0, ctrl: (m & 4) !== 0 };
+}
+
+/** Name for a CSI sequence whose key is encoded in the final byte (arrows, Home/End). */
+function csiFinalName(final: string): string {
   switch (final) {
     case 'A': return 'up';
     case 'B': return 'down';
@@ -113,26 +131,29 @@ function csiName(final: string, params: string): string {
     case 'D': return 'left';
     case 'H': return 'home';
     case 'F': return 'end';
-    case '~':
-      switch (params) {
-        case '1': return 'home';
-        case '2': return 'insert';
-        case '3': return 'delete';
-        case '4': return 'end';
-        case '5': return 'pageup';
-        case '6': return 'pagedown';
-        // Function keys F5..F12 (xterm/vt100 standard tilde form).
-        case '15': return 'f5';
-        case '17': return 'f6';
-        case '18': return 'f7';
-        case '19': return 'f8';
-        case '20': return 'f9';
-        case '21': return 'f10';
-        case '23': return 'f11';
-        case '24': return 'f12';
-        default: return `csi-tilde-${params}`;
-      }
     default: return `csi-${final}`;
+  }
+}
+
+/** Name for a CSI tilde-family sequence, keyed by the numeric code (ESC[<code>~). */
+function tildeName(code: string): string {
+  switch (code) {
+    case '1': return 'home';
+    case '2': return 'insert';
+    case '3': return 'delete';
+    case '4': return 'end';
+    case '5': return 'pageup';
+    case '6': return 'pagedown';
+    // Function keys F5..F12 (xterm/vt100 standard tilde form).
+    case '15': return 'f5';
+    case '17': return 'f6';
+    case '18': return 'f7';
+    case '19': return 'f8';
+    case '20': return 'f9';
+    case '21': return 'f10';
+    case '23': return 'f11';
+    case '24': return 'f12';
+    default: return `csi-tilde-${code}`;
   }
 }
 
