@@ -76,6 +76,14 @@ test('multiple keys in one chunk decode in order', () => {
   expect(parseKeypress('ab\x1b[C').map((k) => k.name)).toEqual(['a', 'b', 'right']);
 });
 
+test('astral characters (emoji) decode as one Key, not split surrogate halves', () => {
+  const keys = parseKeypress('😀');
+  expect(keys).toHaveLength(1);
+  expect(keys[0]).toMatchObject({ name: '😀', sequence: '😀' });
+  // Mixed with ASCII still preserves order and code-point boundaries.
+  expect(parseKeypress('a😀b').map((k) => k.name)).toEqual(['a', '😀', 'b']);
+});
+
 test('unterminated CSI mid-buffer surfaces as escape (rather than swallowing silently)', () => {
   const keys = parseKeypress('\x1b[');
   expect(keys[0]!.name).toBe('escape');

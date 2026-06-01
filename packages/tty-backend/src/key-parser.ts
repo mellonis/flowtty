@@ -4,7 +4,7 @@ import type { Key } from '@flowtty/core';
  * Parse a chunk of input bytes (utf-8 string from stdin) into normalized Key events.
  *
  * Handles:
- *  - printable ASCII / Unicode (one Key per code unit; `name === sequence`)
+ *  - printable ASCII / Unicode (one Key per code point; `name === sequence`)
  *  - control bytes: Tab, Return (CR/LF), Backspace (DEL/BS), Escape, Ctrl-A..Z
  *  - CSI sequences: ESC [ <params> <final> (arrows, Home, End, Delete, PageUp/Down, Insert)
  *  - SS3 sequences: ESC O <letter> (alternate arrow/Home/End encoding)
@@ -15,35 +15,39 @@ import type { Key } from '@flowtty/core';
  */
 export function parseKeypress(input: string): Key[] {
   const out: Key[] = [];
+  // Iterate by Unicode code point so astral characters (emoji, etc.) stay
+  // intact instead of splitting into UTF-16 surrogate halves. Every byte of an
+  // escape sequence is ASCII, so this is also correct for the sequence paths.
+  const chars = [...input];
   let i = 0;
-  while (i < input.length) {
-    const c = input[i]!;
+  while (i < chars.length) {
+    const c = chars[i]!;
 
     if (c === '\x1b') {
       // Lone ESC at end of buffer → the Escape key itself.
-      if (i + 1 >= input.length) {
+      if (i + 1 >= chars.length) {
         out.push({ name: 'escape', sequence: '\x1b', ctrl: false, meta: false, shift: false });
         i++;
         continue;
       }
-      const next = input[i + 1]!;
+      const next = chars[i + 1]!;
 
       // CSI: ESC [ <params> <final-byte 0x40-0x7E>
       if (next === '[') {
         let j = i + 2;
-        while (j < input.length) {
-          const code = input.charCodeAt(j);
+        while (j < chars.length) {
+          const code = chars[j]!.charCodeAt(0);
           if (code >= 0x40 && code <= 0x7E) break;
           j++;
         }
-        if (j < input.length) {
-          const final = input[j]!;
-          const params = input.slice(i + 2, j);
+        if (j < chars.length) {
+          const final = chars[j]!;
+          const params = chars.slice(i + 2, j).join('');
           // CSI Z = Shift+Tab (xterm backtab). Carry the shift modifier.
           if (final === 'Z' && params === '') {
             out.push({
               name: 'tab',
-              sequence: input.slice(i, j + 1),
+              sequence: chars.slice(i, j + 1).join(''),
               ctrl: false, meta: false, shift: true,
             });
             i = j + 1;
@@ -58,31 +62,31 @@ export function parseKeypress(input: string): Key[] {
           const name = final === '~' ? tildeName(parts[0] ?? '') : csiFinalName(final);
           out.push({
             name,
-            sequence: input.slice(i, j + 1),
+            sequence: chars.slice(i, j + 1).join(''),
             ctrl: mod.ctrl, meta: mod.meta, shift: mod.shift,
           });
           i = j + 1;
           continue;
         }
         out.push({ name: 'escape', sequence: '\x1b', ctrl: false, meta: false, shift: false });
-        i = input.length;
+        i = chars.length;
         continue;
       }
 
       // SS3: ESC O <letter>
       if (next === 'O') {
-        if (i + 2 < input.length) {
-          const final = input[i + 2]!;
+        if (i + 2 < chars.length) {
+          const final = chars[i + 2]!;
           out.push({
             name: ss3Name(final),
-            sequence: input.slice(i, i + 3),
+            sequence: chars.slice(i, i + 3).join(''),
             ctrl: false, meta: false, shift: false,
           });
           i += 3;
           continue;
         }
         out.push({ name: 'escape', sequence: '\x1b', ctrl: false, meta: false, shift: false });
-        i = input.length;
+        i = chars.length;
         continue;
       }
 
