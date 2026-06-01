@@ -37,7 +37,9 @@ function truncateLine(line: string, width: number): string {
   if (width <= 0) return '';
   const chars = [...line];
   if (chars.length <= width) return line;
-  if (chars[width] === ' ') return chars.slice(0, width).join('');
+  // Content was cut — always signal it with the ellipsis in the last cell, even
+  // when the cut lands on a word boundary (a space). Otherwise the truncation is
+  // invisible (e.g. "hello world"/5 would silently render as "hello").
   if (width === 1) return ELLIPSIS;
   return chars.slice(0, width - 1).join('') + ELLIPSIS;
 }

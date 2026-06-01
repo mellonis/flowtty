@@ -33,7 +33,13 @@ test('truncate mode: width 1 yields a single ellipsis; width 0 yields empty', ()
 });
 
 test('truncate mode: preserves explicit newline; each source line truncated independently', () => {
-  expect(wrapText('hello world\nfoo bar baz', 7, 'truncate')).toEqual(['hello …', 'foo bar']);
+  expect(wrapText('hello world\nfoo bar baz', 7, 'truncate')).toEqual(['hello …', 'foo ba…']);
+});
+
+test('truncate mode: shows the ellipsis even when the cut falls on a word boundary', () => {
+  // chars[width] is a space here; the truncation must still be visible.
+  expect(wrapText('hello world', 5, 'truncate')).toEqual(['hell…']);
+  expect(wrapText('foo bar baz', 7, 'truncate')).toEqual(['foo ba…']);
 });
 
 test('none mode: no wrapping or truncation (lines kept whole)', () => {
