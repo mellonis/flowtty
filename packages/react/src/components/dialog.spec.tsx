@@ -36,13 +36,13 @@ test('openDialog resolves with done(value) when dialog calls done', async () => 
   }
   const backend = new TestBackend(40, 4);
   await render(createElement(DialogHost, null, createElement(App)), backend);
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'o' });
-  await flushAsync();
+  await flushAsync(backend);
   backend.type('alice');
   await flush();
   backend.press({ name: 'return' });
-  await flushAsync();
+  await flushAsync(backend);
   expect(result).toEqual({ status: 'done', value: 'alice' });
 });
 
@@ -57,11 +57,11 @@ test('openDialog resolves with cancelled when dialog calls cancel', async () => 
   }
   const backend = new TestBackend(40, 4);
   await render(createElement(DialogHost, null, createElement(App)), backend);
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'o' });
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'escape' });
-  await flushAsync();
+  await flushAsync(backend);
   expect(result).toEqual({ status: 'cancelled' });
 });
 
@@ -77,13 +77,13 @@ test('while dialog is open, host useInput subscribers receive no keys (gated)', 
   }
   const backend = new TestBackend(40, 4);
   await render(createElement(DialogHost, null, createElement(App)), backend);
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'o' });   // host receives 'o' and triggers openDialog
-  await flushAsync();
+  await flushAsync(backend);
   backend.type('x');              // dialog open → host should NOT see 'x'
   await flush();
   backend.press({ name: 'escape' });  // dialog closes
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'q' });   // host should see 'q' again
   await flush();
   expect(hostKeys).toEqual(['o', 'q']);   // 'x' consumed by dialog only
@@ -101,11 +101,11 @@ test('after dialog closes, host resumes receiving keys', async () => {
   }
   const backend = new TestBackend(40, 4);
   await render(createElement(DialogHost, null, createElement(App)), backend);
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'o' });
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'escape' });
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'a' });
   backend.press({ name: 'b' });
   await flush();
@@ -137,7 +137,7 @@ test('M1c.4 acceptance: MultiSelect+add-new opens dialog, dialog submit appends 
   }
   const backend = new TestBackend(40, 6);
   await render(createElement(DialogHost, null, createElement(App)), backend);
-  await flushAsync();
+  await flushAsync(backend);
 
   // Cursor 0 = 'apple'; move to '+ add new' row (index 2 = items.length 2)
   backend.press({ name: 'down' });
@@ -147,13 +147,13 @@ test('M1c.4 acceptance: MultiSelect+add-new opens dialog, dialog submit appends 
 
   // Enter on add-new → opens dialog
   backend.press({ name: 'return' });
-  await flushAsync();
+  await flushAsync(backend);
 
   // Dialog mounted; host muted. Type 'cherry' into its TextInput.
   backend.type('cherry');
   await flush();
   backend.press({ name: 'return' });  // dialog calls done('cherry')
-  await flushAsync();
+  await flushAsync(backend);
 
   // Dialog closes; MultiSelect re-renders with appended 'cherry' selected.
   expect(backend.lastFrame).toContain('[x] cherry');
@@ -176,9 +176,9 @@ test('M1f acceptance: dialog renders as an opaque centered overlay ON TOP of the
   }
   const backend = new TestBackend(30, 5);
   await render(createElement(DialogHost, null, createElement(HostApp)), backend);
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'o' });
-  await flushAsync();
+  await flushAsync(backend);
   // The dialog overlay sits INSIDE the 5-row frame; the dialog's "name: " prompt is visible.
   expect(backend.lastFrame.split('\n').length).toBeLessThanOrEqual(5);
   expect(backend.lastFrame).toContain('name:');
