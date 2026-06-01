@@ -238,6 +238,76 @@ Without this safety net, an unhandled error during render or in a useEffect woul
 leave the terminal in alt-screen mode with raw input still enabled — recovery
 would require killing the shell or running `reset`.
 
+### Root abort signal
+
+`useRootAbortSignal()` returns the render root's `AbortSignal` — the one flowtty
+fires (once) when the whole tree tears down, on both `handle.unmount()` and the
+error path (just before `backend.dispose()`). It returns `null` when there's no
+flowtty `render()` in scope.
+
+```tsx
+import { useRootAbortSignal } from 'flowtty';
+
+function Things() {
+  const signal = useRootAbortSignal();
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    fetch('/things', { signal: signal ?? undefined })
+      .then((r) => r.json())
+      .then(setData)
+      .catch((e) => { if (e.name !== 'AbortError') throw e; });
+  }, [signal]);
+  // …
+}
+```
+
+**Why this instead of `useEffect` cleanup?** It isn't *instead* — they solve
+different problems and are meant to be used together:
+
+- **`useEffect` cleanup (or a `cancelled` flag) is per-component.** It runs when
+  *this* component unmounts — a dialog closing, a list row scrolling out of the
+  window. Its job is to stop a stale `setState` from landing after the component
+  is gone. It does **not** cancel the underlying work; a `fetch` whose `.then`
+  is now a no-op is still holding a socket open.
+- **`useRootAbortSignal()` is whole-app.** It fires only when the entire render
+  root goes away (the process is exiting, or an error tore everything down). Its
+  job is to cancel work *at the I/O layer* so the runtime can actually shut down
+  — an in-flight `fetch` is aborted at the socket, a long timer's callback bails
+  — rather than leaving the event loop alive waiting on requests nobody will
+  read. It's also a ready-made cancellation token for anything that already
+  speaks `AbortSignal` (`fetch`, `addEventListener`, `setTimeout` via wrappers).
+
+So: keep your effect cleanup for per-unmount correctness, and *also* forward the
+root signal to async I/O for clean shutdown. A `cancelled` flag for the dialog closing plus the root signal on the `fetch` covers both.
+
+**Composing with your own controller.** Since the hook returns a plain
+`AbortSignal`, you can merge it with controllers *you* own via `AbortSignal.any()`
+(Node 20.3+) — the combined signal aborts when *either* source fires. This is the
+clean way to fold "this component unmounted", "the user hit cancel", or "the
+request timed out" into the same token as "the app is shutting down":
+
+```tsx
+const root = useRootAbortSignal();
+useEffect(() => {
+  const local = new AbortController();              // per-unmount / cancel button
+  const signal = root ? AbortSignal.any([root, local.signal]) : local.signal;
+  fetch(url, { signal })
+    .then(setData)
+    .catch((e) => { if (e.name !== 'AbortError') throw e; });
+  return () => local.abort();                        // fires on THIS effect's cleanup
+}, [url, root]);
+```
+
+That single combined signal makes the `fetch` abort on a per-component unmount
+(via `local.abort()` in the cleanup) *and* on whole-app teardown (via `root`) —
+collapsing the two-layer pattern above into one cancellation token. Mix in
+`AbortSignal.timeout(ms)` the same way for a deadline.
+
+**It's a signal, not a controller.** The hook hands back an `AbortSignal`, which
+has no `.abort()` — only flowtty's private controller can fire it. A component
+deep in the tree can observe teardown (`.aborted`, `addEventListener('abort')`,
+`.throwIfAborted()`) or forward the signal, but it cannot abort the whole app.
+
 ### Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
