@@ -75,13 +75,13 @@ function paintBorder(inst: Instance, buffer: Buffer, box: Rect, clip: Rect | nul
 
   // Top + bottom edges (between corners)
   for (let x = x0 + 1; x < x1; x++) {
-    setClipped(buffer, x, y0, chars.t, cellStyle, clip);
-    setClipped(buffer, x, y1, chars.b, cellStyle, clip);
+    setClipped(buffer, x, y0, chars.h, cellStyle, clip);
+    setClipped(buffer, x, y1, chars.h, cellStyle, clip);
   }
   // Left + right edges (between corners)
   for (let y = y0 + 1; y < y1; y++) {
-    setClipped(buffer, x0, y, chars.l, cellStyle, clip);
-    setClipped(buffer, x1, y, chars.r, cellStyle, clip);
+    setClipped(buffer, x0, y, chars.v, cellStyle, clip);
+    setClipped(buffer, x1, y, chars.v, cellStyle, clip);
   }
 
   // borderTitle: overlay " title " on the top edge starting after the top-left

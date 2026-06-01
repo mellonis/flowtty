@@ -9,7 +9,8 @@ export type { BoxProps } from '@flowtty/core';
 // have a single import surface for everything they typically need.
 export { Buffer } from '@flowtty/core';
 export type { Backend, Cell, Style, Key } from '@flowtty/core';
-export type { BorderStyle, BorderChars } from '@flowtty/core';
+export type { BorderStyle, BorderChars, GridChars } from '@flowtty/core';
+export { DEFAULT_BORDER_STYLE, GRID_CHARS } from '@flowtty/core';
 export { useInput } from './hooks/useInput.js';
 export type { UseInputOptions } from './hooks/useInput.js';
 export { useBackend } from './hooks/useBackend.js';

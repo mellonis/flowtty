@@ -18,7 +18,8 @@ export type { Backend } from './backend.js';
 // Component authors building Box-shaped widgets reach for BoxProps;
 // chrome helpers reach for the wrap / border / visual-line types.
 export type { BoxProps } from './host/host.js';
-export type { BorderStyle, BorderChars } from './host/borders.js';
+export type { BorderStyle, BorderChars, GridChars } from './host/borders.js';
+export { DEFAULT_BORDER_STYLE, GRID_CHARS } from './host/borders.js';
 export type { WrapMode } from './wrap.js';
 export type { VisualLine } from './visualLines.js';
 

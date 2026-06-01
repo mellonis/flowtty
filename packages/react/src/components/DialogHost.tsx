@@ -1,5 +1,6 @@
 import React from 'react';
 import { useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
+import { DEFAULT_BORDER_STYLE } from '@flowtty/core';
 import { Box } from './base/Box.js';
 import { InputContext, type InputSource } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
@@ -125,7 +126,7 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
       let content: ReactNode = d.element;
       if (o?.title != null || o?.floating) {
         const wrapperProps: Record<string, unknown> = {
-          border: 'single',
+          border: DEFAULT_BORDER_STYLE,
           flexDirection: 'column',
           padding: o.padding,
         };

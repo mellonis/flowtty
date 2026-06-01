@@ -25,10 +25,10 @@ describe('openDialog({ title })', () => {
     await flushAsync();
     await flushAsync();
     const rows = backend.lastFrame.split('\n');
-    // Top row: ┌─ My Window ───┐
-    expect(rows[0]).toMatch(/^┌─ My Window ─+┐$/);
-    // Bottom row: └─...─┘
-    expect(rows[rows.length - 1]).toMatch(/^└─+┘$/);
+    // Default border is 'round': ╭─ My Window ───╮
+    expect(rows[0]).toMatch(/^╭─ My Window ─+╮$/);
+    // Bottom row: ╰─...─╯
+    expect(rows[rows.length - 1]).toMatch(/^╰─+╯$/);
     // Content visible inside (row 1, indented past left border).
     expect(rows[1]).toContain('HELLO');
   });

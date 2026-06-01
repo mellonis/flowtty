@@ -25,6 +25,7 @@ import React from "react";
  */
 
 import { useState, type ReactNode } from 'react';
+import { DEFAULT_BORDER_STYLE } from '@flowtty/core';
 import { Box } from './base/Box.js';
 import { useInput } from '../hooks/useInput.js';
 import { useDialog, useDialogHost } from '../hooks/useDialog.js';
@@ -296,7 +297,7 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
         position="absolute"
         top={p.top} left={p.left}
         width={p.width} height={p.height}
-        border="single"
+        border={DEFAULT_BORDER_STYLE}
         backgroundColor="default"
         flexDirection="column"
       >

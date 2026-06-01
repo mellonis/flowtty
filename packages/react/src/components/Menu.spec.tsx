@@ -90,7 +90,7 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
     await flushAsync();
     backend.press({ name: 'down' });
     await flushAsync();
-    expect(backend.lastFrame).toContain('┌');
+    expect(backend.lastFrame).toContain('╭'); // default round border
     expect(backend.lastFrame).toContain('Aaa');
   });
 
