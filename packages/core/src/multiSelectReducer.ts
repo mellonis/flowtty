@@ -28,7 +28,12 @@ export function reduce<T>(items: SelectItem<T>[], state: MultiSelectState, key: 
   }
 
   if (key.name === ' ') {
-    return { kind: 'toggle', index: state.cursor };
+    // Clamp into range: cursor may be stale relative to the current item count
+    // (e.g. the list shrank since it was last set), and consumers index
+    // items[index] directly — an out-of-range index would crash them. n >= 1
+    // here (the n === 0 case returned above).
+    const index = Math.max(0, Math.min(state.cursor, n - 1));
+    return { kind: 'toggle', index };
   }
 
   return { kind: 'noop' };

@@ -20,6 +20,18 @@ test('space toggles the cursor item', () => {
   });
 });
 
+test('space clamps an out-of-range cursor to the last item', () => {
+  // Cursor stale past the end (list shrank) — toggle must not return an index
+  // that would crash a consumer doing items[index].
+  expect(reduce(items(3), { cursor: 7 }, key({ name: ' ', sequence: ' ' }))).toEqual({
+    kind: 'toggle', index: 2,
+  });
+  // Negative cursor clamps to 0.
+  expect(reduce(items(3), { cursor: -2 }, key({ name: ' ', sequence: ' ' }))).toEqual({
+    kind: 'toggle', index: 0,
+  });
+});
+
 test('enter submits', () => {
   expect(reduce(items(3), { cursor: 0 }, key({ name: 'return' }))).toEqual({ kind: 'submit' });
   expect(reduce(items(3), { cursor: 0 }, key({ name: 'enter' }))).toEqual({ kind: 'submit' });
