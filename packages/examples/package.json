@@ -1,0 +1,25 @@
+{
+  "name": "@flowtty/examples",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "articles-tui": "tsx articles-tui/index.tsx",
+    "things-tui": "tsx things-tui/index.tsx",
+    "things-tui:ddev": "THINGS_TUI_BASE=https://api.poetry.ddev.site NODE_TLS_REJECT_UNAUTHORIZED=0 NODE_NO_WARNINGS=1 tsx things-tui/index.tsx",
+    "inline-build-log": "tsx inline-build-log/index.tsx",
+    "docker-logs-tui": "tsx docker-logs-tui/index.tsx",
+    "docker-logs-tui:demo": "tsx docker-logs-tui/index.tsx --demo"
+  },
+  "dependencies": {
+    "@flowtty/react": "*",
+    "@flowtty/tty-backend": "*",
+    "@flowtty/inline-tty-backend": "*",
+    "react": "^19.2.4"
+  },
+  "devDependencies": {
+    "@types/node": "^25.9.1",
+    "@types/react": "^19",
+    "tsx": "^4.22.3"
+  }
+}

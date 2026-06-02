@@ -4,6 +4,7 @@
   // multi-project support and per-package builds via tsup.
   "extends": "./tsconfig.base.json",
   "include": [
-    "packages/*/src"
+    "packages/*/src",
+    "packages/examples/**/*.{ts,tsx}"
   ]
 }

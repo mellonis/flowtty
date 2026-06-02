@@ -11,7 +11,13 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
-    "build": "npm run build -ws --if-present"
+    "build": "npm run build -ws --if-present",
+    "articles-tui": "npm run articles-tui -w @flowtty/examples",
+    "things-tui": "npm run things-tui -w @flowtty/examples",
+    "things-tui:ddev": "npm run things-tui:ddev -w @flowtty/examples",
+    "inline-build-log": "npm run inline-build-log -w @flowtty/examples",
+    "docker-logs-tui": "npm run docker-logs-tui -w @flowtty/examples",
+    "docker-logs-tui:demo": "npm run docker-logs-tui:demo -w @flowtty/examples"
   },
   "devDependencies": {
     "typescript": "^6",

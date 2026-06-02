@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Make `TtyBackend` deliver real keyboard input — implement `TtyBackend.onKey` over `process.stdin` in raw mode, with a ported `parseKeypress(bytes) → Key[]` decoder that handles printable chars, control bytes (`Ctrl-A`..`Z`, Tab, Enter, Backspace), the `ESC`-key, **CSI** sequences (arrows / `Home`/`End`/`Delete`/`PageUp`/`PageDown`), **SS3** sequences (alternate arrow/function-key encoding), and the **Mac Option-as-Meta** prefix (`ESC <char>` → `{name: <char>, meta: true}`). Acceptance is the M1a counter running on `TtyBackend` and reacting to actual keypresses.
+**Goal:** Make `TtyBackend` deliver real keyboard input — implement `TtyBackend.onKey` over `process.stdin` in raw mode, with a ported `parseKeypress(bytes) → Key[]` decoder that handles printable chars, control bytes (`Ctrl-A`..`Z`, Tab, Enter, Backspace), the `ESC`-key, **CSI** sequences (arrows / `Home`/`End`/`Delete`/`PageUp`/`PageDown`), **SS3** sequences (alternate arrow/function-key encoding), and the **Mac Option-as-Meta** prefix (`ESC <char>` → `{name: <char>, meta: true}`). Acceptance is the M1a counter from `examples/` running on `TtyBackend` and reacting to actual keypresses.
 
 **Architecture:** Pure decoder (`src/key-parser.ts`) — a single function `parseKeypress(input: string): Key[]` with no I/O, exhaustively unit-tested. `TtyBackend` (existing) gains `onKey`, `dispose` cleanup, and stdin lifecycle management; it pipes raw bytes through `parseKeypress` and dispatches the resulting `Key[]` to subscribers. The M1a `InputContext` wiring in `render.ts` already lights up automatically as soon as `backend.onKey` is defined — no `render.ts` changes needed.
 
@@ -16,7 +16,7 @@
 
 This is the first of ~3 M1c-scope plans:
 
-- **M1c — TTY input (this plan):** parser + `TtyBackend.onKey` → real-terminal interactivity for everything that already exists (TextInput, counter). Acceptance = the counter demo running interactively on `TtyBackend`.
+- **M1c — TTY input (this plan):** parser + `TtyBackend.onKey` → real-terminal interactivity for everything that already exists (TextInput, counter). Acceptance = the counter example running on `TtyBackend`.
 - **M1c.2 (next):** `<Select>` + `<MultiSelect>` + `<Confirm>` prompts (test backend + the just-shipped TTY backend will both light up).
 - **M1c.3 (after):** intra-form focus ring + `<Form>` + `<Form.Field>` + cancel propagation, plus the embedded-`openDialog` pattern (MultiSelect's "+ add new" sub-prompt is the natural first user).
 
@@ -36,8 +36,8 @@ src/
   editor.test.ts         # MODIFY (small) — Option+Space test uses name: ' ' instead of 'space'
   index.ts               # MODIFY — export parseKeypress (useful for users writing custom backends)
   README.md              # MODIFY — M1c status + real-terminal usage
-scratch/                 # gitignored — local manual-smoke scratch, not committed
-  counter.ts             # the M1a counter on TtyBackend (manual smoke target)
+examples/
+  counter.ts             # NEW — the M1a counter on TtyBackend (manual smoke target)
 ```
 
 Responsibilities:
@@ -558,9 +558,9 @@ git commit -m "test: TtyBackend.onKey via mock stdin — parser integration, dis
 ### Task 4: Manual smoke — interactive counter on a real terminal
 
 **Files:**
-- Create: `scratch/counter.ts` (local manual-smoke scratch — gitignored, not committed)
+- Create: `examples/counter.ts`
 
-- [ ] **Step 1: Write `scratch/counter.ts`** (a runnable local demo, not a vitest test — kept out of version control):
+- [ ] **Step 1: Write `examples/counter.ts`** (a runnable demo, not a vitest test):
 
 ```ts
 import { createElement, useState } from 'react';
@@ -587,7 +587,7 @@ process.on('SIGINT', () => {
 - [ ] **Step 2: Manually run and verify** (this is the M1c acceptance — a human visual check, not an automated test):
 
 ```bash
-npx tsx scratch/counter.ts
+npx tsx examples/counter.ts
 ```
 
 Expected behavior:
@@ -603,7 +603,12 @@ If the counter doesn't update on keypress:
 If the terminal is mangled after exit:
 - `dispose()` isn't restoring cooked mode + showing cursor → check the `inputAttached`/`cursorHidden` flag logic.
 
-This manual smoke is local-only — `scratch/counter.ts` is gitignored and not committed.
+- [ ] **Step 3: Commit**
+
+```bash
+git add examples/counter.ts
+git commit -m "example: interactive counter on TtyBackend (M1c manual smoke)"
+```
 
 ---
 
@@ -628,7 +633,7 @@ M1c (TTY input layer). `TtyBackend` now delivers real keyboard input — raw-mod
 stdin is parsed via `parseKeypress` (CSI arrows, SS3, Mac Option-as-Meta,
 Ctrl-A..Z, named keys) and dispatched to `useInput` subscribers the same way
 the test backend does. The M1a `useInput` + M1b `<TextInput>` work on a real
-terminal now.
+terminal now: see `examples/counter.ts`.
 
 ### Still deferred (later M1c plans + later milestones)
 
@@ -645,7 +650,7 @@ terminal now.
 - `npx vitest run` → all tests pass.
 - `npm run typecheck` → clean.
 - `npm run build` → ESM + dts succeed; `dist/index.js`/`.d.ts` + `dist/testing.js`/`.d.ts` rebuilt (no warnings).
-- `npx tsx scratch/counter.ts` → still works (sanity check after exports change).
+- `npx tsx examples/counter.ts` → still works (sanity check after exports change).
 
 - [ ] **Step 4: Commit**
 

@@ -1,6 +1,6 @@
-# flowtty followups
+# Followups from articles-CLI dogfood
 
-Running log of flowtty gaps + ergonomics issues discovered while porting `site/scripts/articles.mjs` to a flowtty TUI. Each entry: brief description + when it was hit + suggested action. Cleaned up + prioritized at the end.
+Running log of flowtty gaps + ergonomics issues discovered while porting `site/scripts/articles.mjs` to a flowtty TUI. Each entry: brief description + when it was hit + suggested action. Cleaned up + prioritized at end of dogfood.
 
 ---
 
@@ -33,7 +33,7 @@ const handle = await render(
 );
 ```
 
-Safer pattern (used after the fix):
+Safer pattern (used in articles-tui after the fix):
 
 ```js
 let handle = null;
@@ -65,7 +65,7 @@ When the hello-world is launched from WebStorm's IDE run interface (not a real t
 
 `articles.mjs` ends with `await main()` at top level. A consumer that does `import { listFolders } from './articles.mjs'` triggers the entire CLI wizard at import time — the two competing TUI apps share the same stdin/raw-mode state and produce garbage output.
 
-**Hit when:** first `import { listFolders, buildRows, statusOf } from './articles.mjs'` would have hung in the wizard.
+**Hit when:** first `import { listFolders, buildRows, statusOf } from './articles.mjs'` in articles-tui.mjs would have hung in the wizard.
 
 **Fix applied:** gate with `if (process.argv[1]) { ... pathToFileURL check ... }` at the bottom of articles.mjs. This is standard ES-module "main guard" pattern.
 
@@ -129,7 +129,7 @@ When a single-line Text doesn't fit, options today are `wrap: 'wrap'` (multi-lin
 
 ### `width: '100%'` on root child doesn't resolve as expected
 
-In a test that does `computeLayout(container, 20, 1)`, a Box with `width: '100%'` whose parent is the root resolved to the box's CONTENT width, not 20. Workaround: `alignItems: 'stretch'` on parents to grow children cross-axis.
+In a test that does `computeLayout(container, 20, 1)`, a Box with `width: '100%'` whose parent is the root resolved to the box's CONTENT width, not 20. Workaround for the dogfood: `alignItems: 'stretch'` on parents to grow children cross-axis.
 
 **Action:** investigate why Yoga's `calculateLayout(w, h)` ownerSize doesn't satisfy percentage resolution on root children. Possibly need `setWidth(w)` on root before `calculateLayout` — but that overrides explicit widths on root nodes (broke 4 paint tests when tried).
 

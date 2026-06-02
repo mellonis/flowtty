@@ -4,7 +4,7 @@
 
 **Goal:** convert `DialogHost` from single-slot to a stack so dialogs can nest. Currently `openDialog` cancels any previously-open dialog (`src/dialog-host.ts:38-40`); after this plan, `openDialog` PUSHES a new dialog on top of the stack without disturbing lower entries. `close()` (from `useDialog().done` / `.cancel`) POPS the TOP dialog. Visually, dialogs render as overlays in stack order — last on top. Input goes to the TOP dialog only; lower dialogs and host content are muted.
 
-This unblocks a wizard-as-dialog pattern with a true nested "+ new tag" sub-dialog (was: separate state-machine step inside the wizard component; will become: a 2nd-level dialog that pops back to the still-alive wizard on close).
+This unblocks the articles dogfood's wizard-as-dialog with a true nested "+ new tag" sub-dialog (was: separate state-machine step inside the wizard component; will become: a 2nd-level dialog that pops back to the still-alive wizard on close).
 
 **Architecture:** Replace `dialog: PendingDialog | null` with `stack: PendingDialog[]`. `openDialog` becomes `setStack(s => [...s, entry])`; `close` becomes `setStack(s => { resolve top; return s.slice(0, -1) })`. Render: host content + one `<Box position:absolute>` per stack entry (tree order = paint order = stack order — lower stack entries paint first, top entry paints last on top, via M1f's two-pass paint). Input gating: each layer wraps its subtree in `InputContext.Provider` set to the real `outerSource` ONLY if it's the top (or, for host content, only if stack is empty); otherwise muted.
 
@@ -418,4 +418,4 @@ git commit -m "docs: document DialogHost stack semantics"
 
 ## Execution Handoff
 
-Plan complete and saved to `flowtty/docs/plans/dialog-stack.md`. Subagent-driven execution per the user's request — Task 1 (Sonnet, focused refactor of dialog-host.ts + 5 tests), then Task 2 (Haiku, README + build).
+Plan complete and saved to `flowtty/docs/plans/dialog-stack.md`. Subagent-driven execution per the user's request — Task 1 (Sonnet, focused refactor of dialog-host.ts + 5 tests), then Task 2 (Haiku, README + build). After this merges, articles dogfood resumes with wizard-as-dialog + true nested add-tag dialog.

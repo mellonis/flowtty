@@ -43,8 +43,8 @@ src/
 
   index.ts                     # MODIFY — export Select/MultiSelect/Confirm + their Props types
   README.md                    # MODIFY — M1c.2 status + usage examples
-scratch/                       # gitignored — local manual-smoke scratch, not committed
-  pick.ts                      # runnable demo: pick from Select on real TTY
+examples/
+  pick.ts                      # NEW — runnable demo: pick from Select on real TTY (manual smoke)
 ```
 
 Responsibilities:
@@ -806,11 +806,11 @@ git commit -m "feat: <Confirm> component — y/n + default-on-Enter + Esc cancel
 
 ---
 
-### Task 6: Acceptance — picker demo (test backend + manual real-TTY scratch)
+### Task 6: Acceptance — picker demo (test backend + manual real-TTY example)
 
 **Files:**
 - Modify: `src/select.test.ts` (append one combined-prompt acceptance test)
-- Create: `scratch/pick.ts` (runnable local demo — gitignored, not committed)
+- Create: `examples/pick.ts` (runnable demo)
 
 - [ ] **Step 1: Append the acceptance test to `src/select.test.ts`** (imports already cover everything used):
 ```ts
@@ -872,7 +872,7 @@ test('M1c.2 acceptance: Select + MultiSelect + Confirm each fire onSubmit correc
 
 - [ ] **Step 2: Verify** — `npx vitest run src/select.test.ts` → all pass. Full suite green. Typecheck clean.
 
-- [ ] **Step 3: Create `scratch/pick.ts`** (runnable on a real terminal):
+- [ ] **Step 3: Create `examples/pick.ts`** (runnable on a real terminal):
 ```ts
 import { createElement, useState } from 'react';
 import { render, Box, Text, TtyBackend, Select } from '../src/index.js';
@@ -905,7 +905,7 @@ await render(createElement(App), new TtyBackend());
 
 - [ ] **Step 4: Smoke check** (loads without crashing in a non-TTY pipe):
 ```bash
-timeout 1 npx tsx scratch/pick.ts 2>&1 | head -20 || true
+timeout 1 npx tsx examples/pick.ts 2>&1 | head -20 || true
 ```
 Expected: writes the initial frame (ANSI codes + "pick a fruit…" + items) and runs until timeout. If it errors before timeout, report.
 
@@ -913,8 +913,8 @@ The actual interactivity (type to filter, arrow nav, Enter to pick) is a human v
 
 - [ ] **Step 5: Commit**
 ```bash
-git add src/select.test.ts
-git commit -m "test: M1c.2 acceptance — Select+MultiSelect+Confirm e2e"
+git add src/select.test.ts examples/pick.ts
+git commit -m "test+example: M1c.2 acceptance — Select+MultiSelect+Confirm e2e + pick.ts demo"
 ```
 
 ---
@@ -953,7 +953,8 @@ each built on `useInput` + the editor-reducer pattern:
   Enter takes the default, Esc cancels.
 
 All three accept `isFocused` for use in larger trees and work on the test
-backend (synthetic keys) and the TTY backend (real terminal).
+backend (synthetic keys) and the TTY backend (real terminal — see
+`examples/pick.ts`).
 
 ### Usage
 

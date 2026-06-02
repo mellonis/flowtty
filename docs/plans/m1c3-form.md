@@ -37,8 +37,8 @@ src/
   use-field.test.ts      # NEW — hook tests (register/unregister, validate gating)
   index.ts               # MODIFY — export Form + useField + types
   README.md              # MODIFY — M1c.3 status + multi-field usage example
-scratch/                 # gitignored — local manual-smoke scratch, not committed
-  form.ts                # runnable multi-field demo on TTY
+examples/
+  form.ts                # NEW — runnable multi-field demo on TTY (manual smoke)
 ```
 
 Responsibilities:
@@ -665,7 +665,7 @@ git commit -m "test: M1c.3 acceptance — 3-field form with Tab/Enter/validate/s
 
 **Files:**
 - Modify: `src/index.ts`
-- Create: `scratch/form.ts` (gitignored, not committed)
+- Create: `examples/form.ts`
 - Modify: `README.md`
 
 - [ ] **Step 1: Update `src/index.ts`** — append (keep existing unchanged):
@@ -677,7 +677,7 @@ export type { UseFieldOptions, FieldControl } from './use-field.js';
 export type { FormApi, FormFieldRegistration } from './form-context.js';
 ```
 
-- [ ] **Step 2: Create `scratch/form.ts`** (runnable on real TTY):
+- [ ] **Step 2: Create `examples/form.ts`** (runnable on real TTY):
 ```ts
 import { createElement, useState } from 'react';
 import {
@@ -725,7 +725,7 @@ await render(createElement(App), new TtyBackend());
 
 - [ ] **Step 3: Smoke check** (loads without crashing in non-TTY pipe):
 ```bash
-timeout 1 npx tsx scratch/form.ts 2>&1 | head -20 || true
+timeout 1 npx tsx examples/form.ts 2>&1 | head -20 || true
 ```
 Expected: writes initial frame (ANSI + "Enter to advance…" + the three labeled inputs). If it errors before timeout, report.
 
@@ -773,6 +773,8 @@ await render(
 );
 \`\`\`
 
+See `examples/form.ts` for a runnable 3-field demo.
+
 ### Still deferred (later milestones)
 
 - Embedded `openDialog` + `useDialog` (modal sub-prompts that return a value
@@ -793,8 +795,8 @@ await render(
 
 - [ ] **Step 6: Commit**
 ```bash
-git add src/index.ts README.md
-git commit -m "chore: export Form + useField + document M1c.3"
+git add src/index.ts examples/form.ts README.md
+git commit -m "chore: export Form + useField + form.ts demo + document M1c.3"
 ```
 
 ---

@@ -184,7 +184,7 @@ test('M1f acceptance: dialog renders as an opaque centered overlay ON TOP of the
   expect(backend.lastFrame).toContain('name:');
   // Dialog is OPAQUE: every host content row is masked by the overlay fill.
   // (Otherwise lower-stack cells bleed through gaps in the dialog content — see
-  // bleed-through bug we hit in a nested detail view.)
+  // bleed-through bug we hit in the things-tui detail view.)
   expect(backend.lastFrame).not.toContain('HOST CONTENT ROW 1');
   expect(backend.lastFrame).not.toContain('HOST CONTENT ROW 5');
 });

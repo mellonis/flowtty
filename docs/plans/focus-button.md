@@ -506,7 +506,7 @@ Update the focus.test.ts "outside group" assertion accordingly.
 
 - [ ] **Step 5: Verify**
 - `npx vitest run` — full suite (existing TextInput/Select/MultiSelect tests still pass; focus tests pass).
-- Run a manual smoke check (subagent: skip — user smoke-tests).
+- Run dogfood manually (subagent: skip — user smoke-tests).
 
 - [ ] **Step 6: Commit**
 ```bash
@@ -635,7 +635,7 @@ git commit -m "docs: document Focus + Button; export from index"
 
 3. **isActive: false during dialog stacking**: lower dialogs' FocusGroup has `isActive: false` → they don't react to Tab. But the components inside (TextInput etc.) still try to use input via useInput. InputContext already mutes them via the InputContext.Provider wrap with mutedSource. So no double-fire. Verified.
 
-4. **Default `isFocused: () => true` change**: was `false` in initial Step 2 sketch — corrected in Step 4 to preserve backward-compat for components outside a FocusGroup. Without this, a TextInput outside a FocusGroup would be muted, breaking default input delivery etc.
+4. **Default `isFocused: () => true` change**: was `false` in initial Step 2 sketch — corrected in Step 4 to preserve backward-compat for components outside a FocusGroup. Without this, a TextInput outside a FocusGroup would be muted, breaking the counter example etc.
 
 5. **Button's shortcut listens "anywhere in input scope"**: this means in a dialog with multiple buttons, all shortcuts are live regardless of focus. If two buttons have the same shortcut, both fire. Document as caller-responsibility.
 
@@ -647,4 +647,4 @@ git commit -m "docs: document Focus + Button; export from index"
 
 Plan complete and saved to `flowtty/docs/plans/focus-button.md`. Subagent-driven execution per pattern — Task 1 (Sonnet, primitives), Task 2 (Sonnet, Button), Task 3 (Sonnet, integration), Task 4 (Sonnet, DialogHost), Task 5 (Haiku, README + build). 5 tasks; ~moderate complexity each.
 
-After this lands, `<Button>` can be used in a success dialog (`[ Open ] (o)` + `[ Close ] (Enter)`) and focusable buttons added elsewhere as needed.
+After this lands, the articles dogfood can use `<Button>` in the success dialog (`[ Open ] (o)` + `[ Close ] (Enter)`) and we can add focusable buttons elsewhere as needed.

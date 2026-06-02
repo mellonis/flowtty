@@ -467,4 +467,4 @@ git commit -m "docs: document error handling + onError option"
 
 Plan complete and saved to `flowtty/docs/plans/error-boundary.md`. Subagent-driven execution per your request — Task 1 (Sonnet, isolated class component) → Task 2 (Sonnet, render.ts integration is the meat) → Task 3 (Haiku, README + build). Each task tested in flowtty repo; no site repo changes.
 
-After this plan merges, any error during render or in a useEffect will produce a clean stderr trace and a restored terminal instead of a hung session.
+After this plan merges, the articles dogfood resumes with a safer foundation — any error during the remaining dogfood tasks will produce a clean stderr trace and a restored terminal instead of a hung session.

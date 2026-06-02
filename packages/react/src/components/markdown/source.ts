@@ -1,7 +1,8 @@
 // Markdown SOURCE highlighter — the counterpart to layout.ts. Where
 // layoutMarkdown *renders* markdown (consuming markers, e.g. `**x**` → bold
 // "x"), this colors the raw source while keeping every character intact, the
-// way a code editor highlights a .md file. A raw-source view consumes it so the source stays readable AND legible at a glance.
+// way a code editor highlights a .md file. Used by the articles example's "raw"
+// view so the source stays readable AND legible at a glance.
 //
 // It is faithful to the bytes: no word-collapsing. Wrapping (when enabled) is a
 // hard char-wrap at `width`, so indentation and runs of spaces survive.

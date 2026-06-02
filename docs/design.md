@@ -138,7 +138,7 @@ This is, honestly, a multi-year solo project. The sequence ensures something usa
 
 ## Adoption / off-ramp
 
-**Identity:** "a self-contained framework for building terminal apps in React — proven by Midnight Commander." Levers: the MC demo itself (recognizable, screenshot-friendly), docs, an `/open-source` entry on `mellonis.ru`.
+**Identity:** "a self-contained framework for building terminal apps in React — proven by Midnight Commander." Levers: the MC demo itself (recognizable, screenshot-friendly), examples, docs, an `/open-source` entry on `mellonis.ru`.
 
 **Success / off-ramp (for future-me, not marketing):**
 - *Success:* the core MC slice ships and feels good to build on; a few external users / a third party building something real; the MC demo lands as a portfolio centerpiece.

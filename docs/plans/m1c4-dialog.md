@@ -40,8 +40,8 @@ src/
   index.ts               # MODIFY — export DialogHost + useDialog + useDialogHost + types
   README.md              # MODIFY — M1c.4 status + usage (MultiSelect+add-new) + the inline-position caveat
 
-scratch/                 # gitignored — local manual-smoke scratch, not committed
-  pick-or-add.ts         # runnable MultiSelect-with-add-new demo on TTY
+examples/
+  pick-or-add.ts         # NEW — runnable MultiSelect-with-add-new demo on TTY (manual smoke)
 ```
 
 Responsibilities:
@@ -593,7 +593,7 @@ git commit -m "test: M1c.4 acceptance — MultiSelect+add-new + openDialog end-t
 
 **Files:**
 - Modify: `src/index.ts`
-- Create: `scratch/pick-or-add.ts` (gitignored, not committed)
+- Create: `examples/pick-or-add.ts`
 - Modify: `README.md`
 
 - [ ] **Step 1: Update `src/index.ts`** — append (keep existing unchanged):
@@ -605,7 +605,7 @@ export type {
 } from './dialog-context.js';
 ```
 
-- [ ] **Step 2: Create `scratch/pick-or-add.ts`** (runnable on real TTY):
+- [ ] **Step 2: Create `examples/pick-or-add.ts`** (runnable on real TTY):
 ```ts
 import { createElement, useState } from 'react';
 import {
@@ -666,7 +666,7 @@ await render(createElement(DialogHost, null, createElement(App)), new TtyBackend
 
 - [ ] **Step 3: Smoke check** (loads without crashing):
 ```bash
-timeout 1 npx tsx scratch/pick-or-add.ts 2>&1 | head -20 || true
+timeout 1 npx tsx examples/pick-or-add.ts 2>&1 | head -20 || true
 ```
 Expected: writes initial frame (ANSI + help line + 3 items + "+ add new" row). If it errors before timeout, report.
 
@@ -728,6 +728,8 @@ function App() {
 await render(<DialogHost><App /></DialogHost>, new TtyBackend());
 \`\`\`
 
+See `examples/pick-or-add.ts` for a runnable demo.
+
 ### Still deferred (later milestones)
 
 - Stacked/nested dialogs (one at a time today).
@@ -745,7 +747,7 @@ Leave everything ELSE in the README unchanged.
 npx vitest run        # all 160 still pass
 npm run typecheck     # clean
 npm run build         # ESM + dts succeed, no warnings
-git add src/index.ts README.md
+git add src/index.ts examples/pick-or-add.ts README.md
 git commit -m "chore: export DialogHost + useDialog/useDialogHost + document M1c.4"
 ```
 

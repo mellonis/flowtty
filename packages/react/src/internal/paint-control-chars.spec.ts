@@ -1,6 +1,6 @@
 /** Cells must never carry raw C0 control bytes — emitting \r/\b to a TTY
  *  repositions the cursor and corrupts every cell after it in the diff stream.
- *  Regression: calendar rows had titles with stray \r from CRLF-encoded
+ *  Regression: things-tui calendar rows had titles with stray \r from CRLF-encoded
  *  DB data, which caused "…»  [nnils]" tail of one row to overwrite cols 0-10
  *  of the next row. */
 import { createElement } from 'react';

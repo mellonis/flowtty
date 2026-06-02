@@ -1268,7 +1268,7 @@ Expected: all pass.
 
 - [ ] **Step 6: Manual TTY smoke check**
 
-Create `scratch/hello.ts` (gitignored, not committed):
+Create `examples/hello.ts`:
 ```ts
 import { createElement } from 'react';
 import { render, Box, Text } from '../src/index.js';
@@ -1283,13 +1283,13 @@ const handle = await render(
 );
 setTimeout(() => handle.unmount(), 1500);
 ```
-Run: `npx tsx scratch/hello.ts` (add `tsx` as a devDep if needed).
+Run: `npx tsx examples/hello.ts` (add `tsx` as a devDep if needed).
 Expected: "hello world" renders in the terminal for ~1.5s, then the cursor is restored. (This is a human check, not an automated test.)
 
 - [ ] **Step 7: Commit**
 
 ```bash
-git add src/ansi.ts src/backends/tty.ts test/ansi.test.ts
+git add src/ansi.ts src/backends/tty.ts test/ansi.test.ts examples/hello.ts
 git commit -m "feat: ANSI serializer + minimal full-redraw TTY backend"
 ```
 

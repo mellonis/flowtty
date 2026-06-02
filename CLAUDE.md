@@ -21,6 +21,11 @@ npx vitest run packages/core/src/wrap.spec.ts        # single file
 npx vitest run -t "wraps on word boundary"           # single test by name
 npm run typecheck         # tsc --noEmit across all packages (root tsconfig)
 npm run build             # tsup build every package that has a build script
+
+# Run example apps (tsx, no build needed):
+npm run articles-tui      # reads from ../../site/scripts/articles.mjs (abs path)
+npm run things-tui        # hits a poetry API; things-tui:ddev for local DDEV
+npm run inline-build-log  # demos <Static> + InlineTtyBackend
 ```
 
 There is no lint step. Correctness gates are `npm test` + `npm run typecheck`.
@@ -39,12 +44,13 @@ There is no lint step. Correctness gates are `npm test` + `npm run typecheck`.
   │     │     │                         input + key parsing, ANSI helpers.
   │     │     └── @flowtty/inline-tty-backend   redrawable live region + append-only
   │     │                                       log lines above (the <Static> pattern).
+  │     └── (examples depend on react + both backends)
   └── ...
 ```
 
 Rule: `core` must never import react/yoga-in-public-surface/node. Adapters depend
 on `core`; backends depend on `core` (+ `tty-backend` for the inline one). Nothing
-depends on `react` except adapters. Keep it a DAG.
+depends on `react` except adapters and examples. Keep it a DAG.
 
 ## The render pipeline (how a keystroke becomes bytes)
 
@@ -82,7 +88,7 @@ Required: `size()`, `draw(buffer)`. Optional (feature-detected, not assumed):
 ## Non-obvious invariants (will bite you)
 
 **Dev resolves to source, publish flips to dist.** Workspaces run straight off
-`src/*.ts` — no build needed for tests/typecheck. This depends on THREE
+`src/*.ts` — no build needed for tests/examples/typecheck. This depends on THREE
 files staying in sync; change one path, change all three:
 - `tsconfig.base.json` `paths`
 - `vitest.config.ts` `resolve.alias`
@@ -90,11 +96,16 @@ files staying in sync; change one path, change all three:
   the publish flow flips them to `dist/`).
 Adding a new `@flowtty/*` package or subpath means editing all three.
 
-**`.tsx` files need `import React from 'react'`.** tsx (the dev runner) uses
+**`.tsx` files need `import React from 'react'`.** tsx (the example runner) uses
 *classic* JSX and ignores `jsx: react-jsx` from tsconfig — missing the import is a
 runtime "React is not defined", not a compile error. vitest/tsup honor the
-automatic runtime, so tests pass while a tsx-run entrypoint crashes. Every `.tsx`
+automatic runtime, so tests pass while `npm run articles-tui` crashes. Every `.tsx`
 component imports React explicitly.
+
+**`packages/examples/tsconfig.json` is FLAT, not `extends`.** tsx can't follow the
+extends chain, so that file duplicates compilerOptions, `types: ["node"]`, and the
+full `paths` map. New aliases must be added there too, or the IDE flags phantom
+errors (e.g. `Cannot find name 'setInterval'`).
 
 **Yoga defaults ≠ CSS defaults.** `flexShrink` defaults to `0` (CSS uses `1`), so
 children overflow instead of shrinking unless you set `flexShrink={1}`.

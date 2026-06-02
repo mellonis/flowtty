@@ -1,7 +1,8 @@
 // Framework-free markdown → styled visual lines. Turns the block tree from
 // parseMarkdown into a flat list of pre-wrapped lines, each a run of styled
 // spans. Pre-wrapping (rather than leaning on Yoga's flexWrap) is deliberate:
-// it gives a stable visual-line count, so a paginating host can slice the output by row exactly the way it slices raw text.
+// it gives a stable visual-line count, so a paginating host (e.g. the articles
+// example) can slice the output by row exactly the way it slices raw text.
 
 import { parseMarkdown, highlightCode, type InlineSeg } from './parse.js';
 

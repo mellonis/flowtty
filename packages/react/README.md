@@ -97,3 +97,4 @@ A backend implements four methods (see `@flowtty/core`'s `Backend` interface). P
 
 - [`@flowtty/core`](../core) — framework-free data model.
 - [`@flowtty/tty-backend`](../tty-backend) — TTY implementation.
+- [`packages/examples`](../examples) — `articles-tui`, `things-tui`, and smaller demos.

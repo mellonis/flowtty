@@ -278,7 +278,9 @@ different problems and are meant to be used together:
   speaks `AbortSignal` (`fetch`, `addEventListener`, `setTimeout` via wrappers).
 
 So: keep your effect cleanup for per-unmount correctness, and *also* forward the
-root signal to async I/O for clean shutdown. A `cancelled` flag for the dialog closing plus the root signal on the `fetch` covers both.
+root signal to async I/O for clean shutdown. The `things-tui` example wires both
+(see `ThingDetailView` — a `cancelled` flag for the dialog closing plus the root
+signal on the `fetch`).
 
 **Composing with your own controller.** Since the hook returns a plain
 `AbortSignal`, you can merge it with controllers *you* own via `AbortSignal.any()`
@@ -490,14 +492,15 @@ identifiers in prose aren't mangled.
 **Why pre-wrap instead of leaning on Yoga's `flexWrap`?** The component lays the
 markdown out into a flat list of styled *visual lines* (`layoutMarkdown(src,
 width)`), each a run of styled spans, pre-wrapped to the resolved width. That
-gives a stable line count, so a host that paginates by row — slicing the body by terminal height — can page
+gives a stable line count, so a host that paginates by row — like the
+`articles-tui` example, which slices the body by terminal height — can page
 through rendered markdown exactly the way it pages raw text. `layoutMarkdown` is
 exported for that use; `<Markdown>` itself just measures its width (via
 `onLayout`) and renders every line. Pass an explicit `width` to skip the
 measure-and-relayout paint.
 
-> A host can open article `.md` files rendered this way by default and flip
-> to a **raw source view** — the markdown source
+> The `articles-tui` example opens article `.md` files rendered this way by
+> default; press `R` to flip to the **raw source view** — the markdown source
 > shown verbatim but syntax-highlighted in place (markers kept and dimmed,
 > headings/lists/links/fences colored, fenced-code token-colored). That view
 > uses `highlightMarkdownSource(src, width, wrap)`, the source-preserving
