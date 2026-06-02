@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState } from 'react';
-import { DEFAULT_BORDER_STYLE, GRID_CHARS, type BorderStyle } from '@flowtty/core';
+import { DEFAULT_BORDER_STYLE, GRID_CHARS, windowAround, type BorderStyle } from '@flowtty/core';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -43,6 +43,20 @@ export interface TableProps<T> {
    * to the terminal width.
    */
   width?: number;
+  /**
+   * Absolute index into `data` of the highlighted row (the cursor). The row is
+   * drawn inverse. Selection state lives in the caller — Table only paints it.
+   * Omit for a non-selectable table.
+   */
+  selectedIndex?: number;
+  /**
+   * Grow to fill the available height and scroll: only the rows that fit are
+   * rendered, windowed around `selectedIndex`, while the header + rules stay
+   * pinned (sticky). Columns are still sized from the *full* `data`, so widths
+   * don't jitter as rows scroll into view. The caller owns the cursor + key
+   * handling and passes `selectedIndex`. Place inside a flex column with height.
+   */
+  scrollable?: boolean;
 }
 
 const cpLen = (s: string): number => [...s].length;
@@ -116,15 +130,21 @@ function fitColumns<T>(
  * the widest columns (truncating cells with `…`) so the grid never exceeds the
  * available width. (Horizontal scroll for over-wide tables is a planned
  * follow-up.)
+ *
+ * Selectable + scrollable: pass `selectedIndex` to inverse-highlight the cursor
+ * row, and `scrollable` to grow into the available height and vertically window
+ * the rows around the cursor with a sticky header. Cursor state + key handling
+ * stay in the caller.
  */
 export function Table<T>({
   data, columns,
   border = DEFAULT_BORDER_STYLE, borderColor,
   cellPadding = 1, showHeader = true, headerColor, headerBold = true,
-  width,
+  width, selectedIndex, scrollable = false,
 }: TableProps<T>) {
   const term = useTerminalSize();
   const [measured, setMeasured] = useState(0);
+  const [measuredH, setMeasuredH] = useState(0);
   const fixed = typeof width === 'number';
   // Budget: explicit prop > measured container > terminal width (pre-layout fallback).
   const budget = fixed ? width : (measured > 0 ? measured : term.width);
@@ -152,6 +172,25 @@ export function Table<T>({
   // Paddings live in the cell text; the rule segment width per column = content + 2*pad.
   const segWidths = colWidths.map((w) => w + 2 * pad);
 
+  // Highlighted row, clamped into range (-1 = no selection).
+  const selIdx = selectedIndex == null ? -1 : Math.max(0, Math.min(data.length - 1, selectedIndex));
+
+  // Scrolling: render only the rows that fit the measured viewport, windowed
+  // around the cursor. Header + rules stay pinned because they're emitted every
+  // frame regardless of the window. Chrome = top/bottom rules + (header row +
+  // its mid rule). Pre-measure, fall back to the terminal height (clipped by
+  // overflow:hidden) so the first frame isn't a one-row flash.
+  const chromeLines = (bordered ? 2 : 0) + (showHeader ? (bordered ? 2 : 1) : 0);
+  const viewportH = measuredH > 0 ? measuredH : term.height;
+  const capacity = Math.max(1, viewportH - chromeLines);
+  let renderStart = 0;
+  let rows: readonly T[] = data;
+  if (scrollable && data.length > 0) {
+    const w = windowAround(data, selIdx < 0 ? 0 : selIdx, capacity);
+    renderStart = w.start;
+    rows = w.items;
+  }
+
   const rule = (kind: 'top' | 'mid' | 'bottom'): string => {
     const c = chars!;
     const left = kind === 'top' ? c.tl : kind === 'bottom' ? c.bl : c.tRight;
@@ -161,17 +200,19 @@ export function Table<T>({
   };
 
   const padStr = ' '.repeat(pad);
-  const renderRow = (cells: string[], header: boolean) => {
+  // `selected` inverts the whole row — cells and the verticals between/around
+  // them — so the highlight reads as one continuous bar edge-to-edge.
+  const renderRow = (cells: string[], header: boolean, selected = false) => {
     const spans: React.ReactNode[] = [];
-    if (bordered) spans.push(<Text key="l" color={borderColor}>{chars!.v}</Text>);
+    if (bordered) spans.push(<Text key="l" color={borderColor} inverse={selected}>{chars!.v}</Text>);
     for (let c = 0; c < ncols; c++) {
       const content = padStr + fitCell(cells[c] ?? '', colWidths[c]!, columns[c]!.align ?? 'left') + padStr;
       spans.push(
         header
           ? <Text key={`c${c}`} bold={headerBold} color={headerColor}>{content}</Text>
-          : <Text key={`c${c}`}>{content}</Text>,
+          : <Text key={`c${c}`} bold={selected} inverse={selected}>{content}</Text>,
       );
-      if (bordered) spans.push(<Text key={`v${c}`} color={borderColor}>{chars!.v}</Text>);
+      if (bordered) spans.push(<Text key={`v${c}`} color={borderColor} inverse={selected}>{chars!.v}</Text>);
     }
     return <Box flexDirection="row">{spans}</Box>;
   };
@@ -182,26 +223,40 @@ export function Table<T>({
       {bordered && <Text color={borderColor}>{rule('top')}</Text>}
       {showHeader && renderRow(headerCells, true)}
       {showHeader && bordered && <Text color={borderColor}>{rule('mid')}</Text>}
-      {data.map((row, i) => (
-        <React.Fragment key={i}>
-          {renderRow(columns.map((col) => cellTextOf(col, row, i)), false)}
-        </React.Fragment>
-      ))}
+      {rows.map((row, i) => {
+        const abs = renderStart + i;
+        return (
+          <React.Fragment key={abs}>
+            {renderRow(columns.map((col) => cellTextOf(col, row, abs)), false, abs === selIdx)}
+          </React.Fragment>
+        );
+      })}
       {bordered && <Text color={borderColor}>{rule('bottom')}</Text>}
     </>
   );
 
-  if (fixed) {
-    return <Box flexDirection="column">{grid}</Box>;
-  }
-  // Measure the allocated width; the outer column box stretches to the parent's
+  // Measure the allocated width (when not fixed) and — for a scrollable table —
+  // the allocated height. The outer column box stretches to the parent's
   // cross-axis by default (Yoga alignItems: stretch), so onLayout reports the
-  // available width. Diff before setState — onLayout fires on every paint.
+  // available width; `flexGrow` makes it claim the available height to scroll
+  // within. `flexShrink` is the load-bearing half: Yoga defaults it to 0, so
+  // without it the box refuses to shrink below its content and — because the
+  // first frame renders at the term-height fallback — it would self-stabilize
+  // at the full screen height (over-tall, clipping its own bottom border). With
+  // flexShrink it collapses to its flex allocation and the row window fits.
+  // Diff before setState — onLayout fires on every paint.
+  const measureWidth = !fixed;
+  const measure = measureWidth || scrollable;
   return (
     <Box
       flexDirection="column"
       overflow="hidden"
-      onLayout={(r) => { if (r.width !== measured) setMeasured(r.width); }}
+      flexGrow={scrollable ? 1 : undefined}
+      flexShrink={scrollable ? 1 : undefined}
+      onLayout={measure ? (r) => {
+        if (measureWidth && r.width !== measured) setMeasured(r.width);
+        if (scrollable && r.height !== measuredH) setMeasuredH(r.height);
+      } : undefined}
     >
       {grid}
     </Box>

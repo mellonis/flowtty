@@ -16,7 +16,7 @@
  * top/bottom so the cursor remains visible without empty padding.
  */
 export function windowAround<T>(
-  items: T[],
+  items: readonly T[],
   cursor: number,
   visible: number,
 ): { start: number; items: T[] } {
