@@ -7,6 +7,15 @@ import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
 export type TableAlign = 'left' | 'right' | 'center';
 
+/** Per-cell visual overrides, merged over the row's base style. */
+export interface TableCellStyle {
+  color?: string;
+  bold?: boolean;
+  dim?: boolean;
+  underline?: boolean;
+  strikethrough?: boolean;
+}
+
 export interface TableColumn<T> {
   /** Property key on the row, or a function deriving the cell text. */
   accessor: keyof T | ((row: T, index: number) => string);
@@ -19,6 +28,8 @@ export interface TableColumn<T> {
   /** Lower / upper bounds for auto-sizing (cells). */
   minWidth?: number;
   maxWidth?: number;
+  /** Per-cell visual overrides (e.g. dim a fallback value). Selection still inverts the row over these. */
+  cellStyle?: (row: T, index: number) => TableCellStyle | undefined;
 }
 
 export interface TableProps<T> {
@@ -201,16 +212,31 @@ export function Table<T>({
 
   const padStr = ' '.repeat(pad);
   // `selected` inverts the whole row — cells and the verticals between/around
-  // them — so the highlight reads as one continuous bar edge-to-edge.
-  const renderRow = (cells: string[], header: boolean, selected = false) => {
+  // them — so the highlight reads as one continuous bar edge-to-edge. Per-cell
+  // styles layer underneath: their dim/color/underline/strikethrough still
+  // apply, but the row's inverse + bold take precedence so the cursor stays
+  // legible over any column accent.
+  const renderRow = (
+    cells: string[], header: boolean, selected = false,
+    styles?: (TableCellStyle | undefined)[],
+  ) => {
     const spans: React.ReactNode[] = [];
     if (bordered) spans.push(<Text key="l" color={borderColor} inverse={selected}>{chars!.v}</Text>);
     for (let c = 0; c < ncols; c++) {
       const content = padStr + fitCell(cells[c] ?? '', colWidths[c]!, columns[c]!.align ?? 'left') + padStr;
+      const st = styles?.[c];
       spans.push(
         header
           ? <Text key={`c${c}`} bold={headerBold} color={headerColor}>{content}</Text>
-          : <Text key={`c${c}`} bold={selected} inverse={selected}>{content}</Text>,
+          : <Text
+              key={`c${c}`}
+              bold={selected || st?.bold}
+              inverse={selected}
+              dim={st?.dim}
+              color={selected ? undefined : st?.color}
+              underline={st?.underline}
+              strikethrough={st?.strikethrough}
+            >{content}</Text>,
       );
       if (bordered) spans.push(<Text key={`v${c}`} color={borderColor} inverse={selected}>{chars!.v}</Text>);
     }
@@ -225,9 +251,11 @@ export function Table<T>({
       {showHeader && bordered && <Text color={borderColor}>{rule('mid')}</Text>}
       {rows.map((row, i) => {
         const abs = renderStart + i;
+        const cells = columns.map((col) => cellTextOf(col, row, abs));
+        const styles = columns.map((col) => col.cellStyle?.(row, abs));
         return (
           <React.Fragment key={abs}>
-            {renderRow(columns.map((col) => cellTextOf(col, row, abs)), false, abs === selIdx)}
+            {renderRow(cells, false, abs === selIdx, styles)}
           </React.Fragment>
         );
       })}

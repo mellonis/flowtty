@@ -90,6 +90,34 @@ describe('Table', () => {
     r.unmount();
   });
 
+  test('cellStyle dims a per-column cell without touching its neighbours', async () => {
+    const backend = new TestBackend(40, 8);
+    const columns: TableColumn<Person>[] = [
+      { accessor: 'name', header: 'Name', width: 5 },
+      {
+        accessor: 'age',
+        header: 'Age',
+        width: 3,
+        cellStyle: (p) => (p.age < 10 ? { dim: true } : undefined),
+      },
+    ];
+    const data: Person[] = [
+      { name: 'Ann', age: 30 },
+      { name: 'Bo', age: 7 },
+    ];
+    const r = await render(<Table data={data} columns={columns} width={40} />, backend);
+    await flushAsync(backend);
+
+    const buf = backend.lastBuffer!;
+    // Lines: 0 top · 1 header · 2 mid · 3 row0 (age 30) · 4 row1 (age 7, dim).
+    // Age column content starts after "│ Name  │ " — the digit at x=11.
+    const dim = (x: number, y: number) => buf.get(x, y).style.dim === true;
+    expect(dim(11, 4)).toBe(true);  // Bo's age cell is dimmed (age < 10)
+    expect(dim(11, 3)).toBe(false); // Ann's age cell is not (age 30)
+    expect(dim(2, 4)).toBe(false);  // Bo's name cell is untouched
+    r.unmount();
+  });
+
   test('showHeader=false drops the header row and its separator', async () => {
     const backend = new TestBackend(40, 6);
     const columns: TableColumn<Person>[] = [{ accessor: 'name', header: 'Name', width: 5 }];
