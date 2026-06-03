@@ -1,9 +1,27 @@
 {
   "name": "@flowtty/inline-tty-backend",
-  "version": "0.0.0",
+  "version": "1.0.0-alpha.1",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mellonis/flowtty.git",
+    "directory": "packages/inline-tty-backend"
+  },
+  "homepage": "https://github.com/mellonis/flowtty#readme",
+  "bugs": "https://github.com/mellonis/flowtty/issues",
   "description": "Inline TTY backend for flowtty: redrawable live region with append-only log lines above (the Ink <Static> pattern).",
+  "keywords": [
+    "flowtty",
+    "terminal",
+    "tui",
+    "terminal-ui",
+    "cli",
+    "tty",
+    "inline",
+    "static",
+    "log"
+  ],
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -18,8 +36,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@flowtty/core": "*",
-    "@flowtty/tty-backend": "*"
+    "@flowtty/core": "1.0.0-alpha.1",
+    "@flowtty/tty-backend": "1.0.0-alpha.1"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

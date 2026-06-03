@@ -1,9 +1,27 @@
 {
   "name": "@flowtty/tty-backend",
-  "version": "0.0.0",
+  "version": "1.0.0-alpha.1",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mellonis/flowtty.git",
+    "directory": "packages/tty-backend"
+  },
+  "homepage": "https://github.com/mellonis/flowtty#readme",
+  "bugs": "https://github.com/mellonis/flowtty/issues",
   "description": "TTY backend for @flowtty/react: paints to stdout, reads raw input + parses key sequences.",
+  "keywords": [
+    "flowtty",
+    "terminal",
+    "tui",
+    "terminal-ui",
+    "cli",
+    "tty",
+    "ansi",
+    "stdout",
+    "raw-mode"
+  ],
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -18,7 +36,7 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@flowtty/core": "*"
+    "@flowtty/core": "1.0.0-alpha.1"
   },
   "devDependencies": {
     "@types/node": "^25.9.1",

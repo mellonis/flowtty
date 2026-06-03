@@ -1,9 +1,28 @@
 {
   "name": "@flowtty/react",
-  "version": "0.0.0",
+  "version": "1.0.0-alpha.1",
   "type": "module",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/mellonis/flowtty.git",
+    "directory": "packages/react"
+  },
+  "homepage": "https://github.com/mellonis/flowtty#readme",
+  "bugs": "https://github.com/mellonis/flowtty/issues",
   "description": "React adapter for flowtty: yoga-backed layout, paint pipeline, components, hooks, DialogHost.",
+  "keywords": [
+    "flowtty",
+    "react",
+    "terminal",
+    "tui",
+    "terminal-ui",
+    "cli",
+    "ink",
+    "react-reconciler",
+    "yoga",
+    "flexbox"
+  ],
   "exports": {
     ".": {
       "types": "./src/index.ts",
@@ -21,7 +40,7 @@
     "react": "^19.0.0"
   },
   "dependencies": {
-    "@flowtty/core": "*"
+    "@flowtty/core": "1.0.0-alpha.1"
   },
   "devDependencies": {
     "@types/react-reconciler": "^0.28.9",
