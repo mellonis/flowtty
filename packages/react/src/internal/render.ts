@@ -1,12 +1,47 @@
 import { createElement, type ReactNode } from 'react';
-import { type Backend } from '@flowtty/core';
+import { type Backend, type Key } from '@flowtty/core';
 import { getYoga, computeLayout, paint } from '@flowtty/core/host';
-import { createRoot } from './reconciler.js';
+import { createRoot, type Root } from './reconciler.js';
 import { InputContext, type InputSource } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
 import { AbortContext } from '../context/abortContext.js';
 import { TerminalSizeProvider } from '../hooks/useTerminalSize.js';
 import { ErrorBoundary, type ErrorSource } from '../components/ErrorBoundary.js';
+
+// One backend key listener per render tree; useInput subscribers are managed
+// here, not registered with the backend individually. Each key dispatches
+// inside a single root.flushSync — which first flushes pending passive effects
+// (see Root.flushSync) and THEN snapshots the subscriber set — so
+// (un)subscriptions committed just before the key (dialog opened, box turned
+// inert) take effect before delivery. With per-subscriber backend listeners
+// that ordering is impossible: the backend's fan-out list is snapshotted
+// before any React work runs, so a stale handler still receives the key that
+// should have been muted.
+// The backend listener attaches on the first subscriber and detaches on the
+// last, preserving TtyBackend's lazy raw-mode claim and unmount cleanup.
+function makeKeySource(backend: Backend & { onKey: NonNullable<Backend['onKey']> }, root: Root): InputSource {
+  const subscribers = new Set<(key: Key) => void>();
+  let detachBackend: (() => void) | undefined;
+  return {
+    subscribe(handler) {
+      if (subscribers.size === 0) {
+        detachBackend = backend.onKey((key) => {
+          root.flushSync(() => {
+            for (const s of [...subscribers]) s(key);
+          });
+        });
+      }
+      subscribers.add(handler);
+      return () => {
+        subscribers.delete(handler);
+        if (subscribers.size === 0) {
+          detachBackend?.();
+          detachBackend = undefined;
+        }
+      };
+    },
+  };
+}
 
 export interface RenderOptions {
   /** Called when an error is caught at ANY layer (React boundary, process-level handler).
@@ -40,12 +75,9 @@ export async function render(
   const { container, root } = createRoot(Yoga, draw);
 
   // If the backend provides a key source, wrap the tree in an InputContext
-  // provider so useInput subscribers receive its keys. Otherwise, the
-  // default no-op source in InputContext is used (passive view).
-  //
-  // Wrap each dispatched key in root.flushSync so the state update is processed
-  // synchronously inside the handler — flush() then only needs microtask rounds
-  // for the scheduled repaint instead of a macrotask for the Scheduler to drain.
+  // provider so useInput subscribers receive its keys (see makeKeySource for
+  // the dispatch semantics). Otherwise, the default no-op source in
+  // InputContext is used (passive view).
   let cleanedUp = false;
 
   const onUncaughtException = (error: unknown) => handleError(error, 'uncaughtException');
@@ -99,16 +131,7 @@ export async function render(
   const innerTree = backend.onKey
     ? createElement(
         InputContext.Provider,
-        {
-          value: {
-            subscribe(handler) {
-              return backend.onKey!((key) => {
-                // Process the state update synchronously so flush() needs only microtasks.
-                root.flushSync(() => handler(key));
-              });
-            },
-          } as InputSource,
-        },
+        { value: makeKeySource(backend as Backend & { onKey: NonNullable<Backend['onKey']> }, root) },
         element,
       )
     : element;

@@ -43,8 +43,8 @@
     "@flowtty/core": "1.0.0-alpha.1"
   },
   "devDependencies": {
-    "@types/react-reconciler": "^0.28.9",
-    "react-reconciler": "^0.31.0",
+    "@types/react-reconciler": "^0.33.0",
+    "react-reconciler": "^0.33.0",
     "tsup": "^8"
   }
 }

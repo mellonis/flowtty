@@ -253,7 +253,7 @@ describe('DialogHost stack', () => {
       createElement(DialogHost, {}, createElement(Host)),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
 
     // Open lower dialog with 2 buttons.
     openD(
@@ -262,7 +262,7 @@ describe('DialogHost stack', () => {
         createElement(Button, { label: 'L2', onPress: lowerBtn2 }),
       ),
     );
-    await flushAsync();
+    await flushAsync(backend);
 
     // Open upper dialog with 2 buttons + api capture.
     openD(
@@ -272,39 +272,39 @@ describe('DialogHost stack', () => {
         createElement(CaptureApi),
       ),
     );
-    await flushAsync();
-    await flushAsync();
+    await flushAsync(backend);
+    await flushAsync(backend);
 
     // Upper dialog is active; U1 is auto-focused. Enter fires U1.
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(upperBtn1).toHaveBeenCalledTimes(1);
     expect(lowerBtn1).not.toHaveBeenCalled();
 
     // Tab in upper moves focus to U2. Enter fires U2.
     backend.press({ name: 'tab' });
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(upperBtn2).toHaveBeenCalledTimes(1);
     expect(lowerBtn1).not.toHaveBeenCalled();
     expect(lowerBtn2).not.toHaveBeenCalled();
 
     // Close the top dialog.
     topApi!.done(null);
-    await flushAsync();
+    await flushAsync(backend);
 
     // Lower dialog is now top. Its FocusGroup was never reset — L1 is still
     // auto-focused (it was first to register and focus was never stolen).
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(lowerBtn1).toHaveBeenCalledTimes(1);
 
     // Tab in lower moves focus to L2. Enter fires L2.
     backend.press({ name: 'tab' });
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(lowerBtn2).toHaveBeenCalledTimes(1);
 
     handle.unmount();

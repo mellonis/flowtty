@@ -39,7 +39,7 @@
     "@flowtty/core": "1.0.0-alpha.1"
   },
   "devDependencies": {
-    "@types/node": "^25.9.1",
+    "@types/node": "^24",
     "tsup": "^8"
   }
 }

@@ -9,12 +9,15 @@
     "noUncheckedIndexedAccess": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
+    // This config sets no `baseUrl` (deprecated in TS 6, removed in TS 7;
+    // `paths` entries resolve relative to this file's directory), but tsup's
+    // dts build injects `baseUrl: "."` internally — without ignoreDeprecations
+    // every `tsup` dts build fails with TS5101.
     "ignoreDeprecations": "6.0",
     "types": ["node", "vitest/globals"],
     // Resolve @flowtty/* to package source so `tsc --noEmit` works without a
     // prior build. tsup builds publish to dist/ and the package.json `exports`
     // field points there for installed consumers.
-    "baseUrl": ".",
     "paths": {
       "@flowtty/core":          ["./packages/core/src/index.ts"],
       "@flowtty/core/host":     ["./packages/core/src/host/index.ts"],
