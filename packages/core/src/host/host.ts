@@ -41,6 +41,11 @@ export interface BoxProps {
   border?: BorderStyle;
   // Color for border glyphs — same string format as `color` (named or truecolor).
   borderColor?: string;
+  // Background color for border cells. Defaults to the box's effective
+  // background (own backgroundColor, else the inherited one) so a filled box's
+  // border ring shares its fill. Set to 'default' to keep border cells on the
+  // terminal default background.
+  borderBackgroundColor?: string;
   // Text painted into the top border line (after the corner + 1 edge piece).
   // No-op unless `border` is set. Long titles are truncated with `…` to leave
   // at least 1 edge piece on each side. Painted with the same color as the border.

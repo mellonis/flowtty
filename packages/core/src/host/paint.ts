@@ -53,7 +53,11 @@ function intersectRects(a: Rect | null, b: Rect): Rect {
 // the border interior. The border itself sits on the outermost cell ring of
 // the box rect; Yoga's setBorder(edge, 1) reserved those cells from layout
 // so neither own-text nor child layout will land on them.
-function paintBorder(inst: Instance, buffer: Buffer, box: Rect, clip: Rect | null): void {
+// Border cells carry a background: borderBackgroundColor if set, else the
+// box's effective bg (same fallback rule as own-text) — so a filled box's
+// border ring shares its fill instead of punching through to the terminal
+// default. The 'default' sentinel resolves to "no bg", mirroring the fill.
+function paintBorder(inst: Instance, buffer: Buffer, box: Rect, clip: Rect | null, effectiveBg: string | undefined): void {
   const style = inst.props.border;
   if (!style) return;
   if (box.width < 2 || box.height < 2) return; // can't draw a border without an interior
@@ -61,6 +65,8 @@ function paintBorder(inst: Instance, buffer: Buffer, box: Rect, clip: Rect | nul
   const chars = BORDER_CHARS[style];
   const cellStyle: Style = {};
   if (inst.props.borderColor !== undefined) cellStyle.fg = inst.props.borderColor;
+  const bg = inst.props.borderBackgroundColor ?? effectiveBg;
+  if (bg !== undefined && bg !== 'default') cellStyle.bg = bg;
 
   const x0 = box.left;
   const y0 = box.top;
@@ -156,7 +162,7 @@ function paintInstance(
   }
 
   // 1b. Border (if set), clipped by inherited clip.
-  paintBorder(inst, buffer, box, clip);
+  paintBorder(inst, buffer, box, clip, effectiveBg);
 
   // 2. Own text — clipped by content rect (existing behavior) AND inherited clip.
   const text = ownText(inst);

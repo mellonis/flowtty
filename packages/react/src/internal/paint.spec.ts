@@ -239,6 +239,81 @@ describe('Box border', () => {
     expect(buf.get(1, 1).char).toBe('h');
     expect(buf.get(2, 1).char).toBe('i');
   });
+
+  test('border cells carry the box backgroundColor (glyphs keep the fill behind them)', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(createElement('flowtty-box', { border: 'single', backgroundColor: 'blue', width: 3, height: 3 }));
+    computeLayout(container, 3, 3);
+    const buf = paint(container, 3, 3);
+    expect(buf.get(0, 0)).toEqual({ char: '┌', style: { bg: 'blue' } }); // corner
+    expect(buf.get(1, 0)).toEqual({ char: '─', style: { bg: 'blue' } }); // edge
+    expect(buf.get(0, 1)).toEqual({ char: '│', style: { bg: 'blue' } }); // edge
+    expect(buf.get(1, 1)).toEqual({ char: ' ', style: { bg: 'blue' } }); // interior
+  });
+
+  test('bordered child with no own bg inherits the parent backgroundColor on border cells', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(
+      createElement('flowtty-box', { backgroundColor: 'blue', width: 5, height: 5, padding: 1 },
+        createElement('flowtty-box', { border: 'single', width: 3, height: 3 }),
+      ),
+    );
+    computeLayout(container, 5, 5);
+    const buf = paint(container, 5, 5);
+    // Child border ring sits at (1..3, 1..3); its cells keep the parent's fill.
+    expect(buf.get(1, 1)).toEqual({ char: '┌', style: { bg: 'blue' } });
+    expect(buf.get(2, 1)).toEqual({ char: '─', style: { bg: 'blue' } });
+  });
+
+  test('borderBackgroundColor overrides the backgroundColor fallback for border cells only', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(createElement('flowtty-box', {
+      border: 'single', backgroundColor: 'blue', borderBackgroundColor: 'red', borderColor: 'white',
+      width: 3, height: 3,
+    }));
+    computeLayout(container, 3, 3);
+    const buf = paint(container, 3, 3);
+    expect(buf.get(0, 0)).toEqual({ char: '┌', style: { fg: 'white', bg: 'red' } });
+    expect(buf.get(1, 1)).toEqual({ char: ' ', style: { bg: 'blue' } }); // interior keeps box bg
+  });
+
+  test("borderBackgroundColor 'default' opts border cells out of the box bg", async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(createElement('flowtty-box', {
+      border: 'single', backgroundColor: 'blue', borderBackgroundColor: 'default',
+      width: 3, height: 3,
+    }));
+    computeLayout(container, 3, 3);
+    const buf = paint(container, 3, 3);
+    expect(buf.get(0, 0).style.bg).toBeUndefined();
+    expect(buf.get(1, 1).style.bg).toBe('blue'); // interior unaffected
+  });
+
+  test("backgroundColor 'default' sentinel does not leak a literal bg onto border cells", async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(createElement('flowtty-box', { border: 'single', backgroundColor: 'default', width: 3, height: 3 }));
+    computeLayout(container, 3, 3);
+    const buf = paint(container, 3, 3);
+    expect(buf.get(0, 0)).toEqual({ char: '┌', style: {} });
+  });
+
+  test('borderTitle cells carry the border background', async () => {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(createElement('flowtty-box', {
+      border: 'single', borderTitle: 'T', backgroundColor: 'blue',
+      width: 7, height: 3,
+    }));
+    computeLayout(container, 7, 3);
+    const buf = paint(container, 7, 3);
+    // Title " T " starts after corner + 1 edge piece → (2..4, 0)
+    expect(buf.get(3, 0)).toEqual({ char: 'T', style: { bg: 'blue' } });
+  });
 });
 
 describe('Box padding', () => {

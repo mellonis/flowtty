@@ -48,6 +48,12 @@ via Yoga's per-edge border slots, so content fits inside the ring automatically.
 `borderColor` accepts the same values as `color` (named, `#rrggbb`, `rgb(...)`).
 Boxes smaller than 2×2 silently skip the border.
 
+Border cells share the box's background: they default to the box's effective
+background color (own `backgroundColor`, else the inherited one), so a filled
+modal keeps its fill under the border ring. `borderBackgroundColor` overrides
+that for the border cells only; the `'default'` value keeps them on the
+terminal default background.
+
 ### Padding
 
 `<Box>` accepts CSS-style padding props. Per-edge wins over axis wins over shorthand.
