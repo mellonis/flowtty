@@ -1,25 +1,39 @@
 # flowtty
 
-A framework for building terminal apps in React. **M0:** a `react-reconciler`
-host config over Yoga flexbox layout that renders `<Box>`/`<Text>` to a cell
-buffer and draws it to the terminal (or captures it via the test backend).
+A framework for building terminal apps in React: a `react-reconciler` host over
+Yoga flexbox that lays out `<Box>`/`<Text>`, paints them into a cell buffer, and
+writes that buffer to a backend — a full-screen TTY, an inline live region, or an
+in-memory surface for tests.
 
 > The renderer is a host config on top of React's reconciler + Yoga — not a
 > from-scratch renderer including layout, and not a performance competitor to
-> native-core renderers like OpenTUI. flowtty's value is the app + workflow
-> layers built on top (later milestones).
+> native-core renderers like OpenTUI. flowtty's value is the component and
+> workflow layer built on top.
+
+```bash
+npm install @flowtty/react @flowtty/tty-backend react
+```
 
 ## Status
 
-M1e (TTY frame diff). `TtyBackend` now writes only the cells that changed
-since the previous frame. Adjacent changes on the same row share one cursor
-move (the run flows contiguously). Style changes emit SGR only when the pen
-state needs updating. **No-op repaints write nothing.** First frame + size
-mismatch + terminal resize fall back to a full redraw.
+Alpha (`1.0.0-alpha.x` on npm; APIs can still change between alphas — each
+release's notes list what breaks).
 
-This is a perf-only change — no public API additions. Interactive apps
-(counter, prompt, form) that repaint per keystroke now issue a handful of
-bytes per frame instead of the full ~hundreds-of-bytes redraw.
+- **Layout & paint:** flexbox via Yoga, borders with titles, padding/margin/gap,
+  wrap, absolute positioning, `zIndex`, `overflow`, truecolor, OSC 8 hyperlinks,
+  frame-diffed TTY output (a no-op repaint writes nothing).
+- **Components:** `ScrollBox`, `TextInput`, `TextArea`, `Select`, `MultiSelect`,
+  `Form`, `Button` + focus groups, `DialogHost`, `Menu`, `Table`, `Markdown`
+  (GFM tables, nested lists, code highlighting), `Spinner`, `ProgressBar`,
+  `TaskList`, `Link`, `Static`.
+- **Input:** key parsing with modifiers, bracketed paste as one event, the mouse
+  wheel, keys reported by code point (Shift+Enter where the terminal sends it).
+- **Backends:** `@flowtty/tty-backend` (alt screen), `@flowtty/inline-tty-backend`
+  (live region + append-only log), `TestBackend` for frame and cell assertions.
+- **Runs on** Node and Bun, including `bun build --compile` single-file binaries.
+
+Not there yet: cell-accurate wide glyphs (CJK/emoji take one grid cell), mouse
+clicks, the Kitty keyboard protocol — see *Still deferred*.
 
 ### Truecolor
 
@@ -233,7 +247,7 @@ Fires after layout with this box's computed rect. Use for components inside a fl
 **`useTerminalSize()` (whole terminal):**
 
 ```tsx
-import { useTerminalSize } from 'flowtty';
+import { useTerminalSize } from '@flowtty/react';
 
 function App() {
   const { width, height } = useTerminalSize();
@@ -326,7 +340,7 @@ error path (just before `backend.dispose()`). It returns `null` when there's no
 flowtty `render()` in scope.
 
 ```tsx
-import { useRootAbortSignal } from 'flowtty';
+import { useRootAbortSignal } from '@flowtty/react';
 
 function Things() {
   const signal = useRootAbortSignal();
@@ -397,7 +411,7 @@ It's the base clock under `<Spinner>`, `<ProgressBar>`, and elapsed-time
 displays — anything that needs to repaint on a timer.
 
 ```tsx
-import { useTicker, Text } from 'flowtty';
+import { useTicker, Text } from '@flowtty/react';
 
 function Clock() {
   const tick = useTicker({ interval: 1000 });   // one tick per second
@@ -423,7 +437,7 @@ work is in flight; unmount it when done (the animation stops on unmount and on
 whole-app teardown automatically).
 
 ```tsx
-import { Spinner } from 'flowtty';
+import { Spinner } from '@flowtty/react';
 
 <Spinner />                                  // default 'dots' set
 <Spinner type="line" label="Building" />     // named set + trailing label
@@ -447,7 +461,7 @@ the package stays dependency-free.
 new `value` to advance it (it does not self-animate).
 
 ```tsx
-import { ProgressBar } from 'flowtty';
+import { ProgressBar } from '@flowtty/react';
 
 <ProgressBar value={0.5} />                          // fills the row, 50%
 <ProgressBar value={3} total={4} width={20} showPercent />
@@ -471,7 +485,7 @@ Props:
 skipped. It's data-driven: update a task's `state` and re-render to advance it.
 
 ```tsx
-import { TaskList } from 'flowtty';
+import { TaskList } from '@flowtty/react';
 
 <TaskList tasks={[
   { label: 'Install deps', state: 'success' },
@@ -492,7 +506,7 @@ set used for running tasks. Running tasks animate via `<Spinner>` (and thus
 box-drawing rules (`border`) or whitespace (`border="none"`).
 
 ```tsx
-import { Table } from 'flowtty';
+import { Table } from '@flowtty/react';
 
 <Table
   data={[
@@ -533,7 +547,7 @@ best-effort, line-based renderer — not a CommonMark implementation — coverin
 the subset that reads well in a cell grid:
 
 ```tsx
-import { Markdown } from 'flowtty';
+import { Markdown } from '@flowtty/react';
 
 <Markdown>{`
 # Heading
@@ -605,7 +619,7 @@ as Apple Terminal.app), it degrades to the styled label followed by a dim
 `(url)` so the address is still reachable.
 
 ```tsx
-import { Link } from 'flowtty';
+import { Link } from '@flowtty/react';
 
 <Link href="https://example.com">the docs</Link>
 // capable terminal:  the docs        (clickable)
@@ -640,7 +654,7 @@ no dependency. Use it to align columns or budget a row's width when laying out
 your own content (it's the primitive the upcoming `<Table>` builds on).
 
 ```ts
-import { stringWidth } from 'flowtty';
+import { stringWidth } from '@flowtty/react';
 
 stringWidth('café');  // 4  (combining accent adds 0)
 stringWidth('日本語'); // 6  (each ideograph is 2)
@@ -719,7 +733,9 @@ useInput((key) => {
   Inline mode (`InlineTtyBackend`) never enables it: the wheel there belongs to
   the terminal's own scrollback.
 
-In tests, `TestBackend` has `paste(text)` and `wheel('up' | 'down', x?, y?)`.
+In tests, `TestBackend` has `paste(text)` and `wheel('up' | 'down', x?, y?)`. `wheel()`
+defaults to cell (0, 0) — a `<ScrollBox>` only reacts while the pointer is over
+it, so pass coordinates inside the box unless it sits at the origin.
 
 **Key names.** A printable key is named by its character — `' '`, `':'`, `'a'` —
 and the rest come from a fixed list, exported as `NAMED_KEYS` (type `NamedKey`):
@@ -746,7 +762,7 @@ produces, which stops a test from blessing a branch real input never reaches.
 ```tsx
 import { z } from 'zod';
 import { useState } from 'react';
-import { render, TextInput, Box, Text } from 'flowtty';
+import { render, TextInput, Box, Text } from '@flowtty/react';
 
 const Slug = z.string().regex(/^[a-z0-9-]+$/, 'kebab-case only');
 
@@ -816,7 +832,8 @@ Outside a FocusGroup, `useFocus()` returns `{isFocused: true}` (safe default —
 
 ```tsx
 import { createElement } from 'react';
-import { render, Box, Text, TtyBackend } from 'flowtty';
+import { render, Box, Text } from '@flowtty/react';
+import { TtyBackend } from '@flowtty/tty-backend';
 
 await render(
   createElement(Box, { flexDirection: 'row' },

@@ -71,7 +71,7 @@ When the hello-world is launched from WebStorm's IDE run interface (not a real t
 
 **Action:** flowtty can't prevent this — it's a Node.js module-system concern. Consider adding a note to the getting-started guide: "If you import helpers from a CLI script that ends with a top-level `await`, guard it with an `import.meta.url` check." May be worth showing the pattern in a documentation example.
 
-### No `clearScreen` or `altScreen` lifecycle hook on render()
+### No `clearScreen` or `altScreen` lifecycle hook on render() — RESOLVED
 
 `listInteractive` in articles.mjs calls `console.clear()` on every render to give a full-screen feel. In flowtty, the TtyBackend's alt-screen handles this, but after unmount the cursor is left wherever it was last painted — there's no `onMount`/`onUnmount` lifecycle callback on the render handle to do post-exit cleanup (e.g. clear a line, move cursor home).
 
@@ -85,7 +85,7 @@ When the hello-world is launched from WebStorm's IDE run interface (not a real t
 
 ## Create wizard (Task 3)
 
-### `MultiSelect.onAddNew` is `() => void` — can't return the new item id
+### `MultiSelect.onAddNew` is `() => void` — can't return the new item id — RESOLVED
 
 The M1c.4 design intent was for `onAddNew` to be `async () => Promise<string | null>` so the component could automatically splice in and select the new item when the callback resolves. The actual implementation signature is `() => void`. There's no return channel.
 
@@ -93,13 +93,13 @@ The M1c.4 design intent was for `onAddNew` to be `async () => Promise<string | n
 
 **Action:** Upgrade `onAddNew` to `() => Promise<string | null>` (or `() => Promise<void>` with the component re-reading the items array after the promise resolves). The sync `() => void` forces consumers to invent their own sub-prompt state machine for what should be a self-contained flow. This is the highest-priority ergonomics gap from Task 3.
 
-### `TextInput` has no `defaultValue` prop — seeding a step requires a child component
+### `TextInput` has no `defaultValue` prop — seeding a step requires a child component — RESOLVED
 
 `TextInput` is fully controlled (`value` + `onChange` required). To seed the slug step with `slugify(title, lang)`, the implementation needs a separate `SlugStep` child component that owns its own `useState` initialised from a prop. A `defaultValue` prop that populates the initial uncontrolled state would eliminate one component and several lines of boilerplate per wizard step.
 
 **Action:** Add an uncontrolled mode (or at least a `defaultValue` seed) to `TextInput`. The controlled pattern is correct for form integration, but single-shot prompts inside a step-wizard are much simpler with an uncontrolled `defaultValue`.
 
-### No `validate` error rendering — consumer must mirror the error in state
+### No `validate` error rendering — consumer must mirror the error in state — RESOLVED
 
 `TextInput`'s `validate` callback blocks `onSubmit` on failure, but the component does not render the error string. The consumer must duplicate the validation in its own state (`useState<string | null>`) and render it separately below the input.
 
