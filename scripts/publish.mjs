@@ -7,13 +7,15 @@
 // the source form back (try/finally, plus SIGINT), so a failed or interrupted
 // publish never leaves the tree in the published shape.
 //
-//   node scripts/publish.mjs --otp 123456        publish, tag `latest` + `alpha`
+//   node scripts/publish.mjs --otp 123456        publish under `latest`, then tag `alpha` — one
+//                                                run; asks for a fresh code if the OTP expires
 //   node scripts/publish.mjs --dry-run           build, flip, `npm publish --dry-run`, restore
 //
 // Versions are NOT bumped here — bump, commit, then run this. Packages whose
 // version is already on the registry are skipped, so a partial run can be re-run.
 import { execFileSync } from 'node:child_process';
 import { existsSync, readFileSync, writeFileSync } from 'node:fs';
+import { createInterface } from 'node:readline/promises';
 import { fileURLToPath } from 'node:url';
 
 // Dependency order: a package is published after everything it depends on.
@@ -83,13 +85,25 @@ try {
   }
 
   if (!dryRun) {
-    // A second registry write per package. The same OTP usually still works; if
-    // it has expired, the publish itself is done — just re-tag with a fresh code.
+    // A second registry write per package. The publish OTP usually still works;
+    // when it has expired, ask for a fresh one (in a terminal) and carry on, so a
+    // release is one run. Without a terminal, print the commands instead.
+    let tagOtp = otp;
     for (const [name, version] of published) {
-      try {
-        run('npm', ['dist-tag', 'add', `${name}@${version}`, 'alpha', `--otp=${otp}`]);
-      } catch {
-        console.error(`!! could not tag ${name}@${version} as alpha — run: npm dist-tag add ${name}@${version} alpha --otp=<code>`);
+      const spec = `${name}@${version}`;
+      for (let attempt = 0; ; attempt++) {
+        try {
+          run('npm', ['dist-tag', 'add', spec, 'alpha', `--otp=${tagOtp}`]);
+          break;
+        } catch {
+          if (attempt >= 2 || !process.stdin.isTTY) {
+            console.error(`!! could not tag ${spec} as alpha — run: npm dist-tag add ${spec} alpha --otp=<code>`);
+            break;
+          }
+          const rl = createInterface({ input: process.stdin, output: process.stdout });
+          tagOtp = (await rl.question(`OTP expired? Enter a fresh code to tag ${spec} as alpha: `)).trim();
+          rl.close();
+        }
       }
     }
   }
