@@ -149,3 +149,56 @@ test('a multi-line paste lands in the field as text and does not submit', async 
   expect(captured).toBe('abline one line two');
   expect(submitted).toBeNull();
 });
+
+// ─── validate error rendering, defaultValue, field colors ────────────────────
+
+test('a failed validate renders its message under the field, and the next edit clears it', async () => {
+  function App() {
+    const [v, setV] = useState('');
+    return createElement(TextInput, { value: v, onChange: setV, validate: (x: string) => (x ? null : 'required') });
+  }
+  const backend = new TestBackend(12, 3);
+  await render(createElement(App), backend);
+  backend.press({ name: 'return' });
+  await flush();
+  expect(backend.lastFrame.split('\n')).toEqual(['', 'required']);
+  expect(backend.lastBuffer!.get(0, 1).style.fg).toBe('red');
+  backend.type('a');
+  await flush();
+  expect(backend.lastFrame.split('\n')).toEqual(['a']);
+});
+
+test('showError={false} leaves error display to the consumer', async () => {
+  function App() {
+    const [v, setV] = useState('');
+    return createElement(TextInput, { value: v, onChange: setV, validate: () => 'nope', showError: false });
+  }
+  const backend = new TestBackend(12, 3);
+  await render(createElement(App), backend);
+  backend.press({ name: 'return' });
+  await flush();
+  expect(backend.lastFrame).toBe('');
+});
+
+test('defaultValue: uncontrolled — the field keeps its own value and still reports it', async () => {
+  let submitted: string | null = null;
+  const changes: string[] = [];
+  const backend = new TestBackend(12, 1);
+  await render(createElement(TextInput, {
+    defaultValue: 'seed', onChange: (v: string) => changes.push(v), onSubmit: (v: string) => { submitted = v; },
+  }), backend);
+  expect(backend.lastFrame).toBe('seed');
+  backend.type('!');
+  await flush();
+  expect(backend.lastFrame).toBe('seed!');
+  expect(changes).toEqual(['seed!']);
+  backend.press({ name: 'return' });
+  await flush();
+  expect(submitted).toBe('seed!');
+});
+
+test('text on the light field is drawn dark so it reads in a dark theme', async () => {
+  const backend = new TestBackend(12, 1);
+  await render(createElement(TextInput, { value: 'hi', onChange: () => {} }), backend);
+  expect(backend.lastBuffer!.get(0, 0).style.fg).toBe('black');
+});

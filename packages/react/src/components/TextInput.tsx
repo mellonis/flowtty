@@ -8,16 +8,22 @@ import { editorReducer as reduce, type EditorState } from '@flowtty/core';
 import { type Rect } from '@flowtty/core/host';
 
 export interface TextInputProps {
-  /** Controlled value. Required (no defaultValue / uncontrolled mode in M1b). */
-  value: string;
+  /** Controlled value. Omit it (and optionally pass `defaultValue`) for an
+   *  uncontrolled field that keeps its own value — handy for a one-shot prompt. */
+  value?: string;
+  /** Initial value of an uncontrolled field. Ignored when `value` is set. */
+  defaultValue?: string;
   /** Called whenever the value changes (per edit). */
-  onChange: (value: string) => void;
+  onChange?: (value: string) => void;
   /** Called on Enter/Return — only if validate (if provided) returns null/undefined. */
   onSubmit?: (value: string) => void;
   /** Called on Escape. */
   onCancel?: () => void;
   /** Sync validator. Return null/undefined = valid; return string = error message (blocks onSubmit). */
   validate?: (value: string) => string | null | undefined;
+  /** Render the `validate` message under the field after a rejected submit;
+   *  the next edit clears it. Default true — set false to show the error yourself. */
+  showError?: boolean;
   /** When true, render U+2022 (•) per character instead of the actual value. */
   mask?: boolean;
   /** Override focus state. If unset (default), the component reads from the
@@ -30,9 +36,16 @@ export interface TextInputProps {
 // SPACE — combined with inverse:true that's a solid filled cell on most
 // terminals, more reliably visible than the █ block char.
 const CURSOR_AT_END = ' ';
+const FIELD_BG = 'rgb(211,211,211)';
+// The terminal's own foreground is white in a dark theme — unreadable on the
+// light field — so the text is drawn dark. Same pairing as <TextArea>.
+const FIELD_FG = 'black';
 
 export function TextInput(props: TextInputProps): ReactNode {
-  const { value, onChange, onSubmit, onCancel, validate, mask, isFocused: explicitFocus } = props;
+  const { onChange, onSubmit, onCancel, validate, mask, isFocused: explicitFocus, showError = true } = props;
+  const [ownValue, setOwnValue] = useState(props.defaultValue ?? '');
+  const value = props.value ?? ownValue;
+  const [error, setError] = useState<string | null>(null);
   const { isFocused: ctxFocused } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   const [cursor, setCursor] = useState(value.length);
@@ -44,11 +57,16 @@ export function TextInput(props: TextInputProps): ReactNode {
   useInput((key) => {
     const action = reduce({ value, cursor: safeCursor } as EditorState, key);
     if (action.kind === 'edit') {
-      if (action.state.value !== value) onChange(action.state.value);
+      if (action.state.value !== value) {
+        if (props.value === undefined) setOwnValue(action.state.value);
+        if (error !== null) setError(null);
+        onChange?.(action.state.value);
+      }
       if (action.state.cursor !== safeCursor) setCursor(action.state.cursor);
     } else if (action.kind === 'submit') {
       const err = validate ? validate(value) : null;
       if (!err) onSubmit?.(value);
+      setError(err ?? null);
     } else if (action.kind === 'cancel') {
       onCancel?.();
     }
@@ -98,29 +116,29 @@ export function TextInput(props: TextInputProps): ReactNode {
 
   // When NOT focused: render the display flat, no cursor cell. Tells the user
   // at a glance which field has focus (only the focused one shows the inverse cursor).
+  const errorLine = showError && error !== null ? <Text color="red">{error}</Text> : null;
+
   if (!isFocused) {
     const flat = width === null ? display : display.padEnd(width);
     return (
-      <Box
-        flexDirection="row"
-        backgroundColor="rgb(211,211,211)"
-        onLayout={onLayout}
-      >
-        <Text>{flat}</Text>
+      <Box flexDirection="column">
+        <Box flexDirection="row" backgroundColor={FIELD_BG} onLayout={onLayout}>
+          <Text color={FIELD_FG}>{flat}</Text>
+        </Box>
+        {errorLine}
       </Box>
     );
   }
 
   return (
-    <Box
-      flexDirection="row"
-      // Subtle lightgray bg differentiates the input from the dialog content area.
-      backgroundColor="rgb(211,211,211)"
-      onLayout={onLayout}
-    >
-      {before ? <Text>{before}</Text> : null}
-      <Text inverse>{cursorChar}</Text>
-      {after ? <Text>{after}</Text> : null}
+    <Box flexDirection="column">
+      {/* Light-gray bg differentiates the input from the dialog content area. */}
+      <Box flexDirection="row" backgroundColor={FIELD_BG} onLayout={onLayout}>
+        {before ? <Text color={FIELD_FG}>{before}</Text> : null}
+        <Text inverse color={FIELD_FG}>{cursorChar}</Text>
+        {after ? <Text color={FIELD_FG}>{after}</Text> : null}
+      </Box>
+      {errorLine}
     </Box>
   );
 }

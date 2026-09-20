@@ -719,6 +719,11 @@ function App() {
 }
 ```
 
+When `validate` rejects a submit, `<TextInput>` renders the message in red under
+the field and clears it on the next edit (`showError={false}` if you show it
+yourself). For a one-shot prompt, skip the state: `<TextInput defaultValue="seed"
+onSubmit={…} />` keeps its own value.
+
 ### DialogHost (stack)
 
 `<DialogHost>` lets components anywhere in its subtree open dialogs via
