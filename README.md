@@ -40,6 +40,8 @@ clicks, the Kitty keyboard protocol — see *Still deferred*.
 `Style.fg` and `Style.bg` accept:
 
 - Named colors: the 8 ANSI names (`'black'`, `'red'`, `'green'`, `'yellow'`, `'blue'`, `'magenta'`, `'cyan'`, `'white'` — codes 30-37 / 40-47), their bright variants (`'redBright'`, … — 90-97 / 100-107), and `'gray'` / `'grey'` for bright black.
+  The names are exported as `NAMED_COLORS`; every color prop is typed `Color`
+  (`NamedColor | string`), so editors complete them.
 - 3-digit hex `#rgb` (each digit doubled — `#f80` → `#ff8800`).
 - 6-digit hex `#rrggbb`.
 - CSS-style `rgb(R, G, B)` (each channel 0–255 integer).

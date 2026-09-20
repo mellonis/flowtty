@@ -29,6 +29,8 @@ export { wrapText } from './wrap.js';
 export { splitVisualLines } from './visualLines.js';
 export { windowAround } from './windowAround.js';
 export { charWidth, stringWidth } from './displayWidth.js';
+export { NAMED_COLORS } from './colors.js';
+export type { NamedColor, Color } from './colors.js';
 
 // ─── Reducer exports (for advanced widget authors) ───────────────────────────
 // Each reducer module exports a `reduce` function; re-export them under

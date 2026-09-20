@@ -11,8 +11,8 @@ export { inputRows, caretPosition, rowIndexAt } from '@flowtty/core';
 // Re-export core types from @flowtty/core so consumers using only @flowtty/react
 // have a single import surface for everything they typically need.
 export { Buffer } from '@flowtty/core';
-export type { Backend, Cell, Style, Key, KeyName, NamedKey } from '@flowtty/core';
-export { NAMED_KEYS } from '@flowtty/core';
+export type { Backend, Cell, Style, Key, KeyName, NamedKey, Color, NamedColor } from '@flowtty/core';
+export { NAMED_KEYS, NAMED_COLORS } from '@flowtty/core';
 export type { BorderStyle, BorderChars, GridChars } from '@flowtty/core';
 export { DEFAULT_BORDER_STYLE, GRID_CHARS } from '@flowtty/core';
 export { useInput } from './hooks/useInput.js';

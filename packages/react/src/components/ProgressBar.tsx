@@ -2,6 +2,7 @@ import React from 'react';
 import { useState, type ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
+import type { Color } from '@flowtty/core';
 
 export interface ProgressBarProps {
   /** Current progress. Treated as a 0..1 fraction unless `total` is given. */
@@ -15,7 +16,7 @@ export interface ProgressBarProps {
   /** Glyph for empty cells. Default '░'. */
   emptyChar?: string;
   /** Color of the filled portion (named / #rrggbb / rgb(...)). */
-  color?: string;
+  color?: Color;
   /** Append a ` NN%` readout after the bar. Default false. */
   showPercent?: boolean;
 }

@@ -1,4 +1,4 @@
-import type { Cell, Style } from '@flowtty/core';
+import type { Cell, NamedColor, Style } from '@flowtty/core';
 
 export const RESET = '\x1b[0m';
 
@@ -14,8 +14,9 @@ export const MOUSE_OFF = '\x1b[?1006l\x1b[?1000l';
 
 // The 8 ANSI colors plus their bright variants (`redBright` …, 90–97), with
 // `gray` / `grey` as the familiar names for bright black. Background codes are
-// the same numbers + 10.
-const FG: Record<string, number> = {
+// the same numbers + 10. Typed over core's NamedColor: a name added there does
+// not compile here until it has a code.
+const FG: Record<NamedColor, number> = {
   black: 30, red: 31, green: 32, yellow: 33,
   blue: 34, magenta: 35, cyan: 36, white: 37,
   gray: 90, grey: 90,
@@ -23,9 +24,10 @@ const FG: Record<string, number> = {
   blueBright: 94, magentaBright: 95, cyanBright: 96, whiteBright: 97,
 };
 
-const BG: Record<string, number> = Object.fromEntries(
-  Object.entries(FG).map(([name, code]) => [name, code + 10]),
-);
+// Lookups take an arbitrary string (a hex value, a typo), so read through a
+// plain index signature; `FG` itself stays exhaustive over NamedColor.
+const fgCode = (name: string): number | undefined => (FG as Record<string, number | undefined>)[name];
+const bgCode = (name: string): number | undefined => { const c = fgCode(name); return c === undefined ? undefined : c + 10; };
 
 // A color that is neither a known name nor parseable paints nothing — silently,
 // which makes a typo (`'grayish'`) look like a layout bug. The names are kept so a
@@ -100,7 +102,7 @@ export function sgr(style: Style): string {
     if (rgb) {
       parts.push(`38;2;${rgb.r};${rgb.g};${rgb.b}`);
     } else {
-      const code = FG[style.fg];
+      const code = fgCode(style.fg);
       if (code !== undefined) parts.push(String(code));
       else noteUnknownColor(style.fg);
     }
@@ -110,7 +112,7 @@ export function sgr(style: Style): string {
     if (rgb) {
       parts.push(`48;2;${rgb.r};${rgb.g};${rgb.b}`);
     } else {
-      const code = BG[style.bg];
+      const code = bgCode(style.bg);
       if (code !== undefined) parts.push(String(code));
       else noteUnknownColor(style.bg);
     }

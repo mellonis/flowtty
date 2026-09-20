@@ -1,4 +1,5 @@
 import { expect, test, describe } from 'vitest';
+import { NAMED_COLORS } from '@flowtty/core';
 import { sgr, RESET, cursorTo, cellsEqual, parseColor, OSC8_CLOSE, osc8Open, takeUnknownColors } from './ansi.js';
 
 describe('OSC 8 hyperlinks', () => {
@@ -171,4 +172,11 @@ test('an unknown color name is ignored but remembered once, so a backend can rep
   sgr({ bg: 'default' }); // the "no background" sentinel is not a mistake
   expect(takeUnknownColors()).toEqual(['grayish']);
   expect(takeUnknownColors()).toEqual([]);
+});
+
+test('every named color from core has an SGR code, for fg and bg', () => {
+  for (const name of NAMED_COLORS) {
+    expect(sgr({ fg: name }), `fg ${name}`).toMatch(/^\x1b\[(3[0-7]|9[0-7])m$/);
+    expect(sgr({ bg: name }), `bg ${name}`).toMatch(/^\x1b\[(4[0-7]|10[0-7])m$/);
+  }
 });

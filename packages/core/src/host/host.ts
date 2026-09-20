@@ -2,6 +2,7 @@ import { Align, Display, Edge, FlexDirection, Gutter, Justify, MeasureMode, Posi
 import { wrapText, type WrapMode } from '../wrap.js';
 import type { BorderStyle } from './borders.js';
 import type { Rect } from './layout.js';
+import type { Color } from '../colors.js';
 
 // The host has a single element type by design: Text is sugar for Box.
 export type HostType = 'flowtty-box';
@@ -25,7 +26,7 @@ export interface BoxProps {
   // Text wrap mode for direct text children (default: 'none').
   wrap?: 'wrap' | 'truncate' | 'none';
   // Text styling applied to direct text children:
-  color?: string;
+  color?: Color;
   bold?: boolean;
   dim?: boolean;
   underline?: boolean;
@@ -35,17 +36,17 @@ export interface BoxProps {
   // backends that support it; ignored (text still renders) by those that don't.
   link?: string;
   // Box background fill:
-  backgroundColor?: string;
+  backgroundColor?: Color;
   // Border drawn around the box (one cell on each side). When set, Yoga
   // reserves 1 cell on each edge so border doesn't overlap content.
   border?: BorderStyle;
   // Color for border glyphs — same string format as `color` (named or truecolor).
-  borderColor?: string;
+  borderColor?: Color;
   // Background color for border cells. Defaults to the box's effective
   // background (own backgroundColor, else the inherited one) so a filled box's
   // border ring shares its fill. Set to 'default' to keep border cells on the
   // terminal default background.
-  borderBackgroundColor?: string;
+  borderBackgroundColor?: Color;
   // Text painted into the top border line (after the corner + 1 edge piece).
   // No-op unless `border` is set. Long titles are truncated with `…` to leave
   // at least 1 edge piece on each side. Painted with the same color as the border.

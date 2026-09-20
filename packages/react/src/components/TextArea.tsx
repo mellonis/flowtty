@@ -4,6 +4,7 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import type { Color } from '@flowtty/core';
 
 export interface TextAreaProps {
   /** Controlled value; line breaks are `\n`. */
@@ -42,7 +43,7 @@ export interface TextAreaProps {
   /** Field background. Default: the same light gray as `<TextInput>`, with the
    *  text drawn dark on it. Pass your own (or `'default'` for none) and the text
    *  keeps the terminal's colors, with `dim` for the placeholder and ghost. */
-  backgroundColor?: string;
+  backgroundColor?: Color;
 }
 
 const CURSOR_AT_END = ' ';
@@ -170,7 +171,7 @@ export function TextArea(props: TextAreaProps): ReactNode {
   );
 }
 
-function gutter(node: ReactNode, color?: string): ReactNode {
+function gutter(node: ReactNode, color?: Color): ReactNode {
   if (node === undefined || node === null) return <Text>{''}</Text>;
   return typeof node === 'string' ? <Text color={color}>{node}</Text> : node;
 }

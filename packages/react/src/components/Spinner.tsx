@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useTicker } from '../hooks/useTicker.js';
+import type { Color } from '@flowtty/core';
 
 // Inlined frame sets (a curated subset of the cli-spinners catalogue) so the
 // package stays dependency-free. Each carries its own natural cadence; frames
@@ -27,7 +28,7 @@ export interface SpinnerProps {
   /** Optional text shown one space after the spinner glyph. */
   label?: string;
   /** Color applied to the spinner glyph (named / #rrggbb / rgb(...)). */
-  color?: string;
+  color?: Color;
 }
 
 /**

@@ -2,6 +2,7 @@ import { createElement, type ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useBackend } from '../hooks/useBackend.js';
+import type { Color } from '@flowtty/core';
 
 export interface LinkProps {
   /** Target URL. Emitted as an OSC 8 hyperlink on backends that support it. */
@@ -9,7 +10,7 @@ export interface LinkProps {
   /** Visible label. Defaults to the href when omitted. */
   children?: ReactNode;
   /** Label color. Default 'blue'. */
-  color?: string;
+  color?: Color;
   /**
    * When the backend can't render clickable links, append the URL in dim
    * parentheses after the label so it's still reachable. Default true. No-op

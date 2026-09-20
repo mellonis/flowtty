@@ -1,6 +1,7 @@
+import type { Color } from './colors.js';
 export interface Style {
-  fg?: string;
-  bg?: string;
+  fg?: Color;
+  bg?: Color;
   bold?: boolean;
   dim?: boolean;
   underline?: boolean;

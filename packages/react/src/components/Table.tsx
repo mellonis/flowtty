@@ -4,12 +4,13 @@ import { DEFAULT_BORDER_STYLE, GRID_CHARS, windowAround, type BorderStyle } from
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
+import type { Color } from '@flowtty/core';
 
 export type TableAlign = 'left' | 'right' | 'center';
 
 /** Per-cell visual overrides, merged over the row's base style. */
 export interface TableCellStyle {
-  color?: string;
+  color?: Color;
   bold?: boolean;
   dim?: boolean;
   underline?: boolean;
@@ -38,13 +39,13 @@ export interface TableProps<T> {
   /** Box-drawing style for the grid, or 'none' for whitespace-separated columns. Default 'round'. */
   border?: BorderStyle | 'none';
   /** Color for the rule glyphs (named / #rrggbb / rgb(...)). */
-  borderColor?: string;
+  borderColor?: Color;
   /** Spaces on each side of cell content. Default 1. */
   cellPadding?: number;
   /** Render the header row. Default true. */
   showHeader?: boolean;
   /** Color for header cells. */
-  headerColor?: string;
+  headerColor?: Color;
   /** Bold header cells. Default true. */
   headerBold?: boolean;
   /**

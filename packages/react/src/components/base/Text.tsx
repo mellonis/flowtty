@@ -1,8 +1,9 @@
 import { Children, createElement, type ReactNode } from 'react';
+import type { Color } from '@flowtty/core';
 
 export interface TextProps {
   children?: ReactNode;
-  color?: string;
+  color?: Color;
   bold?: boolean;
   dim?: boolean;
   underline?: boolean;

@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { Spinner, type SpinnerType } from './Spinner.js';
+import type { Color } from '@flowtty/core';
 
 export type TaskState = 'pending' | 'running' | 'success' | 'error' | 'skipped';
 
@@ -20,7 +21,7 @@ export interface TaskListProps {
   spinnerType?: SpinnerType;
 }
 
-const ICON: Record<Exclude<TaskState, 'running'>, { glyph: string; color?: string; dim?: boolean }> = {
+const ICON: Record<Exclude<TaskState, 'running'>, { glyph: string; color?: Color; dim?: boolean }> = {
   pending: { glyph: '◌', dim: true },
   success: { glyph: '✓', color: 'green' },
   error: { glyph: '✗', color: 'red' },
