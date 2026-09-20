@@ -7,13 +7,16 @@ no screen capture — the .cast is an exact replay of the bytes a terminal got.
 
     python3 packages/examples/showcase/record.py            # → docs/showcase.cast
     agg --theme dracula --renderer resvg --line-height 1.2 \\
+        --text-font-family 'JetBrains Mono,Menlo,DejaVu Sans Mono,Apple Braille,Apple Symbols' \\
         docs/showcase.cast docs/showcase.gif                 # brew install agg
 
 `--renderer resvg` is what makes the borders clean. agg's default renderer
 rasterizes each glyph into its cell and leaves box-drawing lines short of the
 cell edge — corners don't close and T-junctions sag, with every font tried
 (built-in, Menlo, SF Mono, PT Mono, Andale Mono). resvg draws them joined, and
-with agg's BUILT-IN font, so the GIF does not depend on what is installed.
+with agg's BUILT-IN font. That font has no braille, which the dots spinner is
+made of, so the family list ends in fallbacks that do (Apple Braille on macOS,
+DejaVu Sans Mono elsewhere) — without one the spinner renders as boxed question marks.
 
 `npm run showcase:record` does both. Extra arguments go to the showcase
 (e.g. `--speed 1.5`).
