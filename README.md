@@ -693,8 +693,7 @@ In tests, `TestBackend` has `paste(text)` and `wheel('up' | 'down', x?, y?)`.
   CJK/emoji layout waits on paint reserving the second cell.
 - Scrolling-region optimization for log-stream apps.
 - Column-only cursor moves (`CSI <col>G`) when row is unchanged — small extra perf nibble.
-- Truecolor (`#rgb` / `rgb(…)`).
-- Explicit `zIndex` prop, `position: 'relative'`.
+- `position: 'relative'`.
 - Mouse clicks / hit-testing (the wheel is supported — see *Paste and mouse wheel*), Kitty keyboard protocol.
 
 ### Usage with Zod

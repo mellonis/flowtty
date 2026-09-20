@@ -115,7 +115,9 @@ JSX would auto-infer `T` from `items` / `value` props; `createElement(Select, {.
 
 **Action:** README should document `createElement<Props<T>>(Component, ...)` for typed generic components, OR recommend JSX for app code using flowtty.
 
-### Border-title (top edge: `┌── title ──┐`) not supported
+### Border-title (top edge: `┌── title ──┐`) not supported — RESOLVED
+
+> Shipped as the `borderTitle` prop on `<Box>`.
 
 Currently dialogs render their title as the first line INSIDE the border + a dim HR below. Real on-border titles like `┌── New article ──────┐` would need a `borderTitle?: string` prop with paint-time substitution into the top edge.
 
@@ -127,7 +129,9 @@ When a single-line Text doesn't fit, options today are `wrap: 'wrap'` (multi-lin
 
 **Action:** would need a timer-driven re-render mechanism in flowtty; non-trivial.
 
-### `width: '100%'` on root child doesn't resolve as expected
+### `width: '100%'` on root child doesn't resolve as expected — RESOLVED
+
+> Re-tested 2026-09-21: `width: '100%'` and `'50%'` on a root child resolve against the backend width (12 → 12 and 6), with and without a border.
 
 In a test that does `computeLayout(container, 20, 1)`, a Box with `width: '100%'` whose parent is the root resolved to the box's CONTENT width, not 20. Workaround for the dogfood: `alignItems: 'stretch'` on parents to grow children cross-axis.
 
