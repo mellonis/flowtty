@@ -2,7 +2,7 @@ import React from "react";
 import { expect, test } from 'vitest';
 import { createElement, useState } from 'react';
 import { render } from '../index.js';
-import { TestBackend, flush } from '@flowtty/core/testing';
+import { TestBackend, flush, flushAsync } from '@flowtty/core/testing';
 import { MultiSelect } from './MultiSelect.js';
 
 test('renders all items with [ ] or [x] + cursor marker', async () => {
@@ -129,4 +129,71 @@ test('without onAddNew, no "+ add new" row (back-compat)', async () => {
   const backend = new TestBackend(20, 1);
   await render(createElement(App), backend);
   expect(backend.lastFrame).toBe('▸ [ ] a');
+});
+
+// ─── onAddNew with a result ──────────────────────────────────────────────────
+
+test('onAddNew resolving with a value selects the new item and moves the cursor onto it', async () => {
+  let resolveAdd!: (v: string | null) => void;
+  let selected: string[] = [];
+  function App() {
+    const [items, setItems] = useState([{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }]);
+    const [value, setValue] = useState<string[]>(['b']);
+    selected = value;
+    return createElement(MultiSelect<string>, {
+      items, value, onChange: setValue, onSubmit: () => {},
+      onAddNew: () => new Promise<string | null>((resolve) => {
+        resolveAdd = (v) => { if (v) setItems((cur) => [...cur, { label: v, value: v }]); resolve(v); };
+      }),
+    });
+  }
+  const backend = new TestBackend(20, 4);
+  await render(createElement(App), backend);
+  backend.press({ name: 'down' }); backend.press({ name: 'down' }); // → '+ add new'
+  await flush();
+  backend.press({ name: 'return' });
+  await flush();
+  resolveAdd('c');
+  await flushAsync(backend);
+  expect(selected).toEqual(['b', 'c']);
+  expect(backend.lastFrame).toBe('  [ ] a\n  [x] b\n▸ [x] c\n  + add new');
+});
+
+test('onAddNew resolving with null (the sub-prompt was cancelled) changes nothing', async () => {
+  const changes: string[][] = [];
+  function App() {
+    return createElement(MultiSelect<string>, {
+      items: [{ label: 'a', value: 'a' }], value: [], onChange: (v: string[]) => changes.push(v), onSubmit: () => {},
+      onAddNew: async () => null,
+    });
+  }
+  const backend = new TestBackend(20, 2);
+  await render(createElement(App), backend);
+  backend.press({ name: 'down' });
+  await flush();
+  backend.press({ name: 'return' });
+  await flushAsync(backend);
+  expect(changes).toEqual([]);
+  expect(backend.lastFrame).toBe('  [ ] a\n▸ + add new');
+});
+
+test('onAddNew may also return the value synchronously', async () => {
+  let selected: string[] = [];
+  function App() {
+    const [items, setItems] = useState([{ label: 'a', value: 'a' }]);
+    const [value, setValue] = useState<string[]>([]);
+    selected = value;
+    return createElement(MultiSelect<string>, {
+      items, value, onChange: setValue, onSubmit: () => {},
+      onAddNew: () => { setItems((cur) => [...cur, { label: 'z', value: 'z' }]); return 'z'; },
+    });
+  }
+  const backend = new TestBackend(20, 3);
+  await render(createElement(App), backend);
+  backend.press({ name: 'down' });
+  await flush();
+  backend.press({ name: 'return' });
+  await flushAsync(backend);
+  expect(selected).toEqual(['z']);
+  expect(backend.lastFrame).toBe('  [ ] a\n▸ [x] z\n  + add new');
 });

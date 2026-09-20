@@ -803,6 +803,11 @@ Components inside a `<FocusGroup>` can call `useFocus()` to know if they're the 
 - `shortcut` key (anywhere in the input scope) → `onPress()` even when not focused
 - Focused state: bold + inverse-video label
 
+`<MultiSelect onAddNew>` adds a "+ add new" row. Return the new item's value from
+the callback — directly or as a promise, e.g. after a sub-prompt in a dialog — and
+the component selects it and moves the cursor onto it once it appears in `items`
+(adding it to `items` is the caller's job). Return `null` for a cancelled prompt.
+
 TextInput / Select / MultiSelect also plug into the focus system. Their `isFocused` prop becomes optional — if unset, they read from the FocusGroup. If set explicitly, the prop overrides.
 
 Outside a FocusGroup, `useFocus()` returns `{isFocused: true}` (safe default — single component receives input as before).

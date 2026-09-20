@@ -1,5 +1,5 @@
 import React from "react";
-import { useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
@@ -19,8 +19,12 @@ export interface MultiSelectProps<T> {
    *  enclosing FocusGroup. If set, this overrides — useful for forcing focus
    *  outside the focus system. */
   isFocused?: boolean;
-  /** When provided, a "+ add new" row appears after items; Enter on it calls this callback. */
-  onAddNew?: () => void;
+  /** When provided, a "+ add new" row appears after items; Enter on it calls this
+   *  callback. Return the new item's value — directly or as a promise, e.g. after
+   *  a sub-prompt — and the component selects it and moves the cursor onto it
+   *  once it shows up in `items` (adding it to `items` is the caller's job).
+   *  Return `null` / nothing to leave the selection alone (a cancelled prompt). */
+  onAddNew?: () => void | T | null | Promise<T | null | void>;
 }
 
 export function MultiSelect<T>(props: MultiSelectProps<T>): ReactNode {
@@ -32,10 +36,32 @@ export function MultiSelect<T>(props: MultiSelectProps<T>): ReactNode {
   const cursor = Math.max(0, Math.min(state.cursor, totalRows - 1));
   const onAddRow = onAddNew !== undefined && cursor === items.length;
 
+  // The freshly added value, waiting to be selected. Held until it appears in
+  // `items`: the caller's setItems and our onChange land in separate renders.
+  const valueRef = useRef(value);
+  valueRef.current = value;
+  const [added, setAdded] = useState<{ value: T } | null>(null);
+  useEffect(() => {
+    if (added === null) return;
+    const index = items.findIndex((it) => it.value === added.value);
+    if (index < 0) return;
+    setAdded(null);
+    setState({ cursor: index });
+    const current = valueRef.current;
+    if (!current.includes(added.value)) {
+      onChange(items.filter((it) => it.value === added.value || current.includes(it.value)).map((it) => it.value));
+    }
+  }, [added, items, onChange]);
+  const addNew = () => {
+    void Promise.resolve(onAddNew!()).then((result) => {
+      if (result !== null && result !== undefined) setAdded({ value: result as T });
+    });
+  };
+
   useInput((key) => {
     // Add-new-row specific routing BEFORE reducer.
     if (onAddRow) {
-      if (key.name === 'return') { onAddNew!(); return; }
+      if (key.name === 'return') { addNew(); return; }
       if (key.name === ' ') return;   // Space is noop on the add row
       // (Up/Down/k/j fall through to the reducer for navigation.)
     }
