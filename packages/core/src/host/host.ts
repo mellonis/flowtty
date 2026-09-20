@@ -337,7 +337,21 @@ export function refreshMeasure(inst: Instance, _Yoga: Yoga): void {
   }
 }
 
+// React re-orders keyed children by re-inserting a node that is still attached
+// (appendChild for a move to the end, insertBefore otherwise) — no removeChild
+// first. Take the child out of its current slot so the insert that follows is a
+// move: Yoga aborts on inserting a node that already has an owner, and the
+// children list would otherwise hold it twice. Unlike removeChild, the Yoga node
+// is NOT freed — it is about to be re-attached.
+function detachForMove(parent: Instance, child: Instance | TextInstance): void {
+  const i = parent.children.indexOf(child);
+  if (i < 0) return;
+  parent.children.splice(i, 1);
+  if (child.type === 'box') parent.yogaNode.removeChild(child.yogaNode);
+}
+
 export function appendChild(parent: Instance, child: Instance | TextInstance, Yoga: Yoga): void {
+  detachForMove(parent, child);
   parent.children.push(child);
   if (child.type === 'box') {
     parent.yogaNode.setMeasureFunc(null); // Yoga forbids a measure func on a node with children
@@ -366,6 +380,7 @@ export function insertBefore(
   before: Instance | TextInstance,
   Yoga: Yoga,
 ): void {
+  detachForMove(parent, child);
   const i = parent.children.indexOf(before);
   parent.children.splice(i < 0 ? parent.children.length : i, 0, child);
   if (child.type === 'box') {

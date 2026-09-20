@@ -84,8 +84,15 @@ export function createReconciler(Yoga: Yoga, onCommit?: () => void) {
 
     appendInitialChild: (parent: Instance, child: Instance | TextInstance) => appendChild(parent, child, Yoga),
     appendChild: (parent: Instance, child: Instance | TextInstance) => appendChild(parent, child, Yoga),
+    // Both container inserts double as MOVES when React re-orders keyed root
+    // children (same contract as the host's appendChild/insertBefore): drop the
+    // child's current entry first, or it would be listed — and painted — twice,
+    // and outlive its own removal.
     appendChildToContainer: (container: Container, child: Instance | TextInstance) => {
-      if (child.type === 'box') container.children.push(child);
+      if (child.type !== 'box') return;
+      const at = container.children.indexOf(child);
+      if (at >= 0) container.children.splice(at, 1);
+      container.children.push(child);
     },
     insertBefore: (parent: Instance, child: Instance | TextInstance, before: Instance | TextInstance) =>
       insertBefore(parent, child, before, Yoga),
@@ -94,6 +101,8 @@ export function createReconciler(Yoga: Yoga, onCommit?: () => void) {
       child: Instance | TextInstance,
       before: Instance | TextInstance,
     ) => {
+      const at = container.children.indexOf(child as Instance);
+      if (at >= 0) container.children.splice(at, 1);
       const i = container.children.indexOf(before as Instance);
       container.children.splice(i < 0 ? container.children.length : i, 0, child as Instance);
     },
