@@ -1,4 +1,4 @@
-import { createElement, type ReactNode } from 'react';
+import { Children, createElement, type ReactNode } from 'react';
 
 export interface TextProps {
   children?: ReactNode;
@@ -15,6 +15,13 @@ export interface TextProps {
 }
 
 export function Text({ children, ...style }: TextProps) {
+  // An empty string is a blank line, but React creates no host text node for
+  // it, so the box would measure to zero rows and the line would vanish. Hold
+  // one row open for it. `null` / `false` children (toArray drops them) stay
+  // zero-height: "no content" is not the same as "an empty line".
+  const parts = Children.toArray(children);
+  const blankLine = parts.length > 0 && parts.every((c) => c === '');
   // Renders to a flowtty-box whose paint pass reads these style props off inst.props.
-  return createElement('flowtty-box', style, children);
+  const props: TextProps & { minHeight?: number } = blankLine ? { ...style, minHeight: 1 } : style;
+  return createElement('flowtty-box', props, children);
 }
