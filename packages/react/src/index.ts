@@ -1,5 +1,7 @@
 export { render } from './internal/render.js';
-export type { RenderOptions } from './internal/render.js';
+export type { RenderOptions, RenderHandle } from './internal/render.js';
+export { useApp } from './hooks/useApp.js';
+export type { AppApi } from './context/appContext.js';
 export type { ErrorSource } from './components/ErrorBoundary.js';
 export { useTerminalSize, type TerminalSize } from './hooks/useTerminalSize.js';
 export { Box } from './components/base/Box.js';

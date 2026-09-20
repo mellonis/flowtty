@@ -291,6 +291,33 @@ Without this safety net, an unhandled error during render or in a useEffect woul
 leave the terminal in alt-screen mode with raw input still enabled — recovery
 would require killing the shell or running `reset`.
 
+### Quitting, and work after the UI is gone
+
+`render()` resolves to a handle:
+
+```tsx
+const app = await render(<App />, new TtyBackend());
+const result = await app.waitUntilExit();   // the terminal is restored by now
+console.log('picked:', result);             // prints to the normal screen
+process.exit(0);
+```
+
+- `app.unmount()` tears the tree down and restores the terminal (idempotent).
+- `app.waitUntilExit()` resolves once that has happened — the place to print a
+  summary, flush a file or set an exit code. It resolves with the value passed to
+  `exit(value)`, or `undefined` for a plain unmount, and also after a handled
+  error (the error itself goes to `onError`).
+- Inside a component, `useApp().exit(value?)` quits. It is safe to call from a
+  key handler or an effect:
+
+```tsx
+function Menu() {
+  const { exit } = useApp();
+  useInput((key) => { if (key.name === 'q') exit(); });
+  return <Select items={items} onSubmit={(v) => exit(v)} />;
+}
+```
+
 ### Root abort signal
 
 `useRootAbortSignal()` returns the render root's `AbortSignal` — the one flowtty

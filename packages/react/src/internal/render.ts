@@ -5,6 +5,7 @@ import { createRoot, type Root } from './reconciler.js';
 import { InputContext, type InputSource } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
 import { AbortContext } from '../context/abortContext.js';
+import { AppContext, type AppApi } from '../context/appContext.js';
 import { TerminalSizeProvider } from '../hooks/useTerminalSize.js';
 import { ErrorBoundary, type ErrorSource } from '../components/ErrorBoundary.js';
 
@@ -50,12 +51,30 @@ export interface RenderOptions {
   onError?: (info: { error: unknown; source: ErrorSource }) => void;
 }
 
+export interface RenderHandle {
+  /** Unmount the tree and restore the terminal. Idempotent. */
+  unmount(): void;
+  /**
+   * Resolves once the app is gone and the backend has restored the terminal —
+   * the place to print a summary or set an exit code. Resolves with the value
+   * passed to `useApp().exit(value)`, or `undefined` for a plain unmount. Also
+   * resolves after a handled error (the error itself goes to `onError`).
+   */
+  waitUntilExit(): Promise<unknown>;
+}
+
 export async function render(
   element: ReactNode,
   backend: Backend,
   options: RenderOptions = {},
-): Promise<{ unmount(): void }> {
+): Promise<RenderHandle> {
   const Yoga = await getYoga();
+
+  // Settled exactly once, after teardown — by then the backend has restored the
+  // terminal, so whoever awaits it can print to the normal screen.
+  let exitResult: unknown;
+  let resolveExit!: (value: unknown) => void;
+  const exited = new Promise<unknown>((resolve) => { resolveExit = resolve; });
 
   let unmounted = false;
   // One AbortController per render root. Its signal is handed to the tree (via
@@ -110,6 +129,7 @@ export async function render(
     abortController.abort();
     // Restore terminal so any stderr that follows is readable.
     try { backend.dispose?.(); } catch { /* ignore — dispose must not mask the real error */ }
+    resolveExit(exitResult);
     if (options.onError) {
       // A custom onError may not exit the process, so the resize + process
       // listeners must be released — abort() above already did that via the
@@ -143,7 +163,16 @@ export async function render(
   // optional capabilities (e.g. <Static> checks for printStatic).
   const withBackend = createElement(BackendContext.Provider, { value: backend }, boundedTree);
   const withAbort = createElement(AbortContext.Provider, { value: abortController.signal }, withBackend);
-  const tree = createElement(TerminalSizeProvider, { backend }, withAbort);
+  // exit() is usually called from a key handler, i.e. inside flushSync — tearing
+  // the tree down there is unsafe, so the unmount is deferred to a microtask.
+  const appApi: AppApi = {
+    exit: (result) => {
+      exitResult = result;
+      queueMicrotask(() => handle.unmount());
+    },
+  };
+  const withApp = createElement(AppContext.Provider, { value: appApi }, withAbort);
+  const tree = createElement(TerminalSizeProvider, { backend }, withApp);
 
   root.render(tree);
   // Wait for the initial scheduled paint (via resetAfterCommit → queueMicrotask).
@@ -154,7 +183,8 @@ export async function render(
   // backend) omit onResize and this is a no-op.
   unsubResize = backend.onResize?.(draw);
 
-  return {
+  const handle: RenderHandle = {
+    waitUntilExit: () => exited,
     unmount() {
       if (unmounted) return;
       unmounted = true;
@@ -165,6 +195,8 @@ export async function render(
       abortController.abort();
       root.unmount();
       backend.dispose?.();
+      resolveExit(exitResult);
     },
   };
+  return handle;
 }
