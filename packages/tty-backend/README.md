@@ -31,6 +31,8 @@ await render(
 );
 ```
 
+Pasted text arrives as one `{ name: 'paste', text }` key (bracketed paste is enabled automatically). Pass `{ mouse: true }` as the third constructor argument to receive `wheelup` / `wheeldown` keys — off by default because mouse reporting takes over the terminal's native text selection.
+
 For an **inline** (non-alt-screen) live region with append-only log lines above it, use [`@flowtty/inline-tty-backend`](https://github.com/mellonis/flowtty/tree/master/packages/inline-tty-backend) instead.
 
 ## See also

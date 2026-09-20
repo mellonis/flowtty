@@ -1,8 +1,18 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import { stringWidth, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, osc8Open, sgr } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, osc8Open, sgr } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
+
+export interface TtyBackendOptions {
+  /**
+   * Report the mouse wheel as 'wheelup' / 'wheeldown' keys. Off by default:
+   * while mouse reporting is on, the terminal hands drag-to-select to the app,
+   * so users lose native text selection (most terminals restore it with Shift
+   * or Option held).
+   */
+  mouse?: boolean;
+}
 
 export class TtyBackend implements Backend {
   /** Capability flag — whether the *terminal* honors the OSC 8 hyperlinks this
@@ -49,6 +59,7 @@ export class TtyBackend implements Backend {
   constructor(
     private readonly out: NodeJS.WriteStream = process.stdout,
     private readonly input: NodeJS.ReadStream = process.stdin,
+    private readonly options: TtyBackendOptions = {},
   ) {
     // Enter the alternate screen buffer + hide cursor, atomic write.
     // Alt-screen ensures full-frame redraws happen in place and the user's
@@ -180,7 +191,7 @@ export class TtyBackend implements Backend {
       this.input.resume();
       this.inputAttached = true;
       // Only a backend that reads keys asks for bracketed paste; dispose() undoes it.
-      this.out.write(BRACKETED_PASTE_ON);
+      this.out.write(BRACKETED_PASTE_ON + (this.options.mouse ? MOUSE_ON : ''));
     }
     this.subscribers.add(handler);
     return () => {
@@ -197,7 +208,7 @@ export class TtyBackend implements Backend {
       this.input.pause();
       this.inputAttached = false;
       this.pendingInput = '';
-      this.out.write(BRACKETED_PASTE_OFF);
+      this.out.write((this.options.mouse ? MOUSE_OFF : '') + BRACKETED_PASTE_OFF);
     }
     if (this.resizeAttached) {
       this.out.removeListener('resize', this.resizeNotify);

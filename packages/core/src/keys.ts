@@ -7,7 +7,8 @@ export interface Key {
    * character itself ('a', '!', ' '). For named keys: 'return', 'escape',
    * 'tab', 'backspace', 'delete', 'up', 'down', 'left', 'right', 'home',
    * 'end', 'pageup', 'pagedown'. A bracketed paste is one key named 'paste'
-   * whose content is in `text`.
+   * whose content is in `text`. Mouse wheel steps are 'wheelup' / 'wheeldown',
+   * positioned by `x` / `y`.
    */
   name: string;
   /**
@@ -17,6 +18,13 @@ export interface Key {
    * Undefined for every other key.
    */
   text?: string;
+  /**
+   * Cell under the pointer for a mouse key ('wheelup' / 'wheeldown'): 0-based
+   * column and row, the same coordinates `onLayout` rects use. Undefined for
+   * every other key.
+   */
+  x?: number;
+  y?: number;
   /** Raw byte sequence as received from the source (empty for synthetic keys). */
   sequence: string;
   ctrl: boolean;

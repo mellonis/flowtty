@@ -38,6 +38,8 @@ export class TestBackend implements Backend {
   press(key: Partial<Key> & { name: string }): void {
     const k: Key = {
       ...(key.text !== undefined ? { text: key.text } : {}),
+      ...(key.x !== undefined ? { x: key.x } : {}),
+      ...(key.y !== undefined ? { y: key.y } : {}),
       sequence: key.sequence ?? '',
       ctrl: key.ctrl ?? false,
       meta: key.meta ?? false,
@@ -55,6 +57,11 @@ export class TestBackend implements Backend {
   /** Deliver `text` as ONE 'paste' key — what a TTY backend emits for a bracketed paste. */
   paste(text: string): void {
     this.press({ name: 'paste', text: text.replace(/\r\n?/g, '\n') });
+  }
+
+  /** Deliver one mouse-wheel step at cell (x, y) — what a TTY backend with `mouse` on emits. */
+  wheel(direction: 'up' | 'down', x = 0, y = 0): void {
+    this.press({ name: direction === 'up' ? 'wheelup' : 'wheeldown', x, y });
   }
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function

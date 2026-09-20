@@ -53,3 +53,12 @@ test('TestBackend.paste delivers the text as ONE paste key, not a key per charac
   b.paste('a\nb');
   expect(got).toEqual([['paste', 'a\nb']]);
 });
+
+test('TestBackend.wheel delivers a wheelup / wheeldown key at the given cell', () => {
+  const b = new TestBackend(10, 4);
+  const got: Array<[string, number | undefined, number | undefined]> = [];
+  b.onKey((k) => got.push([k.name, k.x, k.y]));
+  b.wheel('down', 3, 2);
+  b.wheel('up');
+  expect(got).toEqual([['wheeldown', 3, 2], ['wheelup', 0, 0]]);
+});

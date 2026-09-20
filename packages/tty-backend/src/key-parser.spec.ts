@@ -244,3 +244,33 @@ test('an empty paste is still one paste key with empty text', () => {
   const { keys } = decodeKeys('\x1b[200~\x1b[201~');
   expect(keys.map((k) => [k.name, k.text])).toEqual([['paste', '']]);
 });
+
+// ─── SGR mouse: wheel ────────────────────────────────────────────────────────
+
+test('an SGR wheel report becomes a wheelup / wheeldown key with 0-based cell coordinates', () => {
+  const { keys } = decodeKeys('\x1b[<64;10;5M\x1b[<65;1;1M');
+  expect(keys).toEqual([
+    { name: 'wheelup', x: 9, y: 4, sequence: '\x1b[<64;10;5M', ctrl: false, meta: false, shift: false },
+    { name: 'wheeldown', x: 0, y: 0, sequence: '\x1b[<65;1;1M', ctrl: false, meta: false, shift: false },
+  ]);
+});
+
+test('wheel modifier bits map to shift / meta / ctrl', () => {
+  const [shift, meta, ctrl] = decodeKeys('\x1b[<68;1;1M\x1b[<72;1;1M\x1b[<80;1;1M').keys;
+  expect([shift!.name, shift!.shift, shift!.meta, shift!.ctrl]).toEqual(['wheelup', true, false, false]);
+  expect([meta!.name, meta!.shift, meta!.meta, meta!.ctrl]).toEqual(['wheelup', false, true, false]);
+  expect([ctrl!.name, ctrl!.shift, ctrl!.meta, ctrl!.ctrl]).toEqual(['wheelup', false, false, true]);
+});
+
+test('non-wheel mouse reports (press, release, motion) are swallowed, not surfaced as junk keys', () => {
+  const { keys, rest } = decodeKeys('a\x1b[<0;3;4M\x1b[<0;3;4m\x1b[<35;5;6Mb');
+  expect(keys.map((k) => k.name)).toEqual(['a', 'b']);
+  expect(rest).toBe('');
+});
+
+test('a wheel report split across reads is buffered until complete', () => {
+  const first = decodeKeys('\x1b[<64;1');
+  expect(first.keys).toEqual([]);
+  const second = decodeKeys(first.rest + '0;5M');
+  expect(second.keys.map((k) => [k.name, k.x, k.y])).toEqual([['wheelup', 9, 4]]);
+});

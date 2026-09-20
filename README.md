@@ -577,6 +577,31 @@ Measurement is per-code-point, not grapheme-aware, so an emoji ZWJ sequence
 (👩‍👧) over-counts; pre-segment if you need cluster-exact widths. Expects plain
 text (styling lives in the cell, not the string).
 
+### Paste and mouse wheel
+
+Two input events arrive through `useInput` as ordinary keys with a payload:
+
+```tsx
+useInput((key) => {
+  if (key.name === 'paste') insert(key.text!);            // the whole paste, once
+  if (key.name === 'wheelup') scrollBy(-3);               // key.x / key.y = cell under the pointer
+  if (key.name === 'wheeldown') scrollBy(3);
+});
+```
+
+- **Paste.** The TTY backends turn on bracketed paste, so pasted text is delivered
+  as ONE `{ name: 'paste', text }` key (line endings normalized to `\n`) instead
+  of a run of keystrokes. A pasted newline is therefore text, never Enter, and
+  pasted letters never fire single-letter bindings. `<TextInput>` inserts a paste
+  at the caret and, being single-line, turns its line breaks into spaces.
+- **Wheel.** Opt in with `new TtyBackend(stdout, stdin, { mouse: true })`. Off by
+  default because, while mouse reporting is on, the terminal hands drag-to-select
+  to the app — users lose native text selection unless they hold Shift/Option.
+  Inline mode (`InlineTtyBackend`) never enables it: the wheel there belongs to
+  the terminal's own scrollback.
+
+In tests, `TestBackend` has `paste(text)` and `wheel('up' | 'down', x?, y?)`.
+
 ### Still deferred (later milestones)
 
 - Wide-character **rendering**: the grid is still one cell per code point. The
@@ -588,7 +613,7 @@ text (styling lives in the cell, not the string).
 - Column-only cursor moves (`CSI <col>G`) when row is unchanged — small extra perf nibble.
 - Truecolor (`#rgb` / `rgb(…)`).
 - Explicit `zIndex` prop, `position: 'relative'`.
-- Bracketed paste, mouse, Kitty keyboard protocol, modifier-encoded arrows.
+- Mouse clicks / hit-testing (the wheel is supported — see *Paste and mouse wheel*), Kitty keyboard protocol.
 
 ### Usage with Zod
 

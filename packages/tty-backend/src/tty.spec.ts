@@ -409,3 +409,26 @@ test('TtyBackend.onKey: enables bracketed paste with input, disables it on dispo
   back.dispose();
   expect(writes.join('')).toContain('\x1b[?2004l');
 });
+
+test('TtyBackend: mouse reporting is opt-in — off by default, on with { mouse: true }, restored on dispose', () => {
+  const plain = makeStub();
+  const a = new TtyBackend(plain.stub, makeStdinStub());
+  a.onKey(() => {});
+  expect(plain.writes.join('')).not.toContain('\x1b[?1000h');
+  a.dispose();
+
+  const { stub: out, writes } = makeStub();
+  const stdin = makeStdinStub();
+  const b = new TtyBackend(out, stdin, { mouse: true });
+  expect(writes.join('')).not.toContain('\x1b[?1000h'); // passive backend: untouched
+
+  const received: Array<[string, number | undefined, number | undefined]> = [];
+  b.onKey((k) => received.push([k.name, k.x, k.y]));
+  expect(writes.join('')).toContain('\x1b[?1000h\x1b[?1006h');
+
+  stdin.emit('data', '\x1b[<65;7;3M');
+  expect(received).toEqual([['wheeldown', 6, 2]]);
+
+  b.dispose();
+  expect(writes.join('')).toContain('\x1b[?1006l\x1b[?1000l');
+});

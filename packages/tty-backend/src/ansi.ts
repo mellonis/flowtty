@@ -7,6 +7,11 @@ export const RESET = '\x1b[0m';
 export const BRACKETED_PASTE_ON = '\x1b[?2004h';
 export const BRACKETED_PASTE_OFF = '\x1b[?2004l';
 
+// Mouse reporting: button events (1000) in SGR encoding (1006) — decimal
+// coordinates with no 223-column cap. Turned off in reverse order.
+export const MOUSE_ON = '\x1b[?1000h\x1b[?1006h';
+export const MOUSE_OFF = '\x1b[?1006l\x1b[?1000l';
+
 const FG: Record<string, number> = {
   black: 30, red: 31, green: 32, yellow: 33,
   blue: 34, magenta: 35, cyan: 36, white: 37,

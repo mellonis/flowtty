@@ -23,8 +23,28 @@ import type { Key } from '@flowtty/core';
  *    body is never decoded, so a pasted newline is text, not Return. A paste
  *    split across reads is handed back whole as `rest` until its end arrives.
  *
- * NOT handled (later): mouse, Kitty protocol, F13+.
+ *  - SGR mouse reports: ESC[<b;x;yM — wheel steps become {name: 'wheelup' |
+ *    'wheeldown', x, y} (0-based cell). Other mouse reports (press, release,
+ *    motion) are consumed and dropped until click support lands.
+ *
+ * NOT handled (later): mouse clicks, Kitty protocol, F13+.
  */
+// SGR mouse report params: "<button;col;row" (1-based). Button 64/65 = wheel
+// up/down; bits 4/8/16 add Shift/Meta/Ctrl. Anything else is not a wheel step.
+function decodeSgrWheel(params: string, final: string): Omit<Key, 'sequence'> | null {
+  const [b, col, row] = params.slice(1).split(';').map(Number);
+  if (final !== 'M' || b === undefined || col === undefined || row === undefined) return null;
+  if ([b, col, row].some((n) => !Number.isFinite(n))) return null;
+  const button = b & ~(4 | 8 | 16);
+  if (button !== 64 && button !== 65) return null;
+  return {
+    name: button === 64 ? 'wheelup' : 'wheeldown',
+    x: col - 1,
+    y: row - 1,
+    ctrl: (b & 16) !== 0, meta: (b & 8) !== 0, shift: (b & 4) !== 0,
+  };
+}
+
 const PASTE_START_PARAM = '200';
 const PASTE_END = [...'\x1b[201~'];
 
@@ -68,6 +88,12 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
         if (j < chars.length) {
           const final = chars[j]!;
           const params = chars.slice(i + 2, j).join('');
+          if ((final === 'M' || final === 'm') && params.startsWith('<')) {
+            const wheel = decodeSgrWheel(params, final);
+            if (wheel) out.push({ ...wheel, sequence: chars.slice(i, j + 1).join('') });
+            i = j + 1;
+            continue;
+          }
           if (final === '~' && params === PASTE_START_PARAM) {
             const bodyStart = j + 1;
             const end = indexOfSeq(chars, PASTE_END, bodyStart);

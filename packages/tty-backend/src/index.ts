@@ -1,4 +1,4 @@
-export { TtyBackend } from './tty.js';
+export { TtyBackend, type TtyBackendOptions } from './tty.js';
 export { detectHyperlinkSupport } from './hyperlinks.js';
 export { parseKeypress, decodeKeys } from './key-parser.js';
 // ANSI helpers — exposed so sibling TTY backends (e.g. @flowtty/inline-tty-backend)
@@ -8,6 +8,7 @@ export {
   RESET, HIDE_CURSOR, SHOW_CURSOR, CLEAR,
   ALT_SCREEN_ON, ALT_SCREEN_OFF,
   BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF,
+  MOUSE_ON, MOUSE_OFF,
   OSC8_CLOSE, osc8Open,
   sgr, cursorTo, cellsEqual, parseColor,
 } from './ansi.js';
