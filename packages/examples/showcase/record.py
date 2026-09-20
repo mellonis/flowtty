@@ -6,12 +6,14 @@ known size, and write down every chunk it prints with its timestamp. No browser,
 no screen capture — the .cast is an exact replay of the bytes a terminal got.
 
     python3 packages/examples/showcase/record.py            # → docs/showcase.cast
-    agg --theme dracula --font-family 'PT Mono,Andale Mono,Menlo' --line-height 1.2 \\
+    agg --theme dracula --renderer resvg --line-height 1.2 \\
         docs/showcase.cast docs/showcase.gif                 # brew install agg
 
-The font decides how the GIF's borders look. agg's built-in font and Menlo draw
-the rounded corners (╭ ╮) and the T-junctions short, so boxes look broken; PT
-Mono and Andale Mono (both ship with macOS) join them, at a normal glyph width.
+`--renderer resvg` is what makes the borders clean. agg's default renderer
+rasterizes each glyph into its cell and leaves box-drawing lines short of the
+cell edge — corners don't close and T-junctions sag, with every font tried
+(built-in, Menlo, SF Mono, PT Mono, Andale Mono). resvg draws them joined, and
+with agg's BUILT-IN font, so the GIF does not depend on what is installed.
 
 `npm run showcase:record` does both. Extra arguments go to the showcase
 (e.g. `--speed 1.5`).
