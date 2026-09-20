@@ -494,6 +494,11 @@ Style mapping (the terminal cell model has no italic — see [Text](#text)):
 | ` ```lang ` fences  | per-language token colors (js/ts, json)      |
 | `---`               | a dim horizontal rule                        |
 
+> Wrapping and table columns are measured in **code points**, matching flowtty's
+> one-cell-per-code-point grid (same as `<Table>`), so columns stay aligned on
+> rows with CJK/emoji. Those glyphs carry the usual visual overlap until paint
+> reserves the second cell (see *Still deferred*).
+
 Emphasis is **asterisk-only** on purpose: `_` is left alone so `snake_case`
 identifiers in prose aren't mangled.
 

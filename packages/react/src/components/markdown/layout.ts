@@ -4,7 +4,6 @@
 // it gives a stable visual-line count, so a paginating host (e.g. the articles
 // example) can slice the output by row exactly the way it slices raw text.
 
-import { charWidth, stringWidth } from '@flowtty/core';
 import { parseMarkdown, highlightCode, type InlineSeg, type MdList, type MdAlign } from './parse.js';
 
 export interface StyledSpan {
@@ -57,7 +56,13 @@ function segsToChars(segs: InlineSeg[], base: SpanStyle = {}): StyledChar[] {
   return out;
 }
 
-const cellWidth = (c: StyledChar): number => charWidth(c.ch.codePointAt(0)!);
+// The unit every measurement here uses: GRID columns. flowtty's grid is one cell
+// per code point — paint puts a double-width glyph (emoji, CJK) in a single cell
+// and the backends keep it to one screen column — so padding computed in display
+// cells would leave rows with wide glyphs a column short per glyph. `<Table>`
+// measures the same way. When paint learns to reserve a glyph's second cell,
+// this is the one place to switch to `charWidth`.
+const cellWidth = (_c: StyledChar): number => 1;
 
 function charsWidth(chars: StyledChar[]): number {
   let n = 0;
@@ -65,8 +70,10 @@ function charsWidth(chars: StyledChar[]): number {
   return n;
 }
 
-// Greedy word-wrap over styled chars, measured in display cells (a wide glyph is
-// 2). Words are non-space runs; a single space separates them. Over-long words
+const textWidth = (text: string): number => [...text].length;
+
+// Greedy word-wrap over styled chars, measured in grid columns (see cellWidth).
+// Words are non-space runs; a single space separates them. Over-long words
 // are hard char-wrapped. Collapses space runs, which is fine because paragraphs
 // are already space-joined by parseMarkdown.
 //
@@ -142,7 +149,7 @@ export function charsToSpans(chars: StyledChar[]): StyledSpan[] {
 }
 
 function prefixWidth(p?: StyledSpan[]): number {
-  return p ? p.reduce((n, s) => n + stringWidth(s.text), 0) : 0;
+  return p ? p.reduce((n, s) => n + textWidth(s.text), 0) : 0;
 }
 
 // Wrap inline content, optionally with a first-line prefix (e.g. a list marker)
@@ -198,7 +205,7 @@ const TABLE_GUTTER = 2;
 // Render a table as space-padded columns: bold header, a dim rule per column,
 // then the rows. Columns are as wide as their widest cell; when that overflows
 // `width` the widest column gives way a cell at a time and its content wraps,
-// so a row can span several lines. Widths are display cells, not code points.
+// so a row can span several lines. Widths are grid columns (see cellWidth).
 function layoutTable(
   align: (MdAlign | undefined)[],
   header: InlineSeg[][],

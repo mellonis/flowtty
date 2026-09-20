@@ -144,11 +144,12 @@ describe('layoutMarkdown', () => {
     expect(text(lines[2]!)).toBe('a         b   c');
   });
 
-  test('table column widths are measured in display cells (wide glyphs count 2)', () => {
-    const lines = layoutMarkdown('| s | n |\n| - | - |\n| ✅ ok | 1 |\n| plain | 2 |', 40);
-    // "✅ ok" is 5 cells wide, same as "plain": both second cells start in one column.
+  test('table padding counts grid columns: a wide glyph is one, like any code point', () => {
+    const lines = layoutMarkdown('| s | n |\n| - | - |\n| ✅ ok | 1 |\n| four | 2 |', 40);
+    // "✅ ok" and "four" are both 4 code points, so their second cells start
+    // at the same grid column (see the painted-grid test in Markdown.spec.tsx).
     expect(text(lines[2]!)).toBe('✅ ok  1');
-    expect(text(lines[3]!)).toBe('plain  2');
+    expect(text(lines[3]!)).toBe('four  2');
   });
 
   test('a table wider than the width shrinks its widest column and wraps the cell', () => {
@@ -161,8 +162,29 @@ describe('layoutMarkdown', () => {
     ]);
   });
 
-  test('paragraph wrapping counts wide glyphs as two cells', () => {
-    const lines = layoutMarkdown('日本語 日本語', 8);
-    expect(lines.map(text)).toEqual(['日本語', '日本語']);
+  test('an unbreakable long word in a table cell hard-wraps inside its column', () => {
+    const lines = layoutMarkdown('| name | url |\n| - | - |\n| docs | https://example.com/a/very/long/path/index.html |', 30);
+    expect(lines.map(text)).toEqual([
+      'name  url',
+      '────  ────────────────────────',
+      'docs  https://example.com/a/ve',
+      '      ry/long/path/index.html',
+    ]);
+  });
+
+  test('wrapped lines of an aligned cell are each aligned, and no line exceeds the width', () => {
+    const lines = layoutMarkdown('| k | value |\n| - | --: |\n| a | lorem ipsum dolor sit amet consectetur |', 30);
+    expect(lines.map(text)).toEqual([
+      'k                       value',
+      '─  ──────────────────────────',
+      'a  lorem ipsum dolor sit amet',
+      '                  consectetur',
+    ]);
+    for (const l of lines) expect([...text(l)].length).toBeLessThanOrEqual(30);
+  });
+
+  test('wrapping counts grid columns, so wide glyphs fill the width like any code point', () => {
+    const lines = layoutMarkdown('日本語 日本語 日本語', 8);
+    expect(lines.map(text)).toEqual(['日本語 日本語', '日本語']);
   });
 });
