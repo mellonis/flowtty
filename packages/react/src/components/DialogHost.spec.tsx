@@ -8,6 +8,7 @@ import { useDialog, useDialogHost } from '../hooks/useDialog.js';
 import { useInput } from '../hooks/useInput.js';
 import type { DialogResult, DialogResultApi } from '../context/dialogContext.js';
 import { Box } from './base/Box.js';
+import { Text } from './base/Text.js';
 import { Button } from './Button.js';
 
 describe('DialogHost stack', () => {
@@ -378,4 +379,72 @@ describe('DialogHost stack', () => {
       }
     });
   });
+});
+
+// ─── backdrop ────────────────────────────────────────────────────────────────
+
+function BackdropApp({ hostBackdrop, dialogBackdrop, stacked }: { hostBackdrop?: boolean; dialogBackdrop?: boolean; stacked?: boolean }) {
+  function Opener() {
+    const { openDialog } = useDialogHost();
+    useInput((key) => {
+      if (key.name !== 'o') return;
+      const opts = { floating: true, title: 'one', ...(dialogBackdrop !== undefined ? { backdrop: dialogBackdrop } : {}) };
+      void openDialog(createElement(Text, null, 'first'), opts);
+      if (stacked) void openDialog(createElement(Text, null, 'second'), { ...opts, title: 'two' });
+    });
+    return createElement(Text, { color: 'red' }, 'host content in the corner');
+  }
+  return createElement(DialogHost, hostBackdrop === undefined ? null : { backdrop: hostBackdrop }, createElement(Opener));
+}
+
+test('<DialogHost backdrop> dims the content behind a floating dialog and keeps the dialog bright', async () => {
+  const backend = new TestBackend(40, 9);
+  await render(createElement(BackdropApp, { hostBackdrop: true }), backend);
+  expect(backend.lastBuffer!.get(0, 0).style.dim).toBeFalsy();
+  backend.press({ name: 'o' });
+  await flushAsync(backend);
+  const buf = backend.lastBuffer!;
+  expect(buf.get(0, 0).char).toBe('h');                  // still readable…
+  expect(buf.get(0, 0).style).toMatchObject({ dim: true, fg: 'red' }); // …but pushed back
+  const frame = backend.lastFrame.split('\n');
+  const y = frame.findIndex((l) => l.includes('first'));
+  const x = frame[y]!.indexOf('first');
+  expect(buf.get(x, y).style.dim).toBeFalsy();           // the dialog itself is not dimmed
+});
+
+test('no backdrop unless asked for; a dialog can opt in or out on its own', async () => {
+  const plain = new TestBackend(40, 9);
+  await render(createElement(BackdropApp, {}), plain);
+  plain.press({ name: 'o' });
+  await flushAsync(plain);
+  expect(plain.lastBuffer!.get(0, 0).style.dim).toBeFalsy();
+
+  const optIn = new TestBackend(40, 9);
+  await render(createElement(BackdropApp, { dialogBackdrop: true }), optIn);
+  optIn.press({ name: 'o' });
+  await flushAsync(optIn);
+  expect(optIn.lastBuffer!.get(0, 0).style.dim).toBe(true);
+
+  const optOut = new TestBackend(40, 9);
+  await render(createElement(BackdropApp, { hostBackdrop: true, dialogBackdrop: false }), optOut);
+  optOut.press({ name: 'o' });
+  await flushAsync(optOut);
+  expect(optOut.lastBuffer!.get(0, 0).style.dim).toBeFalsy();
+});
+
+test('stacked dialogs: the lower dialog is dimmed by the one above it, the host content is not dimmed twice', async () => {
+  const one = new TestBackend(40, 9);
+  await render(createElement(BackdropApp, { hostBackdrop: true }), one);
+  one.press({ name: 'o' });
+  await flushAsync(one);
+
+  const two = new TestBackend(40, 9);
+  await render(createElement(BackdropApp, { hostBackdrop: true, stacked: true }), two);
+  two.press({ name: 'o' });
+  await flushAsync(two);
+
+  expect(two.lastBuffer!.get(0, 0)).toEqual(one.lastBuffer!.get(0, 0)); // same cell, one dialog or two
+  const frame = two.lastFrame.split('\n');
+  const y = frame.findIndex((l) => l.includes('second'));
+  expect(two.lastBuffer!.get(frame[y]!.indexOf('second'), y).style.dim).toBeFalsy();
 });

@@ -172,6 +172,21 @@ function paintInstance(
     || box.top >= clip.top + clip.height || box.top + box.height <= clip.top
   );
 
+  // 0. Backdrop: restyle the cells already in the buffer, before anything of
+  // this box is drawn over them. bold is dropped — a terminal renders bold+dim
+  // inconsistently, and the point is to push this content back.
+  if (!offscreen && inst.props.backdrop === 'dim') {
+    for (let y = box.top; y < box.top + box.height; y++) {
+      for (let x = box.left; x < box.left + box.width; x++) {
+        if (x < 0 || y < 0 || x >= buffer.width || y >= buffer.height) continue;
+        const under = buffer.get(x, y);
+        if (under.style.dim && !under.style.bold) continue; // already pushed back
+        const { bold: _bold, ...rest } = under.style;
+        setClipped(buffer, x, y, under.char, { ...rest, dim: true }, clip);
+      }
+    }
+  }
+
   if (!offscreen && ownBg !== undefined) {
     const fillStyle: Style = ownBg === 'default' ? {} : { bg: ownBg };
     for (let y = box.top; y < box.top + box.height; y++) {

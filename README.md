@@ -805,6 +805,14 @@ one, and only receive input when they become the top of the stack again.
 
 **Caveat:** all dialogs share a single `dialogApi` instance — calling `done()` or `cancel()` always pops the TOP, regardless of which dialog component triggered it. Since input is gated to the top dialog, normal user-driven flows are safe; the edge case is async side-effects from a lower dialog (e.g. a useEffect / setTimeout) that calls `done` after a new dialog opened on top — it would pop the wrong entry. Wrap async work in `isMounted` guards if you need to be paranoid.
 
+**Backdrop.** `<DialogHost backdrop>` dims everything behind an open floating
+dialog — the host content and any dialog below it — while the dialog itself stays
+bright; `openDialog(el, { floating: true, backdrop: false })` overrides it for one
+dialog. It is built on a `<Box backdrop="dim">` prop, which restyles the cells
+already painted under the box instead of covering them (characters and colors
+stay, `bold` is dropped). `dim` is a flag on a cell, not an opacity, so a stack of
+dialogs never darkens anything twice.
+
 ### Focus + Button
 
 Components inside a `<FocusGroup>` can call `useFocus()` to know if they're the active focusable. Tab cycles forward, Shift-Tab backward. First registered = auto-focused.

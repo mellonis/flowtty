@@ -114,6 +114,12 @@ export interface BoxProps {
    *  'hidden' clips ALL descendant writes including their backgrounds and borders.
    *  Does NOT clip this box's own background or border (those are this box's own area). */
   overflow?: 'visible' | 'hidden';
+  /** Restyle what is ALREADY painted under this box instead of covering it:
+   *  `'dim'` dims those cells and keeps their characters and colors — the scrim
+   *  behind a modal. Painted before the box's own background, border, text and
+   *  children, which therefore stay bright. `dim` is a flag on a cell, not an
+   *  opacity, so stacked backdrops never darken anything twice. */
+  backdrop?: 'dim';
   /** Scroll the content up by this many rows (0 = top). Setting either scroll
    *  prop makes the box a scroll viewport: it clips like `overflow: 'hidden'`
    *  and paints its flow children shifted. The value is clamped to the scrollable

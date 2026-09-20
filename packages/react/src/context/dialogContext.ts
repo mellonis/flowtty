@@ -42,6 +42,11 @@ export interface OpenDialogOptions {
   maxHeight?: number | string;
   /** Padding (cells) inside the wrapper between border and content. */
   padding?: number;
+  /** Dim everything behind this dialog (the host content and any dialog below
+   *  it). Overrides `<DialogHost backdrop>` for this one dialog. Only meaningful
+   *  for `floating` dialogs — a full-screen one already covers what is behind.
+   *  Stacked backdrops never darken twice: dim is a flag on a cell. */
+  backdrop?: boolean;
 }
 
 /** Dialog-side API: the dialog's own components call these to resolve. */

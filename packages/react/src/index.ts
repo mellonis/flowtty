@@ -42,7 +42,7 @@ export type { FormProps } from './components/Form.js';
 export { useField } from './hooks/useField.js';
 export type { UseFieldOptions, FieldControl } from './hooks/useField.js';
 export type { FormApi, FormFieldRegistration } from './context/formContext.js';
-export { DialogHost } from './components/DialogHost.js';
+export { DialogHost, type DialogHostProps } from './components/DialogHost.js';
 export { useDialog, useDialogHost, useDialogIsTop } from './hooks/useDialog.js';
 export type {
   DialogHostApi, DialogResultApi, DialogResult,

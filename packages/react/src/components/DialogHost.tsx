@@ -24,7 +24,14 @@ interface PendingDialog {
   resolve(result: DialogResult<unknown>): void;
 }
 
-export function DialogHost(props: { children?: ReactNode }): ReactNode {
+export interface DialogHostProps {
+  children?: ReactNode;
+  /** Dim everything behind an open floating dialog. Default false; a dialog can
+   *  override it with `openDialog(el, { backdrop })`. */
+  backdrop?: boolean;
+}
+
+export function DialogHost(props: DialogHostProps): ReactNode {
   const outerSource = useContext(InputContext);
   const [stack, setStack] = useState<PendingDialog[]>([]);
   const nextId = useRef(0);
@@ -162,6 +169,10 @@ export function DialogHost(props: { children?: ReactNode }): ReactNode {
           // dialogs so the wrapper is the only opaque region and lower stack
           // entries show around it. See `overlayBg` computed above.
           backgroundColor={overlayBg}
+          // The scrim is this full-screen overlay itself: it restyles what is
+          // under it (host content, lower dialogs), then the dialog paints on
+          // top, bright. Floating only — a full-screen dialog covers everything.
+          backdrop={o?.floating && (o.backdrop ?? props.backdrop ?? false) ? 'dim' : undefined}
         >
           {/* Each dialog gets a result API bound to its OWN stack entry, so an
               async done()/cancel() from a lower (input-muted) dialog resolves
