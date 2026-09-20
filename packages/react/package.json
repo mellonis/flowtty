@@ -1,6 +1,6 @@
 {
   "name": "@flowtty/react",
-  "version": "1.0.0-alpha.4",
+  "version": "1.0.0-alpha.5",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -40,7 +40,7 @@
     "react": "^19.3.0"
   },
   "dependencies": {
-    "@flowtty/core": "1.0.0-alpha.4"
+    "@flowtty/core": "1.0.0-alpha.5"
   },
   "devDependencies": {
     "@types/react-reconciler": "^0.33.0",
