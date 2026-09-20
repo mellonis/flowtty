@@ -128,6 +128,16 @@ function contentRectOf(inst: Instance, box: Rect): Rect {
   };
 }
 
+// The box minus its border ring (padding included).
+function paddingRectOf(inst: Instance, box: Rect): Rect {
+  const n = inst.yogaNode;
+  const t = n.getComputedBorder(Edge.Top);
+  const r = n.getComputedBorder(Edge.Right);
+  const b = n.getComputedBorder(Edge.Bottom);
+  const l = n.getComputedBorder(Edge.Left);
+  return { left: box.left + l, top: box.top + t, width: Math.max(0, box.width - l - r), height: Math.max(0, box.height - t - b) };
+}
+
 function paintInstance(
   inst: Instance,
   buffer: Buffer,
@@ -152,7 +162,17 @@ function paintInstance(
   // overwrites whatever was in those cells without tinting (terminal default bg
   // shows through). Use this for opaque dialogs/overlays that should mask
   // underlying content but match the terminal theme.
-  if (ownBg !== undefined) {
+  // A box wholly outside the clip draws nothing of its own — every cell would be
+  // rejected one by one. Skipping the fill/border/text work (wrapText included)
+  // is what keeps a long scrolled list cheap: only the rows in view are drawn.
+  // Layout callbacks above and the recursion below still run, since a child can
+  // overflow its parent into view and hosts read onLayout of off-screen rows.
+  const offscreen = clip !== null && (
+    box.left >= clip.left + clip.width || box.left + box.width <= clip.left
+    || box.top >= clip.top + clip.height || box.top + box.height <= clip.top
+  );
+
+  if (!offscreen && ownBg !== undefined) {
     const fillStyle: Style = ownBg === 'default' ? {} : { bg: ownBg };
     for (let y = box.top; y < box.top + box.height; y++) {
       for (let x = box.left; x < box.left + box.width; x++) {
@@ -162,10 +182,10 @@ function paintInstance(
   }
 
   // 1b. Border (if set), clipped by inherited clip.
-  paintBorder(inst, buffer, box, clip, effectiveBg);
+  if (!offscreen) paintBorder(inst, buffer, box, clip, effectiveBg);
 
   // 2. Own text — clipped by content rect (existing behavior) AND inherited clip.
-  const text = ownText(inst);
+  const text = offscreen ? '' : ownText(inst);
   if (text) {
     const content = contentRectOf(inst, box);
     const mode = (inst.props.wrap ?? 'none') as WrapMode;
@@ -191,9 +211,33 @@ function paintInstance(
     }
   }
 
-  // Compute descendant clip: if this box has overflow:hidden, intersect inherited
-  // clip with this box's content rect; otherwise pass inherited through.
-  const childClip = inst.props.overflow === 'hidden'
+  // A scroll prop turns the box into a scroll viewport: resolve the effective
+  // offset now, against this frame's layout, so a pinned view (scrollBottom: 0)
+  // follows growing content without a catch-up frame.
+  const scrolls = inst.props.scrollTop !== undefined || inst.props.scrollBottom !== undefined;
+  let scrollTop = 0;
+  if (scrolls || inst.props.onScrollMetrics) {
+    const viewport = contentRectOf(inst, box);
+    // Content height = the lowest bottom edge among flow children, measured from
+    // the content rect's top. Absolute children are overlays and don't count.
+    let contentBottom = 0;
+    for (const child of inst.children) {
+      if (child.type !== 'box' || child.props.position === 'absolute' || child.props.display === 'none') continue;
+      const n = child.yogaNode;
+      contentBottom = Math.max(contentBottom, n.getComputedTop() + n.getComputedHeight() + n.getComputedMargin(Edge.Bottom));
+    }
+    const contentHeight = Math.max(0, contentBottom - (viewport.top - box.top));
+    const maxScrollTop = Math.max(0, contentHeight - viewport.height);
+    const wanted = inst.props.scrollBottom !== undefined
+      ? maxScrollTop - inst.props.scrollBottom
+      : inst.props.scrollTop ?? 0;
+    scrollTop = Math.max(0, Math.min(maxScrollTop, Math.round(wanted)));
+    inst.props.onScrollMetrics?.({ contentHeight, viewportHeight: viewport.height, scrollTop, maxScrollTop });
+  }
+
+  // Compute descendant clip: if this box clips (overflow:hidden, or it scrolls),
+  // intersect inherited clip with this box's content rect; otherwise pass through.
+  const childClip = inst.props.overflow === 'hidden' || scrolls
     ? intersectRects(clip, contentRectOf(inst, box))
     : clip;
 
@@ -210,6 +254,9 @@ function paintInstance(
   const byZ = (a: Instance, b: Instance) => (a.props.zIndex ?? 0) - (b.props.zIndex ?? 0);
   stackFlow.sort(byZ);
   absolutes.sort(byZ);
-  for (const child of stackFlow) paintInstance(child, buffer, box.left, box.top, effectiveBg, childClip);
-  for (const child of absolutes) paintInstance(child, buffer, box.left, box.top, effectiveBg, childClip);
+  for (const child of stackFlow) paintInstance(child, buffer, box.left, box.top - scrollTop, effectiveBg, childClip);
+  // Overlays of a scroll viewport may sit in its padding (a scrollbar in the
+  // column reserved by paddingRight), so they clip to the padding box instead.
+  const overlayClip = scrolls ? intersectRects(clip, paddingRectOf(inst, box)) : childClip;
+  for (const child of absolutes) paintInstance(child, buffer, box.left, box.top, effectiveBg, overlayClip);
 }

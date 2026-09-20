@@ -113,6 +113,29 @@ export interface BoxProps {
    *  'hidden' clips ALL descendant writes including their backgrounds and borders.
    *  Does NOT clip this box's own background or border (those are this box's own area). */
   overflow?: 'visible' | 'hidden';
+  /** Scroll the content up by this many rows (0 = top). Setting either scroll
+   *  prop makes the box a scroll viewport: it clips like `overflow: 'hidden'`
+   *  and paints its flow children shifted. The value is clamped to the scrollable
+   *  range at paint time, against the content's CURRENT height — so it never
+   *  needs a second frame to catch up. `position: 'absolute'` children are
+   *  overlays: they neither scroll nor count as content (a scrollbar, a
+   *  "new messages" badge). */
+  scrollTop?: number;
+  /** Like `scrollTop`, but counted from the END of the content: 0 pins the last
+   *  rows into view and keeps them there as content grows. Wins over `scrollTop`
+   *  when both are set. */
+  scrollBottom?: number;
+  /** Fires every paint (diff before setState, like onLayout) with the numbers a
+   *  scrolling component needs: content and viewport heights, the effective
+   *  (clamped) `scrollTop`, and its maximum. */
+  onScrollMetrics?: (metrics: ScrollMetrics) => void;
+}
+
+export interface ScrollMetrics {
+  contentHeight: number;
+  viewportHeight: number;
+  scrollTop: number;
+  maxScrollTop: number;
 }
 
 export interface Instance {

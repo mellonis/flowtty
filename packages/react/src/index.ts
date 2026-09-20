@@ -4,7 +4,7 @@ export type { ErrorSource } from './components/ErrorBoundary.js';
 export { useTerminalSize, type TerminalSize } from './hooks/useTerminalSize.js';
 export { Box } from './components/base/Box.js';
 export { Text } from './components/base/Text.js';
-export type { BoxProps } from '@flowtty/core';
+export type { BoxProps, ScrollMetrics } from '@flowtty/core';
 // Re-export core types from @flowtty/core so consumers using only @flowtty/react
 // have a single import surface for everything they typically need.
 export { Buffer } from '@flowtty/core';
@@ -60,6 +60,7 @@ export { ProgressBar, type ProgressBarProps } from './components/ProgressBar.js'
 export { TaskList, type TaskListProps, type TaskItem, type TaskState } from './components/TaskList.js';
 export { Table, type TableProps, type TableColumn, type TableAlign, type TableCellStyle } from './components/Table.js';
 export { Link, type LinkProps } from './components/Link.js';
+export { ScrollBox, type ScrollBoxProps, type ScrollBoxHandle } from './components/ScrollBox.js';
 export { Markdown, type MarkdownProps } from './components/Markdown.js';
 export { layoutMarkdown, type StyledLine, type StyledSpan } from './components/markdown/layout.js';
 export { highlightMarkdownSource, type SourceLine } from './components/markdown/source.js';

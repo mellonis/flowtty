@@ -135,6 +135,52 @@ CSS deviation: CSS3 defaults `align-content` to `'stretch'` for flex; flowtty de
 
 `'hidden'` does NOT clip the box's own background or border — those are this box's own area, not its descendants' writes. Clips are intersected across nested `overflow: 'hidden'` ancestors.
 
+### Scrolling
+
+`scrollTop` / `scrollBottom` turn a box into a **scroll viewport**: it clips like
+`overflow="hidden"` and paints its flow children shifted by that many rows.
+
+- `scrollTop={n}` — rows scrolled from the top. `scrollBottom={n}` — rows from the
+  END of the content; `scrollBottom={0}` pins the last rows into view.
+- The value is clamped at paint time against the content's *current* height, so a
+  pinned view follows growing content in the same frame — no catch-up repaint.
+  Content shorter than the viewport never scrolls (it sits at the top).
+- `position="absolute"` children are **overlays**: they don't scroll and don't
+  count as content. That is how a scrollbar or a sticky header row is drawn.
+- `onScrollMetrics({ contentHeight, viewportHeight, scrollTop, maxScrollTop })`
+  fires every paint (diff before `setState`, like `onLayout`).
+- A scrolled child's `onLayout` reports its on-screen row (negative once it is
+  above the viewport) and still fires while it is clipped away.
+
+Most apps want the component instead:
+
+```tsx
+<Box flexDirection="column" height="100%">
+  <Header />
+  <ScrollBox flexGrow={1} flexShrink={1} anchor="bottom" scrollbar>
+    {messages.map((m) => <Message key={m.id} {...m} />)}
+  </ScrollBox>
+  <Prompt />
+</Box>
+```
+
+`<ScrollBox>` sizes like any `<Box>` — with `flexGrow` it takes whatever the
+layout leaves, so the app never adds up sibling heights to know how many rows fit.
+
+| Prop | |
+|---|---|
+| `anchor` | `'top'` (default) or `'bottom'`. Bottom is the chat/log shape: the last rows show and stay in view as content grows — until the user scrolls up, after which new content no longer moves what they are reading. Scrolling back to the end re-pins. |
+| `offset` / `onScroll` | Controlled position, in rows from the anchored edge (0 = at that edge). When `offset` is set the box never moves on its own; keys and the wheel only report through `onScroll(offset, metrics)`. |
+| `onMetrics` | Content / viewport heights changed — for a "↑ more" hint, or a host that clamps its own `offset`. |
+| `isActive` | Handle PgUp / PgDn and the wheel (default `true`). The wheel only counts while the pointer is over the box. |
+| `wheelStep`, `pageStep` | Rows per wheel notch (default 3) and per PgUp/PgDn (default: viewport height − 1). |
+| `scrollbar` | Draw a thumb in the right-hand column while the content overflows. |
+| `ref` | `scrollTo(offset)`, `scrollToStart()`, `scrollToEnd()`. |
+
+Every child is laid out by Yoga (cleanly cached between frames), but only rows
+in view are drawn, so a few thousand rows scroll comfortably. Keep rows cheap to
+re-render — one memoized component per message, not one per line.
+
 ### Size constraints
 
 `<Box>` accepts four optional min/max size props that clamp Yoga's computed size:
