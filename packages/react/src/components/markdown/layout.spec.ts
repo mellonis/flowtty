@@ -187,4 +187,18 @@ describe('layoutMarkdown', () => {
     const lines = layoutMarkdown('日本語 日本語 日本語', 8);
     expect(lines.map(text)).toEqual(['日本語 日本語', '日本語']);
   });
+
+  test('a fenced code line longer than the width hard-wraps, keeping its token colors — it never overflows', () => {
+    const lines = layoutMarkdown("```ts\nimport { render } from '@flowtty/react';\n```", 20);
+    for (const l of lines) expect([...text(l)].length).toBeLessThanOrEqual(20);
+    expect(lines.map(text)).toEqual(['```ts', 'import { render } fr', "om '@flowtty/react';", '```']);
+    // `import` keeps its keyword color, and the string keeps its own across the break.
+    expect(lines[1]!.spans.find((s) => s.text === 'import')?.color).toBe('magenta');
+    expect(lines[2]!.spans.find((s) => s.text.includes('@flowtty'))?.color).toBe('green');
+  });
+
+  test('a short code line is left alone, and an empty one is still a row', () => {
+    const lines = layoutMarkdown('```\nab\n\ncd\n```', 20);
+    expect(lines.map(text)).toEqual(['```', 'ab', '', 'cd', '```']);
+  });
 });

@@ -314,10 +314,14 @@ export function layoutMarkdown(src: string, width: number): StyledLine[] {
         const fence = '```';
         out.push({ spans: [{ text: fence + b.lang, dim: true }] });
         for (const cl of b.lines) {
-          out.push({
-            spans: highlightCode(cl, b.lang)
-              .map((cs) => ({ text: cs.text, color: cs.color, dim: cs.dim })),
-          });
+          // Code keeps its whitespace, so it can't be word-wrapped — but a long
+          // line must not run out of the box either. Hard-wrap it at the width,
+          // token colors carried across the break.
+          const chars: StyledChar[] = highlightCode(cl, b.lang)
+            .flatMap((cs) => [...cs.text].map((ch) => ({ ch, style: { color: cs.color, dim: cs.dim } })));
+          if (chars.length === 0) { out.push({ spans: [] }); continue; }
+          const step = width > 0 ? width : chars.length;
+          for (let at = 0; at < chars.length; at += step) out.push({ spans: charsToSpans(chars.slice(at, at + step)) });
         }
         out.push({ spans: [{ text: fence, dim: true }] });
         break;
