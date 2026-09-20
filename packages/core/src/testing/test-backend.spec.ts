@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { TestBackend } from './test-backend.js';
-import type { Key } from '../keys.js';
+import { NAMED_KEYS, type Key } from '../keys.js';
 import { Buffer } from '../cells.js';
 
 test('onKey returns an unsubscribe; subscribers receive press()', () => {
@@ -61,4 +61,20 @@ test('TestBackend.wheel delivers a wheelup / wheeldown key at the given cell', (
   b.wheel('down', 3, 2);
   b.wheel('up');
   expect(got).toEqual([['wheeldown', 3, 2], ['wheelup', 0, 0]]);
+});
+
+test('TestBackend.press rejects a name no terminal can produce, and says what to use instead', () => {
+  const b = new TestBackend(4, 1);
+  expect(() => b.press({ name: 'space' })).toThrow(/'space'.*' '/s);
+  expect(() => b.press({ name: 'enter' })).toThrow(/'enter'.*'return'/s);
+  expect(() => b.press({ name: 'esc' })).toThrow(/'esc'.*'escape'/s);
+  expect(() => b.press({ name: 'colon' })).toThrow(/not a key name/);
+});
+
+test('TestBackend.press accepts every named key, any single character, and the decoder\'s csi-* fallbacks', () => {
+  const b = new TestBackend(4, 1);
+  const got: string[] = [];
+  b.onKey((k) => got.push(k.name));
+  for (const name of [...NAMED_KEYS, ' ', ':', 'a', 'ж', '😀', 'csi-u']) b.press({ name });
+  expect(got).toHaveLength(NAMED_KEYS.length + 6);
 });

@@ -685,6 +685,14 @@ useInput((key) => {
 
 In tests, `TestBackend` has `paste(text)` and `wheel('up' | 'down', x?, y?)`.
 
+**Key names.** A printable key is named by its character — `' '`, `':'`, `'a'` —
+and the rest come from a fixed list, exported as `NAMED_KEYS` (type `NamedKey`):
+`return`, `escape`, `tab`, `backspace`, `delete`, `insert`, the arrows, `home`,
+`end`, `pageup`, `pagedown`, `f1`–`f12`, `paste`, `wheelup`, `wheeldown`. There is
+no `'space'` or `'enter'`. The type can't reject such a typo (any character is a
+valid name), so `TestBackend.press()` does: it throws on a name no terminal
+produces, which stops a test from blessing a branch real input never reaches.
+
 ### Still deferred (later milestones)
 
 - Wide-character **rendering**: the grid is still one cell per code point. The

@@ -11,7 +11,8 @@
 // ─── Data model + Backend interface ──────────────────────────────────────────
 export { Buffer } from './cells.js';
 export type { Cell, Style } from './cells.js';
-export type { Key } from './keys.js';
+export { NAMED_KEYS } from './keys.js';
+export type { Key, KeyName, NamedKey } from './keys.js';
 export type { Backend } from './backend.js';
 
 // ─── Component-author types ──────────────────────────────────────────────────

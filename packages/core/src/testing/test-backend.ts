@@ -1,6 +1,23 @@
 import { Buffer } from '../cells.js';
-import type { Key } from '../keys.js';
+import { NAMED_KEYS, type Key } from '../keys.js';
 import type { Backend } from '../backend.js';
+
+// Common guesses, mapped to the name the decoder actually produces.
+const KEY_NAME_HINTS: Record<string, string> = {
+  space: ' ', enter: 'return', esc: 'escape', del: 'delete', ins: 'insert',
+  pgup: 'pageup', pgdn: 'pagedown', pgdown: 'pagedown', bs: 'backspace',
+};
+
+function assertRealKeyName(name: string): void {
+  // One code point = a printable key; csi-* = the parser's name for an unknown sequence.
+  if ([...name].length === 1 || name.startsWith('csi-')) return;
+  if ((NAMED_KEYS as readonly string[]).includes(name)) return;
+  const hint = KEY_NAME_HINTS[name.toLowerCase()];
+  throw new Error(
+    `TestBackend.press: '${name}' is not a key name any terminal produces`
+    + (hint !== undefined ? ` — use '${hint}'.` : `. A printable key is named by its character (':' not 'colon'); named keys: ${NAMED_KEYS.join(', ')}.`),
+  );
+}
 
 export class TestBackend implements Backend {
   frames: string[] = [];
@@ -34,8 +51,13 @@ export class TestBackend implements Backend {
     return () => { this.subscribers.delete(handler); };
   }
 
-  /** Synchronously deliver one Key to every subscriber. */
+  /**
+   * Synchronously deliver one Key to every subscriber. Throws on a name no
+   * terminal can produce (`'space'`, `'enter'`): a test that presses such a key
+   * exercises a branch real input never reaches, and would pass anyway.
+   */
   press(key: Partial<Key> & { name: string }): void {
+    assertRealKeyName(key.name);
     const k: Key = {
       ...(key.text !== undefined ? { text: key.text } : {}),
       ...(key.x !== undefined ? { x: key.x } : {}),
