@@ -202,3 +202,33 @@ test('text on the light field is drawn dark so it reads in a dark theme', async 
   await render(createElement(TextInput, { value: 'hi', onChange: () => {} }), backend);
   expect(backend.lastBuffer!.get(0, 0).style.fg).toBe('black');
 });
+
+test('an emoji is one character: typed, stepped over, deleted whole, and drawn intact under the caret', async () => {
+  let captured = '';
+  function App() {
+    const [v, setV] = useState('a');
+    captured = v;
+    return createElement(TextInput, { value: v, onChange: setV });
+  }
+  const backend = new TestBackend(10, 1);
+  await render(createElement(App), backend);
+  backend.type('😀b');
+  await flush();
+  expect(captured).toBe('a😀b');
+  backend.press({ name: 'left' }); backend.press({ name: 'left' });
+  await flush();
+  // The caret sits ON the emoji: one inverse cell holding the whole character.
+  const buf = backend.lastBuffer!;
+  expect(buf.get(1, 0).char).toBe('😀');
+  expect(buf.get(1, 0).style.inverse).toBe(true);
+  expect(buf.get(2, 0).char).toBe('b');
+  backend.press({ name: 'delete' });
+  await flush();
+  expect(captured).toBe('ab');
+});
+
+test('mask draws one bullet per character, not per UTF-16 unit', async () => {
+  const backend = new TestBackend(10, 1);
+  await render(createElement(TextInput, { value: 'a😀', onChange: () => {}, mask: true }), backend);
+  expect(backend.lastFrame).toBe('••');
+});

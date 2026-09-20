@@ -32,3 +32,13 @@ test('at the end of a line that exactly fills the width, the caret gets a row of
   expect(inputRows('abcdefghij', 10, 10).map((r) => r.text)).toEqual(['abcdefghij', '']);
   expect(inputRows('abcdefghij', 10, 3).map((r) => r.text)).toEqual(['abcdefghij']); // caret elsewhere: no extra row
 });
+
+test('rows wrap by character, never between the two halves of an astral character', () => {
+  const rows = inputRows('😀😀😀😀😀', 2);
+  expect(rows.map((r) => [r.text, r.start])).toEqual([['😀😀', 0], ['😀😀', 4], ['😀', 8]]);
+});
+
+test('caretPosition reports the column in characters; `start` and `cursor` stay UTF-16 indices', () => {
+  expect(caretPosition('😀😀x', 4, 10)).toEqual({ row: 0, col: 2 });
+  expect(caretPosition('😀😀😀', 4, 2)).toEqual({ row: 1, col: 0 }); // soft wrap after two characters
+});

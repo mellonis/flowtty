@@ -224,3 +224,36 @@ test('multiline: ^k / ^u kill to the end / start of the current line only', () =
 test('multiline: backspace at the start of a line joins it to the previous one', () => {
   expect(edit(reduce(s('ab\ncd', 3), key({ name: 'backspace' }), ml))).toEqual({ value: 'abcd', cursor: 2 });
 });
+
+// ─── astral characters (emoji = two UTF-16 units) and CR in pastes ───────────
+
+test('left / right step over a whole astral character, never into the middle of it', () => {
+  const v = 'a😀b'; // units: a(0) 😀(1,2) b(3)
+  expect(edit(reduce(s(v, 1), key({ name: 'right' }))).cursor).toBe(3);
+  expect(edit(reduce(s(v, 3), key({ name: 'left' }))).cursor).toBe(1);
+});
+
+test('backspace / delete remove a whole astral character', () => {
+  expect(edit(reduce(s('a😀b', 3), key({ name: 'backspace' })))).toEqual({ value: 'ab', cursor: 1 });
+  expect(edit(reduce(s('a😀b', 1), key({ name: 'delete' })))).toEqual({ value: 'ab', cursor: 1 });
+});
+
+test('a cursor handed in mid-pair is snapped to the character boundary before editing', () => {
+  expect(edit(reduce(s('a😀b', 2), key({ name: 'x' })))).toEqual({ value: 'ax😀b', cursor: 2 });
+  expect(edit(reduce(s('a😀b', 2), key({ name: 'backspace' })))).toEqual({ value: '😀b', cursor: 0 });
+});
+
+test('typing an astral character inserts it and moves the cursor past both units', () => {
+  expect(edit(reduce(s('ab', 1), key({ name: '😀' })))).toEqual({ value: 'a😀b', cursor: 3 });
+});
+
+test('a paste normalizes CRLF and lone CR to LF (multiline) — no CR ever enters the value', () => {
+  expect(edit(reduce(s('ab', 1), key({ name: 'paste', text: 'x\r\ny\rz' }), ml))).toEqual({ value: 'ax\ny\nzb', cursor: 6 });
+  expect(edit(reduce(s('', 0), key({ name: 'paste', text: 'x\r\ny' })))).toEqual({ value: 'x y', cursor: 3 });
+});
+
+test('multiline: up / down keep the column counted in characters across rows with astral characters', () => {
+  const v = '😀😀😀x\nabcdef'; // col 3 on row 0 is before "x" (unit index 6)
+  expect(edit(reduce(s(v, 6), key({ name: 'down' }), ml)).cursor).toBe(11);  // "abc|def"
+  expect(edit(reduce(s(v, 11), key({ name: 'up' }), ml)).cursor).toBe(6);
+});

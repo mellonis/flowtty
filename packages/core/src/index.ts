@@ -35,7 +35,7 @@ export { charWidth, stringWidth } from './displayWidth.js';
 // distinct public names so a single import surface doesn't collide.
 export { reduce as editorReducer } from './editor.js';
 export type { EditorState, EditorAction, EditorOptions } from './editor.js';
-export { inputRows, caretPosition } from './inputRows.js';
+export { inputRows, caretPosition, rowIndexAt } from './inputRows.js';
 export type { InputRow } from './inputRows.js';
 
 export { reduce as selectReducer, visibleIndices } from './selectReducer.js';

@@ -18,7 +18,8 @@ export interface TextAreaProps {
   /** Runs BEFORE the field's own handling; return true to consume the key. This
    *  is how a host owns Enter, Tab, Escape, history on up/down, etc. */
   onKey?: (key: Key) => boolean | void;
-  /** Controlled caret (index into `value`). Omit to let the field keep it; then
+  /** Controlled caret: a UTF-16 index into `value` (`value.slice(0, cursor)` is
+   *  the text before it), always on a character boundary. Omit to let the field keep it; then
    *  a value replaced from outside puts the caret at its end. */
   cursor?: number;
   onCursorChange?: (cursor: number) => void;
@@ -137,7 +138,10 @@ export function TextArea(props: TextAreaProps): ReactNode {
           const r = first + i;
           const isCaretRow = isFocused && r === caret.row;
           const isLastRow = r === rows.length - 1;
-          const tail = isLastRow ? [...trailing].slice(0, Math.max(0, wrapWidth - row.text.length)).join('') : '';
+          // Characters, not UTF-16 units: an emoji is one cell and must never be sliced in two.
+          const cells = [...row.text];
+          const tailCells = isLastRow ? [...trailing].slice(0, Math.max(0, wrapWidth - cells.length)) : [];
+          const tail = tailCells.join('');
           if (!isCaretRow) {
             return (
               <Box key={r} flexDirection="row">
@@ -146,11 +150,11 @@ export function TextArea(props: TextAreaProps): ReactNode {
               </Box>
             );
           }
-          const before = row.text.slice(0, caret.col);
-          const onText = caret.col < row.text.length;
-          const caretChar = onText ? row.text.charAt(caret.col) : tail.charAt(0) || CURSOR_AT_END;
-          const after = onText ? row.text.slice(caret.col + 1) : '';
-          const dimAfter = onText ? tail : tail.slice(1);
+          const before = cells.slice(0, caret.col).join('');
+          const onText = caret.col < cells.length;
+          const caretChar = onText ? cells[caret.col]! : tailCells[0] ?? CURSOR_AT_END;
+          const after = onText ? cells.slice(caret.col + 1).join('') : '';
+          const dimAfter = onText ? tail : tailCells.slice(1).join('');
           return (
             <Box key={r} flexDirection="row">
               {before ? <Text color={textColor}>{before}</Text> : null}

@@ -660,6 +660,15 @@ The pure parts are exported for custom fields: the editor reducer takes
 `{ multiline: true, width }`, and `inputRows(value, width, cursor?)` /
 `caretPosition(value, cursor, width)` give the row layout and the caret's place in it.
 
+**Units.** `cursor` (and `InputRow.start`) is a UTF-16 index into the value, so
+`value.slice(0, cursor)` is the text before the caret — but it only ever rests on
+a character boundary: an emoji is two UTF-16 units and the editor steps over,
+deletes and wraps it as ONE character. Widths and `caretPosition().col` count
+characters (code points), the grid's unit; `rowIndexAt(row, col)` converts a
+column back to an index. Grapheme clusters (ZWJ emoji, combining marks) are not
+merged — code point is the floor. A paste's `\r\n` / `\r` become `\n` in the
+reducer itself, so a host that builds its own `paste` key is covered too.
+
 ### Paste and mouse wheel
 
 Two input events arrive through `useInput` as ordinary keys with a payload:

@@ -1,10 +1,20 @@
 import type { Key } from './keys.js';
-import { caretPosition, inputRows } from './inputRows.js';
+import { caretPosition, inputRows, rowIndexAt } from './inputRows.js';
 
 export interface EditorState {
   value: string;
+  /** UTF-16 index into `value` (so `value.slice(0, cursor)` is the text before
+   *  the caret). It only ever rests on a character boundary: movement and
+   *  deletion step over a whole code point, and a cursor handed in between the
+   *  two halves of a surrogate pair is snapped back before anything else. */
   cursor: number;
 }
+
+const isHigh = (u: string | undefined): boolean => u !== undefined && u >= '\ud800' && u <= '\udbff';
+const isLow = (u: string | undefined): boolean => u !== undefined && u >= '\udc00' && u <= '\udfff';
+// Index one character to the left / right of `i` (an astral character is two units).
+const prevIndex = (v: string, i: number): number => (i >= 2 && isLow(v[i - 1]) && isHigh(v[i - 2]) ? i - 2 : Math.max(0, i - 1));
+const nextIndex = (v: string, i: number): number => (isHigh(v[i]) && isLow(v[i + 1]) ? i + 2 : Math.min(v.length, i + 1));
 
 export type EditorAction =
   | { kind: 'edit'; state: EditorState }
@@ -55,8 +65,10 @@ export interface EditorOptions {
 }
 
 export function reduce(state: EditorState, key: Key, opts: EditorOptions = {}): EditorAction {
-  const { value, cursor } = state;
-  const clamp = (n: number) => Math.max(0, Math.min(value.length, n));
+  const { value } = state;
+  // Never edit from inside a surrogate pair.
+  let cursor = Math.max(0, Math.min(value.length, state.cursor));
+  if (isLow(value[cursor]) && isHigh(value[cursor - 1])) cursor--;
   const multiline = opts.multiline === true;
   // Bounds of the line the cursor is on: the whole value when single-line.
   const lineStart = multiline ? value.lastIndexOf('\n', cursor - 1) + 1 : 0;
@@ -70,7 +82,9 @@ export function reduce(state: EditorState, key: Key, opts: EditorOptions = {}): 
   // Paste: insert the whole text at the cursor. This editor is single-line, so
   // line breaks become spaces — a multi-line paste must never act as Enter.
   if (key.name === 'paste') {
-    const text = multiline ? (key.text ?? '') : (key.text ?? '').replace(/\n/g, ' ');
+    // Hosts may build the key themselves, so normalize here too, not only in the key parser.
+    const pasted = (key.text ?? '').replace(/\r\n?/g, '\n');
+    const text = multiline ? pasted : pasted.replace(/\n/g, ' ');
     if (text === '') return { kind: 'noop' };
     return insert(text);
   }
@@ -92,7 +106,7 @@ export function reduce(state: EditorState, key: Key, opts: EditorOptions = {}): 
       if (target < 0) return { kind: 'edit', state: { value, cursor: 0 } };
       if (target >= rows.length) return { kind: 'edit', state: { value, cursor: value.length } };
       const row = rows[target]!;
-      return { kind: 'edit', state: { value, cursor: row.start + Math.min(at.col, row.text.length) } };
+      return { kind: 'edit', state: { value, cursor: rowIndexAt(row, at.col) } };
     }
   }
 
@@ -101,8 +115,8 @@ export function reduce(state: EditorState, key: Key, opts: EditorOptions = {}): 
   if (key.name === 'b' && key.meta) return { kind: 'edit', state: { value, cursor: wordLeft(value, cursor) } };
   if (key.name === 'right' && key.meta) return { kind: 'edit', state: { value, cursor: wordRight(value, cursor) } };
   if (key.name === 'f' && key.meta) return { kind: 'edit', state: { value, cursor: wordRight(value, cursor) } };
-  if (key.name === 'left') return { kind: 'edit', state: { value, cursor: clamp(cursor - 1) } };
-  if (key.name === 'right') return { kind: 'edit', state: { value, cursor: clamp(cursor + 1) } };
+  if (key.name === 'left') return { kind: 'edit', state: { value, cursor: prevIndex(value, cursor) } };
+  if (key.name === 'right') return { kind: 'edit', state: { value, cursor: nextIndex(value, cursor) } };
   if (key.name === 'home') return { kind: 'edit', state: { value, cursor: lineStart } };
   if (key.name === 'end') return { kind: 'edit', state: { value, cursor: lineEnd } };
   if (key.name === 'a' && key.ctrl) return { kind: 'edit', state: { value, cursor: lineStart } };
@@ -143,12 +157,13 @@ export function reduce(state: EditorState, key: Key, opts: EditorOptions = {}): 
 
   // Single-char deletion
   if (key.name === 'backspace') {
-    if (cursor === 0) return { kind: 'edit', state };
-    return { kind: 'edit', state: { value: value.slice(0, cursor - 1) + value.slice(cursor), cursor: cursor - 1 } };
+    if (cursor === 0) return { kind: 'edit', state: { value, cursor } };
+    const from = prevIndex(value, cursor);
+    return { kind: 'edit', state: { value: value.slice(0, from) + value.slice(cursor), cursor: from } };
   }
   if (key.name === 'delete' || (key.name === 'd' && key.ctrl)) {
-    if (cursor === value.length) return { kind: 'edit', state };
-    return { kind: 'edit', state: { value: value.slice(0, cursor) + value.slice(cursor + 1), cursor } };
+    if (cursor === value.length) return { kind: 'edit', state: { value, cursor } };
+    return { kind: 'edit', state: { value: value.slice(0, cursor) + value.slice(nextIndex(value, cursor)), cursor } };
   }
 
   // Submit / cancel
@@ -158,10 +173,8 @@ export function reduce(state: EditorState, key: Key, opts: EditorOptions = {}): 
   // Printable insertion — single-character name only, no modifiers.
   // (ctrl/meta combinations that didn't match an earlier specific branch are noops,
   // NOT insertions — so Ctrl-Q does nothing rather than typing 'q'.)
-  if (!key.ctrl && !key.meta && key.name.length === 1) {
-    const ch = key.name;
-    return { kind: 'edit', state: { value: value.slice(0, cursor) + ch + value.slice(cursor), cursor: cursor + 1 } };
-  }
+  // One CODE POINT, not one UTF-16 unit: an emoji's name is two units long.
+  if (!key.ctrl && !key.meta && [...key.name].length === 1) return insert(key.name);
 
   return { kind: 'noop' };
 }

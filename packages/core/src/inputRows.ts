@@ -2,7 +2,10 @@
 // given width, and where the caret sits among them. Pure, shared by the editor
 // reducer (up/down movement) and by whatever renders the field.
 //
-// Rows hard-wrap at the cell boundary (code points, like the rest of the grid).
+// Units: `cursor` and `InputRow.start` are UTF-16 indices into the value (so
+// `value.slice(0, cursor)` works), while widths and the caret's `col` count
+// CHARACTERS (code points) — the grid's unit. Rows hard-wrap by character, so an
+// astral character (an emoji is two UTF-16 units) is never split across rows.
 // Caret rules:
 //  - at the end of a line that is followed by a line break, it stays on that line;
 //  - on a blank line it has a row to stand on;
@@ -24,20 +27,29 @@ export function inputRows(value: string, width: number, cursor?: number): InputR
   const rows: InputRow[] = [];
   let lineStart = 0;
   for (const line of value.split('\n')) {
-    if (line.length === 0) {
+    const chars = [...line];
+    if (chars.length === 0) {
       rows.push({ text: '', start: lineStart, continuation: false });
     } else {
-      for (let at = 0; at < line.length; at += w) {
-        rows.push({ text: line.slice(at, at + w), start: lineStart + at, continuation: at > 0 });
+      let start = lineStart;
+      for (let at = 0; at < chars.length; at += w) {
+        const text = chars.slice(at, at + w).join('');
+        rows.push({ text, start, continuation: at > 0 });
+        start += text.length;
       }
       // The caret parked after a line that exactly fills its last row needs a row.
-      if (cursor === lineStart + line.length && line.length % w === 0) {
+      if (cursor === lineStart + line.length && chars.length % w === 0) {
         rows.push({ text: '', start: cursor, continuation: true });
       }
     }
     lineStart += line.length + 1;
   }
   return rows;
+}
+
+/** UTF-16 index of character column `col` within `row` (clamped to its end). */
+export function rowIndexAt(row: InputRow, col: number): number {
+  return row.start + [...row.text].slice(0, Math.max(0, col)).join('').length;
 }
 
 export function caretPosition(value: string, cursor: number, width: number): { row: number; col: number } {
@@ -47,7 +59,9 @@ export function caretPosition(value: string, cursor: number, width: number): { r
   // from the end makes a soft-wrap boundary resolve to the next row's col 0.
   for (let r = rows.length - 1; r >= 0; r--) {
     const row = rows[r]!;
-    if (row.start <= c && c <= row.start + row.text.length) return { row: r, col: c - row.start };
+    if (row.start <= c && c <= row.start + row.text.length) {
+      return { row: r, col: [...value.slice(row.start, c)].length };
+    }
   }
   return { row: 0, col: 0 };
 }

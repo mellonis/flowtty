@@ -72,7 +72,11 @@ export function TextInput(props: TextInputProps): ReactNode {
     }
   }, { isActive: isFocused });
 
-  const display = mask ? '•'.repeat(value.length) : value;
+  // Everything below works in CHARACTERS (code points), the grid's unit: an emoji
+  // is two UTF-16 units but one cell, so slicing the string by `cursor` directly
+  // would tear it. `cursor` itself stays a UTF-16 index (see EditorState).
+  const chars = [...(mask ? '•'.repeat([...value].length) : value)];
+  const caretAt = [...value.slice(0, safeCursor)].length;
 
   // Always render exactly `width` cells (or the natural value+cursor when width
   // is unknown — one-frame placeholder until onLayout fires).
@@ -86,29 +90,30 @@ export function TextInput(props: TextInputProps): ReactNode {
   let windowEnd: number;
   if (width === null) {
     off = 0;
-    windowEnd = display.length;
+    windowEnd = chars.length;
   } else {
     const w = width;
-    if (safeCursor < scrollOffsetRef.current) scrollOffsetRef.current = safeCursor;
-    if (safeCursor >= scrollOffsetRef.current + w) scrollOffsetRef.current = safeCursor - w + 1;
+    if (caretAt < scrollOffsetRef.current) scrollOffsetRef.current = caretAt;
+    if (caretAt >= scrollOffsetRef.current + w) scrollOffsetRef.current = caretAt - w + 1;
     // Slide-left-on-shrink: scroll offset must not exceed what's needed to fit
     // content+cursor. Beyond that, leading content can come into view.
-    const maxUseful = Math.max(0, display.length + 1 - w);
+    const maxUseful = Math.max(0, chars.length + 1 - w);
     if (scrollOffsetRef.current > maxUseful) scrollOffsetRef.current = maxUseful;
     off = scrollOffsetRef.current;
     windowEnd = off + w;
   }
 
   // Split the visible display around the cursor. The cursor consumes one cell:
-  // either the char at safeCursor (rendered with inverse) or CURSOR_AT_END
-  // (space + inverse = solid filled cell) when safeCursor is past end-of-value.
-  const before = display.slice(off, safeCursor);
-  const cursorChar = safeCursor < display.length ? display.charAt(safeCursor) : CURSOR_AT_END;
+  // either the char at the caret (rendered with inverse) or CURSOR_AT_END
+  // (space + inverse = solid filled cell) when the caret is past end-of-value.
+  const before = chars.slice(off, caretAt).join('');
+  const cursorChar = caretAt < chars.length ? chars[caretAt]! : CURSOR_AT_END;
   // Pad "after" with trailing spaces to fill the viewport — these become visible
   // blank cells (with the lightgray bg) instead of leaving previous content behind.
-  const afterRaw = display.slice(safeCursor + 1, windowEnd);
-  const afterLen = Math.max(0, windowEnd - safeCursor - 1);
-  const after = width === null ? afterRaw : afterRaw.padEnd(afterLen);
+  const afterChars = chars.slice(caretAt + 1, windowEnd);
+  const afterLen = Math.max(0, windowEnd - caretAt - 1);
+  const after = afterChars.join('') + (width === null ? '' : ' '.repeat(Math.max(0, afterLen - afterChars.length)));
+  const display = chars.join('');
 
   const onLayout = (r: Rect) => {
     if (r.width !== width) setWidth(r.width);
@@ -119,7 +124,7 @@ export function TextInput(props: TextInputProps): ReactNode {
   const errorLine = showError && error !== null ? <Text color="red">{error}</Text> : null;
 
   if (!isFocused) {
-    const flat = width === null ? display : display.padEnd(width);
+    const flat = width === null ? display : display + ' '.repeat(Math.max(0, width - chars.length));
     return (
       <Box flexDirection="column">
         <Box flexDirection="row" backgroundColor={FIELD_BG} onLayout={onLayout}>

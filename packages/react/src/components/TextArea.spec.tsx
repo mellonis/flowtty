@@ -180,4 +180,17 @@ describe('TextArea', () => {
     expect(buf.get(4, 0).style.dim).toBe(true);
     unmount();
   });
+
+  test('an emoji is one character: the caret lands on it whole and rows never split it', async () => {
+    const { backend, seen, frame, caret, unmount } = await mount('', {}, 4);
+    backend.type('😀😀😀😀😀');
+    expect(await frame()).toEqual(['😀😀😀😀', '😀']);
+    backend.press({ name: 'left' });
+    expect(await caret()).toEqual({ x: 0, y: 1 });
+    expect(backend.lastBuffer!.get(0, 1).char).toBe('😀');
+    backend.press({ name: 'backspace' });
+    await frame();
+    expect(seen.value).toBe('😀😀😀😀');
+    unmount();
+  });
 });
