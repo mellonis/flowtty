@@ -33,7 +33,9 @@ export { charWidth, stringWidth } from './displayWidth.js';
 // Each reducer module exports a `reduce` function; re-export them under
 // distinct public names so a single import surface doesn't collide.
 export { reduce as editorReducer } from './editor.js';
-export type { EditorState, EditorAction } from './editor.js';
+export type { EditorState, EditorAction, EditorOptions } from './editor.js';
+export { inputRows, caretPosition } from './inputRows.js';
+export type { InputRow } from './inputRows.js';
 
 export { reduce as selectReducer, visibleIndices } from './selectReducer.js';
 export type { SelectItem, SelectState, SelectAction } from './selectReducer.js';

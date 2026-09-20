@@ -1,4 +1,5 @@
 import type { Key } from './keys.js';
+import { caretPosition, inputRows } from './inputRows.js';
 
 export interface EditorState {
   value: string;
@@ -42,16 +43,57 @@ function wordRight(value: string, cursor: number): number {
   return c;
 }
 
-export function reduce(state: EditorState, key: Key): EditorAction {
+export interface EditorOptions {
+  /** Multi-line editing: line breaks are part of the value. Shift+Enter,
+   *  Alt+Enter and backslash-then-Enter insert one (plain Enter still submits),
+   *  up/down move between visual rows, Home/End and the kill bindings work
+   *  within the current line, and a paste keeps its line breaks. */
+  multiline?: boolean;
+  /** Wrap width in cells — what up/down use to walk soft-wrapped rows. Only
+   *  read when `multiline`; without it each source line counts as one row. */
+  width?: number;
+}
+
+export function reduce(state: EditorState, key: Key, opts: EditorOptions = {}): EditorAction {
   const { value, cursor } = state;
   const clamp = (n: number) => Math.max(0, Math.min(value.length, n));
+  const multiline = opts.multiline === true;
+  // Bounds of the line the cursor is on: the whole value when single-line.
+  const lineStart = multiline ? value.lastIndexOf('\n', cursor - 1) + 1 : 0;
+  const nextBreak = multiline ? value.indexOf('\n', cursor) : -1;
+  const lineEnd = nextBreak < 0 ? value.length : nextBreak;
+  const insert = (text: string): EditorAction => ({
+    kind: 'edit',
+    state: { value: value.slice(0, cursor) + text + value.slice(cursor), cursor: cursor + text.length },
+  });
 
   // Paste: insert the whole text at the cursor. This editor is single-line, so
   // line breaks become spaces — a multi-line paste must never act as Enter.
   if (key.name === 'paste') {
-    const text = (key.text ?? '').replace(/\n/g, ' ');
+    const text = multiline ? (key.text ?? '') : (key.text ?? '').replace(/\n/g, ' ');
     if (text === '') return { kind: 'noop' };
-    return { kind: 'edit', state: { value: value.slice(0, cursor) + text + value.slice(cursor), cursor: cursor + text.length } };
+    return insert(text);
+  }
+
+  if (multiline) {
+    // Line breaks. Backslash-then-Enter is the one form every terminal delivers:
+    // Shift+Enter is often indistinguishable from Enter without the Kitty protocol.
+    if (key.name === 'return' && (key.shift || key.meta)) return insert('\n');
+    if (key.name === 'return' && cursor > 0 && value[cursor - 1] === '\\') {
+      return { kind: 'edit', state: { value: value.slice(0, cursor - 1) + '\n' + value.slice(cursor), cursor } };
+    }
+    // Row-wise movement over the wrapped layout, keeping the column where the
+    // target row is long enough. Off the first/last row → start/end of the value.
+    if (key.name === 'up' || key.name === 'down') {
+      const width = opts.width ?? Number.MAX_SAFE_INTEGER;
+      const rows = inputRows(value, width, cursor);
+      const at = caretPosition(value, cursor, width);
+      const target = at.row + (key.name === 'up' ? -1 : 1);
+      if (target < 0) return { kind: 'edit', state: { value, cursor: 0 } };
+      if (target >= rows.length) return { kind: 'edit', state: { value, cursor: value.length } };
+      const row = rows[target]!;
+      return { kind: 'edit', state: { value, cursor: row.start + Math.min(at.col, row.text.length) } };
+    }
   }
 
   // Cursor movement
@@ -61,10 +103,10 @@ export function reduce(state: EditorState, key: Key): EditorAction {
   if (key.name === 'f' && key.meta) return { kind: 'edit', state: { value, cursor: wordRight(value, cursor) } };
   if (key.name === 'left') return { kind: 'edit', state: { value, cursor: clamp(cursor - 1) } };
   if (key.name === 'right') return { kind: 'edit', state: { value, cursor: clamp(cursor + 1) } };
-  if (key.name === 'home') return { kind: 'edit', state: { value, cursor: 0 } };
-  if (key.name === 'end') return { kind: 'edit', state: { value, cursor: value.length } };
-  if (key.name === 'a' && key.ctrl) return { kind: 'edit', state: { value, cursor: 0 } };
-  if (key.name === 'e' && key.ctrl) return { kind: 'edit', state: { value, cursor: value.length } };
+  if (key.name === 'home') return { kind: 'edit', state: { value, cursor: lineStart } };
+  if (key.name === 'end') return { kind: 'edit', state: { value, cursor: lineEnd } };
+  if (key.name === 'a' && key.ctrl) return { kind: 'edit', state: { value, cursor: lineStart } };
+  if (key.name === 'e' && key.ctrl) return { kind: 'edit', state: { value, cursor: lineEnd } };
 
   // Word deletion (check meta-modified BEFORE plain backspace/delete)
   if (key.name === 'backspace' && key.meta) {
@@ -86,10 +128,10 @@ export function reduce(state: EditorState, key: Key): EditorAction {
 
   // Kill bindings
   if (key.name === 'k' && key.ctrl) {
-    return { kind: 'edit', state: { value: value.slice(0, cursor), cursor } };
+    return { kind: 'edit', state: { value: value.slice(0, cursor) + value.slice(lineEnd), cursor } };
   }
   if (key.name === 'u' && key.ctrl) {
-    return { kind: 'edit', state: { value: value.slice(cursor), cursor: 0 } };
+    return { kind: 'edit', state: { value: value.slice(0, lineStart) + value.slice(cursor), cursor: lineStart } };
   }
 
   // Typography: Option+key with an OPT_MAP entry inserts a typography character.

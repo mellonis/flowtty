@@ -153,3 +153,74 @@ test('a multi-line paste into the single-line editor never submits: line breaks 
 test('an empty paste is a noop', () => {
   expect(reduce(s('hi', 1), key({ name: 'paste', text: '' }))).toEqual({ kind: 'noop' });
 });
+
+// ─── multiline ───────────────────────────────────────────────────────────────
+
+const ml = { multiline: true, width: 10 } as const;
+const edit = (a: ReturnType<typeof reduce>) => (a as { state: EditorState }).state;
+
+test('multiline: plain Enter still submits', () => {
+  expect(reduce(s('hi', 2), key({ name: 'return' }), ml)).toEqual({ kind: 'submit' });
+});
+
+test('multiline: Shift+Enter and Alt+Enter insert a line break at the cursor', () => {
+  expect(edit(reduce(s('ab', 1), key({ name: 'return', shift: true }), ml))).toEqual({ value: 'a\nb', cursor: 2 });
+  expect(edit(reduce(s('ab', 1), key({ name: 'return', meta: true }), ml))).toEqual({ value: 'a\nb', cursor: 2 });
+});
+
+test('multiline: backslash then Enter turns the backslash into a line break instead of submitting', () => {
+  expect(edit(reduce(s('one\\two', 4), key({ name: 'return' }), ml))).toEqual({ value: 'one\ntwo', cursor: 4 });
+});
+
+test('single-line: backslash + Enter is just submit, and Shift+Enter too', () => {
+  expect(reduce(s('one\\', 4), key({ name: 'return' }))).toEqual({ kind: 'submit' });
+  expect(reduce(s('one', 3), key({ name: 'return', shift: true }))).toEqual({ kind: 'submit' });
+});
+
+test('multiline: a paste keeps its line breaks', () => {
+  expect(edit(reduce(s('ab', 1), key({ name: 'paste', text: 'x\ny' }), ml))).toEqual({ value: 'ax\nyb', cursor: 4 });
+});
+
+test('multiline: down / up move between lines keeping the column', () => {
+  const v = 'hello\nworld!\nx';
+  expect(edit(reduce(s(v, 3), key({ name: 'down' }), ml)).cursor).toBe(9);   // "wor|ld!"
+  expect(edit(reduce(s(v, 9), key({ name: 'up' }), ml)).cursor).toBe(3);
+});
+
+test('multiline: moving onto a shorter line clamps to its end; onto a blank line lands on it', () => {
+  const v = 'hello\n\nx';
+  expect(edit(reduce(s(v, 4), key({ name: 'down' }), ml)).cursor).toBe(6);   // the blank line
+  expect(edit(reduce(s(v, 6), key({ name: 'down' }), ml)).cursor).toBe(7);   // col 0 of "x"
+  expect(edit(reduce(s('hello\nx', 4), key({ name: 'down' }), ml)).cursor).toBe(7); // end of "x"
+});
+
+test('multiline: up on the first row goes to the start, down on the last row to the end', () => {
+  expect(edit(reduce(s('hello\nx', 3), key({ name: 'up' }), ml)).cursor).toBe(0);
+  expect(edit(reduce(s('hello\nxyz', 7), key({ name: 'down' }), ml)).cursor).toBe(9);
+});
+
+test('multiline: up / down walk soft-wrapped rows of one long line', () => {
+  const v = 'abcdefghijKLMNOPQRSTuvw'; // rows at width 10: abcdefghij / KLMNOPQRST / uvw
+  expect(edit(reduce(s(v, 2), key({ name: 'down' }), ml)).cursor).toBe(12);
+  expect(edit(reduce(s(v, 12), key({ name: 'down' }), ml)).cursor).toBe(22);
+  expect(edit(reduce(s(v, 17), key({ name: 'down' }), ml)).cursor).toBe(23); // clamps to the short last row
+  expect(edit(reduce(s(v, 22), key({ name: 'up' }), ml)).cursor).toBe(12);
+});
+
+test('multiline: Home / End and ^a / ^e work within the current line, not the whole value', () => {
+  const v = 'one\ntwo three\nfour';
+  expect(edit(reduce(s(v, 7), key({ name: 'home' }), ml)).cursor).toBe(4);
+  expect(edit(reduce(s(v, 7), key({ name: 'end' }), ml)).cursor).toBe(13);
+  expect(edit(reduce(s(v, 7), key({ name: 'a', ctrl: true }), ml)).cursor).toBe(4);
+  expect(edit(reduce(s(v, 7), key({ name: 'e', ctrl: true }), ml)).cursor).toBe(13);
+});
+
+test('multiline: ^k / ^u kill to the end / start of the current line only', () => {
+  const v = 'one\ntwo three\nfour';
+  expect(edit(reduce(s(v, 7), key({ name: 'k', ctrl: true }), ml))).toEqual({ value: 'one\ntwo\nfour', cursor: 7 });
+  expect(edit(reduce(s(v, 7), key({ name: 'u', ctrl: true }), ml))).toEqual({ value: 'one\n three\nfour', cursor: 4 });
+});
+
+test('multiline: backspace at the start of a line joins it to the previous one', () => {
+  expect(edit(reduce(s('ab\ncd', 3), key({ name: 'backspace' }), ml))).toEqual({ value: 'abcd', cursor: 2 });
+});

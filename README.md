@@ -623,6 +623,42 @@ Measurement is per-code-point, not grapheme-aware, so an emoji ZWJ sequence
 (👩‍👧) over-counts; pre-segment if you need cluster-exact widths. Expects plain
 text (styling lives in the cell, not the string).
 
+### TextArea
+
+`<TextArea>` is the multi-line sibling of `<TextInput>`: soft wrap, a caret that
+moves across visual rows (and can stand on a blank line), Home/End, word motion
+and the kill bindings per line, and pastes inserted with their line breaks. Its
+height is its row count, capped by `maxRows`, so the layout around it needs no
+bookkeeping.
+
+```tsx
+<TextArea
+  value={text} onChange={setText} onSubmit={send}
+  maxRows={5}
+  prefix={<Text color="cyan">› </Text>} continuationPrefix="  "
+  placeholder="type a message"
+  onKey={(key) => key.name === 'tab' && complete()}   // true = consumed
+/>
+```
+
+- **Line breaks.** Enter submits. Shift+Enter, Alt+Enter and **backslash then
+  Enter** insert a line break — the last one works in every terminal (without the
+  Kitty protocol many terminals send plain Enter for Shift+Enter).
+- **`onKey(key)`** runs before the field's own handling; return `true` to consume
+  the key. That is how a host owns Enter, Tab, Escape, or history on up/down.
+- **Caret.** Uncontrolled by default; a value replaced from outside (history,
+  completion) puts the caret at its end. Pass `cursor` + `onCursorChange` to
+  control it.
+- **`prefix` / `continuationPrefix`** — a gutter before the first row of the value
+  and before every other row; the text wraps in the width that is left.
+- **`ghost`** — untyped completion drawn dim after the value while the caret is
+  at its end, with the caret on the ghost's first character; not part of the
+  value. **`suffix`** renders after it (a key hint). Typed text is never dimmed.
+
+The pure parts are exported for custom fields: the editor reducer takes
+`{ multiline: true, width }`, and `inputRows(value, width, cursor?)` /
+`caretPosition(value, cursor, width)` give the row layout and the caret's place in it.
+
 ### Paste and mouse wheel
 
 Two input events arrive through `useInput` as ordinary keys with a payload:
