@@ -33,7 +33,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup && node scripts/checkDist.mjs",
+    "build": "tsdown && node scripts/checkDist.mjs",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
@@ -45,6 +45,6 @@
   "devDependencies": {
     "@types/react-reconciler": "^0.33.0",
     "react-reconciler": "^0.34.0",
-    "tsup": "^8"
+    "tsdown": "^0.23.0"
   }
 }

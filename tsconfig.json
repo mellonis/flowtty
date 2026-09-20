@@ -1,7 +1,7 @@
 {
   // Root tsconfig drives `tsc --noEmit` across the whole workspace. Each
   // package also has its own tsconfig (extending tsconfig.base.json) for IDE
-  // multi-project support and per-package builds via tsup.
+  // multi-project support and per-package builds via tsdown (whose dts step also reads THIS file — see any tsdown.config.ts).
   "extends": "./tsconfig.base.json",
   "include": [
     "packages/*/src",

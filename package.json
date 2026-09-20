@@ -21,7 +21,7 @@
     "docker-logs-tui:demo": "npm run docker-logs-tui:demo -w @flowtty/examples"
   },
   "devDependencies": {
-    "typescript": "^6",
+    "typescript": "^7",
     "vitest": "^5"
   }
 }

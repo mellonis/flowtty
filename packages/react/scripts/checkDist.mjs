@@ -1,6 +1,6 @@
 // Post-build guard: the dist must acquire React through static ESM imports only.
 // A runtime `require('react')` (or a createRequire shim that enables one) gives
-// bundlers such as `bun build` a second React instance — see tsup.config.ts.
+// bundlers such as `bun build` a second React instance — see tsdown.config.ts.
 import { readFile } from 'node:fs/promises';
 
 const dist = new URL('../dist/index.js', import.meta.url);
