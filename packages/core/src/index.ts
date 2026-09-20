@@ -42,4 +42,4 @@ export { reduce as selectReducer, visibleIndices } from './selectReducer.js';
 export type { SelectItem, SelectState, SelectAction } from './selectReducer.js';
 
 export { reduce as multiSelectReducer } from './multiSelectReducer.js';
-export type { MultiSelectState, MultiSelectAction } from './multiSelectReducer.js';
+export type { MultiSelectState, MultiSelectAction, MultiSelectOptions } from './multiSelectReducer.js';

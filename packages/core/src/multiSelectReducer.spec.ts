@@ -48,3 +48,22 @@ test('empty items list: up/down are noop, submit still fires', () => {
 test('unhandled key is noop', () => {
   expect(reduce(items(3), { cursor: 0 }, key({ name: 'a' }))).toEqual({ kind: 'noop' });
 });
+
+// ─── extra rows (e.g. MultiSelect's "+ add new") ─────────────────────────────
+
+test('extraRows: navigation wraps over the items PLUS the extra rows', () => {
+  const opts = { extraRows: 1 };
+  expect(reduce(items(2), { cursor: 1 }, key({ name: 'down' }), opts)).toEqual({ kind: 'state', state: { cursor: 2 } });
+  expect(reduce(items(2), { cursor: 2 }, key({ name: 'down' }), opts)).toEqual({ kind: 'state', state: { cursor: 0 } });
+  expect(reduce(items(2), { cursor: 0 }, key({ name: 'up' }), opts)).toEqual({ kind: 'state', state: { cursor: 2 } });
+});
+
+test('extraRows: Space on an extra row toggles nothing', () => {
+  expect(reduce(items(2), { cursor: 2 }, key({ name: ' ', sequence: ' ' }), { extraRows: 1 })).toEqual({ kind: 'noop' });
+  expect(reduce(items(2), { cursor: 1 }, key({ name: ' ', sequence: ' ' }), { extraRows: 1 })).toEqual({ kind: 'toggle', index: 1 });
+});
+
+test('extraRows: an extra row is navigable even with no items', () => {
+  expect(reduce(items(0), { cursor: 0 }, key({ name: 'down' }), { extraRows: 1 })).toEqual({ kind: 'state', state: { cursor: 0 } });
+  expect(reduce(items(0), { cursor: 0 }, key({ name: ' ', sequence: ' ' }), { extraRows: 1 })).toEqual({ kind: 'noop' });
+});

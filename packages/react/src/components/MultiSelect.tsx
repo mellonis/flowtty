@@ -59,23 +59,15 @@ export function MultiSelect<T>(props: MultiSelectProps<T>): ReactNode {
   };
 
   useInput((key) => {
-    // Add-new-row specific routing BEFORE reducer.
-    if (onAddRow) {
-      if (key.name === 'return') { addNew(); return; }
-      if (key.name === ' ') return;   // Space is noop on the add row
-      // (Up/Down/k/j fall through to the reducer for navigation.)
-    }
-    // Pad items so the reducer sees `totalRows` entries for navigation wrap.
-    // The synthetic add-row value is never looked up (Space guarded above;
-    // Enter routes via onAddRow check before submit-handling).
-    const paddedItems = onAddNew !== undefined
-      ? [...items, { label: '+ add new', value: '\0__add_new__\0' as unknown as T }]
-      : items;
-    const action = reduce(paddedItems, { cursor }, key);
+    // Enter on the "+ add new" row adds instead of submitting. Everything else —
+    // navigation over that row, Space doing nothing on it — is the reducer's job:
+    // it is told the row exists, so no placeholder item has to be invented.
+    if (onAddRow && key.name === 'return') { addNew(); return; }
+    const action = reduce(items, { cursor }, key, { extraRows: onAddNew !== undefined ? 1 : 0 });
     if (action.kind === 'state') {
       setState(action.state);
     } else if (action.kind === 'toggle') {
-      // Only fires for real item rows (Space on add row guarded above).
+      // Only fires for real item rows (the reducer never toggles an extra row).
       const toggled = items[action.index]!.value;
       const isOn = value.includes(toggled);
       // Build next array in ORIGINAL item order so callers get a deterministic order:

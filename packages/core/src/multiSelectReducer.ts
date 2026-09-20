@@ -12,8 +12,20 @@ export type MultiSelectAction =
   | { kind: 'cancel' }
   | { kind: 'noop' };
 
-export function reduce<T>(items: SelectItem<T>[], state: MultiSelectState, key: Key): MultiSelectAction {
-  const n = items.length;
+export interface MultiSelectOptions {
+  /** Rows after the items that the cursor can stand on but that hold no item —
+   *  e.g. a trailing "+ add new" row. Navigation wraps over items + extra rows;
+   *  Space on an extra row toggles nothing. Default 0. */
+  extraRows?: number;
+}
+
+export function reduce<T>(
+  items: SelectItem<T>[],
+  state: MultiSelectState,
+  key: Key,
+  opts: MultiSelectOptions = {},
+): MultiSelectAction {
+  const n = items.length + Math.max(0, opts.extraRows ?? 0);
 
   if (key.name === 'escape') return { kind: 'cancel' };
   if (key.name === 'return') return { kind: 'submit' };
@@ -33,6 +45,7 @@ export function reduce<T>(items: SelectItem<T>[], state: MultiSelectState, key: 
     // items[index] directly — an out-of-range index would crash them. n >= 1
     // here (the n === 0 case returned above).
     const index = Math.max(0, Math.min(state.cursor, n - 1));
+    if (index >= items.length) return { kind: 'noop' }; // an extra row holds no item
     return { kind: 'toggle', index };
   }
 
