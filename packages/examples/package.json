@@ -4,6 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "showcase": "tsx showcase/index.tsx",
     "articles-tui": "tsx articles-tui/index.tsx",
     "things-tui": "tsx things-tui/index.tsx",
     "things-tui:ddev": "THINGS_TUI_BASE=https://api.poetry.ddev.site NODE_TLS_REJECT_UNAUTHORIZED=0 NODE_NO_WARNINGS=1 tsx things-tui/index.tsx",

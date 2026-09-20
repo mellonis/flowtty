@@ -14,6 +14,24 @@ in-memory surface for tests.
 npm install @flowtty/react @flowtty/tty-backend react
 ```
 
+## Showcase
+
+```bash
+npm run showcase            # a self-playing tour: layout, forms, table + markdown,
+                            # progress, a chat, dialogs, and a game of snake
+```
+
+It plays itself — a script types, tabs and scrolls through seven scenes — and
+hands over the keys the moment you press one (`Ctrl+G` gives them back, `Ctrl+N` /
+`Ctrl+P` change scene). It needs a 100×30 terminal. `--speed 2`, `--manual`,
+`--loop` and `--exit` are there too.
+
+The script is an ordinary list of steps (`type`, `press`, `paste`, `wheel`,
+`waitFor`) fed through a `Backend` wrapper, so the very same script runs against
+`TestBackend` in the test suite: what gets recorded is what gets tested.
+`npm run showcase:record` renders it to `docs/showcase.gif` with
+[vhs](https://github.com/charmbracelet/vhs).
+
 ## Status
 
 Alpha (`1.0.0-alpha.x` on npm; APIs can still change between alphas — each
