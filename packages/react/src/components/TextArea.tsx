@@ -38,12 +38,19 @@ export interface TextAreaProps {
   placeholder?: string;
   /** Override focus state; defaults to the enclosing FocusGroup's. */
   isFocused?: boolean;
-  /** Field background. Default: the same light gray as `<TextInput>`. */
+  /** Field background. Default: the same light gray as `<TextInput>`, with the
+   *  text drawn dark on it. Pass your own (or `'default'` for none) and the text
+   *  keeps the terminal's colors, with `dim` for the placeholder and ghost. */
   backgroundColor?: string;
 }
 
 const CURSOR_AT_END = ' ';
 const FIELD_BG = 'rgb(211,211,211)';
+// On the default light field the terminal's own foreground (white in a dark
+// theme) and `dim` on top of it are close to invisible — draw the text dark and
+// the placeholder/ghost in a mid gray instead.
+const FIELD_FG = 'black';
+const FIELD_FADED = 'rgb(105,105,105)';
 
 /**
  * A multi-line text field: soft wrap, a caret that moves across visual rows,
@@ -109,13 +116,16 @@ export function TextArea(props: TextAreaProps): ReactNode {
     : value === '' && placeholder ? placeholder
     : atEnd ? ghost ?? '' : '';
   const hasGutter = prefix !== undefined || continuationPrefix !== undefined;
+  const onDefaultField = backgroundColor === FIELD_BG;
+  const textColor = onDefaultField ? FIELD_FG : undefined;
+  const faded = onDefaultField ? { color: FIELD_FADED } : { dim: true };
 
   return (
     <Box flexDirection="row" backgroundColor={backgroundColor}>
       {hasGutter ? (
         <Box flexDirection="column" flexShrink={0}>
           {rows.slice(first, first + visible).map((_, i) => (
-            <Box key={i} flexDirection="row">{gutter(first + i === 0 ? prefix : continuationPrefix)}</Box>
+            <Box key={i} flexDirection="row">{gutter(first + i === 0 ? prefix : continuationPrefix, textColor)}</Box>
           ))}
         </Box>
       ) : null}
@@ -131,8 +141,8 @@ export function TextArea(props: TextAreaProps): ReactNode {
           if (!isCaretRow) {
             return (
               <Box key={r} flexDirection="row">
-                <Text>{row.text}</Text>
-                {tail ? <Text dim>{tail}</Text> : null}
+                <Text color={textColor}>{row.text}</Text>
+                {tail ? <Text {...faded}>{tail}</Text> : null}
               </Box>
             );
           }
@@ -143,10 +153,10 @@ export function TextArea(props: TextAreaProps): ReactNode {
           const dimAfter = onText ? tail : tail.slice(1);
           return (
             <Box key={r} flexDirection="row">
-              {before ? <Text>{before}</Text> : null}
-              <Text inverse>{caretChar}</Text>
-              {after ? <Text>{after}</Text> : null}
-              {dimAfter ? <Text dim>{dimAfter}</Text> : null}
+              {before ? <Text color={textColor}>{before}</Text> : null}
+              <Text inverse color={textColor}>{caretChar}</Text>
+              {after ? <Text color={textColor}>{after}</Text> : null}
+              {dimAfter ? <Text {...faded}>{dimAfter}</Text> : null}
               {isLastRow && atEnd ? suffix : null}
             </Box>
           );
@@ -156,7 +166,7 @@ export function TextArea(props: TextAreaProps): ReactNode {
   );
 }
 
-function gutter(node: ReactNode): ReactNode {
+function gutter(node: ReactNode, color?: string): ReactNode {
   if (node === undefined || node === null) return <Text>{''}</Text>;
-  return typeof node === 'string' ? <Text>{node}</Text> : node;
+  return typeof node === 'string' ? <Text color={color}>{node}</Text> : node;
 }

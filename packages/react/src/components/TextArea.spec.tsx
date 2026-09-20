@@ -140,7 +140,10 @@ describe('TextArea', () => {
     expect(await caret()).toEqual({ x: 3, y: 0 });
     const buf = backend.lastBuffer!;
     expect(buf.get(3, 0).char).toBe('l');
-    expect(buf.get(4, 0).style.dim).toBe(true);
+    // On the default light field: typed text is dark, the ghost a mid gray —
+    // `dim` over a light background is unreadable in a dark theme.
+    expect(buf.get(4, 0).style.fg).toBe('rgb(105,105,105)');
+    expect(buf.get(1, 0).style.fg).toBe('black');
     expect(buf.get(1, 0).style.dim).toBeFalsy(); // typed text is never dimmed
     backend.press({ name: 'left' });
     expect(await frame()).toEqual(['/he']); // ghost only shows with the caret at the end
@@ -166,6 +169,15 @@ describe('TextArea', () => {
     backend.type('z');
     expect(await caret()).toBeNull();
     expect(seen.value).toBe('abc');
+    unmount();
+  });
+
+  test('with a custom background the text keeps the terminal colors and the ghost is dim', async () => {
+    const { backend, frame, unmount } = await mount('/he', { ghost: 'lp', backgroundColor: 'default' });
+    await frame();
+    const buf = backend.lastBuffer!;
+    expect(buf.get(1, 0).style.fg).toBeUndefined();
+    expect(buf.get(4, 0).style.dim).toBe(true);
     unmount();
   });
 });
