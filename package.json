@@ -14,7 +14,7 @@
     "build": "npm run build -ws --if-present",
     "release:publish": "node scripts/publish.mjs",
     "showcase": "npm run showcase -w @flowtty/examples --",
-    "showcase:record": "python3 packages/examples/showcase/record.py && agg --quiet --theme dracula --font-size 16 docs/showcase.cast docs/showcase.gif",
+    "showcase:record": "python3 packages/examples/showcase/record.py && agg --quiet --theme dracula --font-size 16 --font-family \"PT Mono,Andale Mono,Menlo\" --line-height 1.2 docs/showcase.cast docs/showcase.gif",
     "articles-tui": "npm run articles-tui -w @flowtty/examples",
     "things-tui": "npm run things-tui -w @flowtty/examples",
     "things-tui:ddev": "npm run things-tui:ddev -w @flowtty/examples",
