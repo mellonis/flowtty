@@ -274,3 +274,32 @@ test('a wheel report split across reads is buffered until complete', () => {
   const second = decodeKeys(first.rest + '0;5M');
   expect(second.keys.map((k) => [k.name, k.x, k.y])).toEqual([['wheelup', 9, 4]]);
 });
+
+// ─── modified Enter / Tab / Escape / Backspace in CSI-u and modifyOtherKeys form ──
+
+test('Shift+Enter decodes to return+shift in both the CSI-u and the xterm modifyOtherKeys form', () => {
+  const { keys } = decodeKeys('\x1b[13;2u\x1b[27;2;13~');
+  expect(keys.map((k) => [k.name, k.shift, k.ctrl, k.meta])).toEqual([
+    ['return', true, false, false],
+    ['return', true, false, false],
+  ]);
+});
+
+test('other modifiers on Enter carry through (Ctrl+Enter, Alt+Enter)', () => {
+  const { keys } = decodeKeys('\x1b[13;5u\x1b[27;3;13~');
+  expect(keys.map((k) => [k.name, k.shift, k.ctrl, k.meta])).toEqual([
+    ['return', false, true, false],
+    ['return', false, false, true],
+  ]);
+});
+
+test('CSI-u / modifyOtherKeys forms of Tab, Escape, Backspace and printable keys decode to the usual names', () => {
+  const { keys } = decodeKeys('\x1b[9;2u\x1b[27u\x1b[127;3u\x1b[97;5u\x1b[27;5;97~');
+  expect(keys.map((k) => [k.name, k.shift, k.ctrl, k.meta])).toEqual([
+    ['tab', true, false, false],
+    ['escape', false, false, false],
+    ['backspace', false, false, true],
+    ['a', false, true, false],
+    ['a', false, true, false],
+  ]);
+});

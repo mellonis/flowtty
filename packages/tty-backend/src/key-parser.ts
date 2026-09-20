@@ -27,7 +27,12 @@ import type { Key } from '@flowtty/core';
  *    'wheeldown', x, y} (0-based cell). Other mouse reports (press, release,
  *    motion) are consumed and dropped until click support lands.
  *
- * NOT handled (later): mouse clicks, Kitty protocol, F13+.
+ *  - Keys reported by code point: CSI-u (ESC[13;2u) and xterm modifyOtherKeys
+ *    (ESC[27;2;13~) → the usual name plus modifiers, e.g. Shift+Enter =
+ *    {name: 'return', shift: true}. Decoded whenever a terminal sends them;
+ *    flowtty does not yet ask terminals to (that is the Kitty protocol).
+ *
+ * NOT handled (later): mouse clicks, enabling the Kitty protocol, F13+.
  */
 // SGR mouse report params: "<button;col;row" (1-based). Button 64/65 = wheel
 // up/down; bits 4/8/16 add Shift/Meta/Ctrl. Anything else is not a wheel step.
@@ -43,6 +48,23 @@ function decodeSgrWheel(params: string, final: string): Omit<Key, 'sequence'> | 
     y: row - 1,
     ctrl: (b & 16) !== 0, meta: (b & 8) !== 0, shift: (b & 4) !== 0,
   };
+}
+
+function decodeKeyByCodePoint(final: string, params: string): Omit<Key, 'sequence'> | null {
+  const parts = params.split(';');
+  let code: number;
+  let modParam: string | undefined;
+  if (final === 'u') { code = Number(parts[0]); modParam = parts[1]; }
+  else if (final === '~' && parts[0] === '27' && parts.length === 3) { code = Number(parts[2]); modParam = parts[1]; }
+  else return null;
+  if (!Number.isInteger(code) || code <= 0) return null;
+  // The modifier may carry a ":<event-type>" suffix in the Kitty form; ignore it.
+  const mod = modParam === undefined ? NO_MOD : decodeModifier(Number(modParam.split(':')[0]));
+  // Name it the way the plain byte would be named (13 → return, 9 → tab, …), but
+  // take the modifiers from the report: parseChar would read 0x01–0x1A as Ctrl+letter.
+  const base = code < 0x20 || code === 0x7f ? parseChar(String.fromCodePoint(code)) : null;
+  const name = base && !base.ctrl ? base.name : String.fromCodePoint(code);
+  return { name, ctrl: mod.ctrl, meta: mod.meta, shift: mod.shift };
 }
 
 const PASTE_START_PARAM = '200';
@@ -91,6 +113,16 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
           if ((final === 'M' || final === 'm') && params.startsWith('<')) {
             const wheel = decodeSgrWheel(params, final);
             if (wheel) out.push({ ...wheel, sequence: chars.slice(i, j + 1).join('') });
+            i = j + 1;
+            continue;
+          }
+          // A key reported by code point: CSI-u "<code>;<mod>u" (fixterms / Kitty)
+          // or xterm modifyOtherKeys "27;<mod>;<code>~". This is how a terminal
+          // configured for it tells Shift+Enter from Enter. Decoding needs no
+          // protocol negotiation — it only matters that the bytes are understood.
+          const byCode = decodeKeyByCodePoint(final, params);
+          if (byCode) {
+            out.push({ ...byCode, sequence: chars.slice(i, j + 1).join('') });
             i = j + 1;
             continue;
           }
