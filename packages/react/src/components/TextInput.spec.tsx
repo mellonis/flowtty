@@ -133,3 +133,19 @@ test('M1d acceptance: <Box width=10 backgroundColor=blue><Text color=red bold wr
   expect(buf.get(5, 0)).toEqual({ char: ' ', style: { bg: 'blue' } });
   expect(buf.get(0, 2)).toEqual({ char: ' ', style: { bg: 'blue' } });
 });
+
+test('a multi-line paste lands in the field as text and does not submit', async () => {
+  let captured = '';
+  let submitted: string | null = null;
+  function App() {
+    const [v, setV] = useState('ab');
+    captured = v;
+    return createElement(TextInput, { value: v, onChange: setV, onSubmit: (x: string) => { submitted = x; } });
+  }
+  const backend = new TestBackend(30, 1);
+  await render(createElement(App), backend);
+  backend.paste('line one\nline two');
+  await flush();
+  expect(captured).toBe('abline one line two');
+  expect(submitted).toBeNull();
+});

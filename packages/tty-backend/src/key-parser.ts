@@ -19,8 +19,25 @@ import type { Key } from '@flowtty/core';
  *    (ESC[1;<mod>P..S) for modified F1–F4, and tilde form (ESC[11~..[24~) for all
  *  - Mac Option-as-Meta: ESC <char> → {name: <char>, meta: true}
  *
- * NOT handled (later): bracketed paste, mouse, Kitty protocol, F13+.
+ *  - Bracketed paste: ESC[200~ … ESC[201~ → ONE key {name: 'paste', text}. The
+ *    body is never decoded, so a pasted newline is text, not Return. A paste
+ *    split across reads is handed back whole as `rest` until its end arrives.
+ *
+ * NOT handled (later): mouse, Kitty protocol, F13+.
  */
+const PASTE_START_PARAM = '200';
+const PASTE_END = [...'\x1b[201~'];
+
+// Index of `seq` in `chars` at or after `from`, or -1.
+function indexOfSeq(chars: string[], seq: string[], from: number): number {
+  for (let k = from; k + seq.length <= chars.length; k++) {
+    let hit = true;
+    for (let m = 0; m < seq.length; m++) if (chars[k + m] !== seq[m]) { hit = false; break; }
+    if (hit) return k;
+  }
+  return -1;
+}
+
 export function decodeKeys(input: string): { keys: Key[]; rest: string } {
   const out: Key[] = [];
   // Iterate by Unicode code point so astral characters (emoji, etc.) stay
@@ -51,6 +68,20 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
         if (j < chars.length) {
           const final = chars[j]!;
           const params = chars.slice(i + 2, j).join('');
+          if (final === '~' && params === PASTE_START_PARAM) {
+            const bodyStart = j + 1;
+            const end = indexOfSeq(chars, PASTE_END, bodyStart);
+            // Terminator not here yet — buffer the whole paste for the next read.
+            if (end < 0) return { keys: out, rest: chars.slice(i).join('') };
+            out.push({
+              name: 'paste',
+              text: chars.slice(bodyStart, end).join('').replace(/\r\n?/g, '\n'),
+              sequence: chars.slice(i, end + PASTE_END.length).join(''),
+              ctrl: false, meta: false, shift: false,
+            });
+            i = end + PASTE_END.length;
+            continue;
+          }
           // CSI Z = Shift+Tab (xterm backtab). Carry the shift modifier.
           if (final === 'Z' && params === '') {
             out.push({

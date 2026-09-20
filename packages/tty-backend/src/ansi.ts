@@ -2,6 +2,11 @@ import type { Cell, Style } from '@flowtty/core';
 
 export const RESET = '\x1b[0m';
 
+// Bracketed paste mode: the terminal wraps pasted text in ESC[200~ … ESC[201~ so
+// the key parser can deliver it as one 'paste' key instead of a run of keystrokes.
+export const BRACKETED_PASTE_ON = '\x1b[?2004h';
+export const BRACKETED_PASTE_OFF = '\x1b[?2004l';
+
 const FG: Record<string, number> = {
   black: 30, red: 31, green: 32, yellow: 33,
   blue: 34, magenta: 35, cyan: 36, white: 37,

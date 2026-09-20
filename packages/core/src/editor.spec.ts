@@ -139,3 +139,17 @@ test('Option+letter that has no typography mapping is a noop (NOT a word op)', (
   // 'z' has no entry in OPT_MAP and no word/movement binding
   expect(reduce(s('hi', 2), key({ name: 'z', meta: true }))).toEqual({ kind: 'noop' });
 });
+
+test('a paste inserts its whole text at the cursor and moves the cursor past it', () => {
+  const a = reduce(s('hello', 2), key({ name: 'paste', text: 'XYZ' }));
+  expect(a).toEqual({ kind: 'edit', state: { value: 'heXYZllo', cursor: 5 } });
+});
+
+test('a multi-line paste into the single-line editor never submits: line breaks become spaces', () => {
+  const a = reduce(s('', 0), key({ name: 'paste', text: 'one\ntwo\n\nthree' }));
+  expect(a).toEqual({ kind: 'edit', state: { value: 'one two  three', cursor: 14 } });
+});
+
+test('an empty paste is a noop', () => {
+  expect(reduce(s('hi', 1), key({ name: 'paste', text: '' }))).toEqual({ kind: 'noop' });
+});

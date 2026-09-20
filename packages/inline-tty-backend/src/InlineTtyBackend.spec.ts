@@ -171,4 +171,21 @@ describe('InlineTtyBackend', () => {
     expect(text).not.toContain('x\b');
     b.dispose();
   });
+
+  test('enables bracketed paste with input, disables it on dispose, and delivers a paste as one key', () => {
+    const out = mockStdout();
+    const stdin = mockStdin();
+    const b = new InlineTtyBackend({ out, in: stdin });
+    expect(out.captured()).not.toContain('\x1b[?2004h');
+
+    const received: Array<[string, string | undefined]> = [];
+    b.onKey((k) => received.push([k.name, k.text]));
+    expect(out.captured()).toContain('\x1b[?2004h');
+
+    stdin.emit('data', '\x1b[200~a\nb\x1b[201~');
+    expect(received).toEqual([['paste', 'a\nb']]);
+
+    b.dispose();
+    expect(out.captured()).toContain('\x1b[?2004l');
+  });
 });

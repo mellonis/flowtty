@@ -46,6 +46,14 @@ export function reduce(state: EditorState, key: Key): EditorAction {
   const { value, cursor } = state;
   const clamp = (n: number) => Math.max(0, Math.min(value.length, n));
 
+  // Paste: insert the whole text at the cursor. This editor is single-line, so
+  // line breaks become spaces — a multi-line paste must never act as Enter.
+  if (key.name === 'paste') {
+    const text = (key.text ?? '').replace(/\n/g, ' ');
+    if (text === '') return { kind: 'noop' };
+    return { kind: 'edit', state: { value: value.slice(0, cursor) + text + value.slice(cursor), cursor: cursor + text.length } };
+  }
+
   // Cursor movement
   if (key.name === 'left' && key.meta) return { kind: 'edit', state: { value, cursor: wordLeft(value, cursor) } };
   if (key.name === 'b' && key.meta) return { kind: 'edit', state: { value, cursor: wordLeft(value, cursor) } };

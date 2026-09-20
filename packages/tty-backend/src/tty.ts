@@ -1,6 +1,6 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import { stringWidth, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, CLEAR, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, osc8Open, sgr } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, osc8Open, sgr } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
 
@@ -179,6 +179,8 @@ export class TtyBackend implements Backend {
       this.input.on('data', this.inputDataHandler);
       this.input.resume();
       this.inputAttached = true;
+      // Only a backend that reads keys asks for bracketed paste; dispose() undoes it.
+      this.out.write(BRACKETED_PASTE_ON);
     }
     this.subscribers.add(handler);
     return () => {
@@ -195,6 +197,7 @@ export class TtyBackend implements Backend {
       this.input.pause();
       this.inputAttached = false;
       this.pendingInput = '';
+      this.out.write(BRACKETED_PASTE_OFF);
     }
     if (this.resizeAttached) {
       this.out.removeListener('resize', this.resizeNotify);

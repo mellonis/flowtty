@@ -4,6 +4,7 @@ import {
   decodeKeys,
   detectHyperlinkSupport,
   RESET, HIDE_CURSOR, SHOW_CURSOR,
+  BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF,
   OSC8_CLOSE, osc8Open,
   sgr,
 } from '@flowtty/tty-backend';
@@ -136,6 +137,8 @@ export class InlineTtyBackend implements Backend {
       this.input.on('data', this.inputDataHandler);
       this.input.resume();
       this.inputAttached = true;
+      // Only a backend that reads keys asks for bracketed paste; dispose() undoes it.
+      this.out.write(BRACKETED_PASTE_ON);
     }
     this.subscribers.add(handler);
     return () => { this.subscribers.delete(handler); };
@@ -150,6 +153,7 @@ export class InlineTtyBackend implements Backend {
       this.input.pause();
       this.inputAttached = false;
       this.pendingInput = '';
+      this.out.write(BRACKETED_PASTE_OFF);
     }
     if (this.resizeAttached) {
       this.out.removeListener('resize', this.resizeNotify);

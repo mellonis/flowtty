@@ -7,6 +7,7 @@ export { parseKeypress, decodeKeys } from './key-parser.js';
 export {
   RESET, HIDE_CURSOR, SHOW_CURSOR, CLEAR,
   ALT_SCREEN_ON, ALT_SCREEN_OFF,
+  BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF,
   OSC8_CLOSE, osc8Open,
   sgr, cursorTo, cellsEqual, parseColor,
 } from './ansi.js';

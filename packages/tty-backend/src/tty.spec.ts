@@ -392,3 +392,20 @@ test('TtyBackend: resize invalidates previousBuffer → next draw is a full redr
   expect(drawWrite).toContain('abcd');
   back.dispose();
 });
+
+test('TtyBackend.onKey: enables bracketed paste with input, disables it on dispose, and delivers a paste as one key', () => {
+  const { stub: out, writes } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  expect(writes.join('')).not.toContain('\x1b[?2004h'); // passive backend: untouched
+
+  const received: Array<[string, string | undefined]> = [];
+  back.onKey((k) => received.push([k.name, k.text]));
+  expect(writes.join('')).toContain('\x1b[?2004h');
+
+  stdin.emit('data', '\x1b[200~line one\nline two\x1b[201~');
+  expect(received).toEqual([['paste', 'line one\nline two']]);
+
+  back.dispose();
+  expect(writes.join('')).toContain('\x1b[?2004l');
+});

@@ -201,3 +201,46 @@ test('decodeKeys does NOT buffer a lone trailing ESC — surfaces it as escape',
   expect(r.keys.map((k) => k.name)).toEqual(['escape']);
   expect(r.rest).toBe('');
 });
+
+// ─── bracketed paste ─────────────────────────────────────────────────────────
+
+test('a bracketed paste arrives as ONE paste key carrying the whole text', () => {
+  const { keys, rest } = decodeKeys('\x1b[200~hello world\x1b[201~');
+  expect(rest).toBe('');
+  expect(keys).toEqual([{
+    name: 'paste', text: 'hello world', sequence: '\x1b[200~hello world\x1b[201~',
+    ctrl: false, meta: false, shift: false,
+  }]);
+});
+
+test('newlines inside a paste stay text — no return key — and line endings normalize to \\n', () => {
+  const { keys } = decodeKeys('\x1b[200~one\r\ntwo\rthree\nfour\x1b[201~');
+  expect(keys).toHaveLength(1);
+  expect(keys[0]!.text).toBe('one\ntwo\nthree\nfour');
+  expect(keys.some((k) => k.name === 'return')).toBe(false);
+});
+
+test('escape sequences and single letters inside a paste are not decoded as keys', () => {
+  const { keys } = decodeKeys('\x1b[200~q\x1b[Aq\x1b[201~');
+  expect(keys.map((k) => k.name)).toEqual(['paste']);
+  expect(keys[0]!.text).toBe('q\x1b[Aq');
+});
+
+test('keys before and after a paste decode normally', () => {
+  const { keys } = decodeKeys('a\x1b[200~xy\x1b[201~\r');
+  expect(keys.map((k) => k.name)).toEqual(['a', 'paste', 'return']);
+});
+
+test('a paste split across reads is buffered whole until its terminator arrives', () => {
+  const first = decodeKeys('a\x1b[200~par');
+  expect(first.keys.map((k) => k.name)).toEqual(['a']);
+  expect(first.rest).toBe('\x1b[200~par');
+  const second = decodeKeys(first.rest + 'tial\x1b[201~');
+  expect(second.keys.map((k) => k.text)).toEqual(['partial']);
+  expect(second.rest).toBe('');
+});
+
+test('an empty paste is still one paste key with empty text', () => {
+  const { keys } = decodeKeys('\x1b[200~\x1b[201~');
+  expect(keys.map((k) => [k.name, k.text])).toEqual([['paste', '']]);
+});

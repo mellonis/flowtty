@@ -45,3 +45,11 @@ test('TestBackend.lastBuffer exposes the last drawn Buffer for cell-level assert
   expect(got).not.toBeNull();
   expect(got!.get(0, 0)).toEqual({ char: 'X', style: { bold: true, fg: 'red' } });
 });
+
+test('TestBackend.paste delivers the text as ONE paste key, not a key per character', () => {
+  const b = new TestBackend(4, 1);
+  const got: Array<[string, string | undefined]> = [];
+  b.onKey((k) => got.push([k.name, k.text]));
+  b.paste('a\nb');
+  expect(got).toEqual([['paste', 'a\nb']]);
+});
