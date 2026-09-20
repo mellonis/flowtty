@@ -257,3 +257,23 @@ test('multiline: up / down keep the column counted in characters across rows wit
   expect(edit(reduce(s(v, 6), key({ name: 'down' }), ml)).cursor).toBe(11);  // "abc|def"
   expect(edit(reduce(s(v, 11), key({ name: 'up' }), ml)).cursor).toBe(6);
 });
+
+// A host layers its own keys on top of the editor by handling them first and
+// passing the rest through. That only works if a key the editor has no meaning
+// for comes back as `noop` — never as an edit, in either mode.
+test('contract: a key the editor does not handle is a noop, never an edit', () => {
+  const unhandled = [
+    key({ name: 'tab' }), key({ name: 'tab', shift: true }),
+    key({ name: 'r', ctrl: true }), key({ name: 'q', ctrl: true }),
+    key({ name: 'pageup' }), key({ name: 'pagedown' }), key({ name: 'insert' }),
+    key({ name: 'f5' }), key({ name: 'wheelup', x: 1, y: 1 }), key({ name: 'wheeldown', x: 1, y: 1 }),
+    key({ name: 'csi-u' }), key({ name: 'z', meta: true }),
+  ];
+  for (const k of unhandled) {
+    expect(reduce(s('hello\nworld', 3), k), `single-line: ${k.name}`).toEqual({ kind: 'noop' });
+    expect(reduce(s('hello\nworld', 3), k, ml), `multiline: ${k.name}`).toEqual({ kind: 'noop' });
+  }
+  // up / down mean nothing to a single-line field either.
+  expect(reduce(s('hello', 3), key({ name: 'up' }))).toEqual({ kind: 'noop' });
+  expect(reduce(s('hello', 3), key({ name: 'down' }))).toEqual({ kind: 'noop' });
+});

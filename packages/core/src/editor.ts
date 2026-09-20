@@ -60,10 +60,19 @@ export interface EditorOptions {
    *  within the current line, and a paste keeps its line breaks. */
   multiline?: boolean;
   /** Wrap width in cells — what up/down use to walk soft-wrapped rows. Only
-   *  read when `multiline`; without it each source line counts as one row. */
+   *  read when `multiline`; without it each source line counts as one row.
+   *  It MUST be the width the field is actually drawn with (the one passed to
+   *  `inputRows` / `caretPosition`): a host that renders the rows itself computes
+   *  both, and a mismatch makes up/down land on a different column than shown. */
   width?: number;
 }
 
+/**
+ * One key against an editor state. Contract hosts rely on: a key the editor has
+ * no meaning for (Tab, Ctrl+R, PgUp, the wheel, an unrecognized sequence …)
+ * returns `{ kind: 'noop' }` — never an edit — so a host can handle its own keys
+ * first and pass everything else through.
+ */
 export function reduce(state: EditorState, key: Key, opts: EditorOptions = {}): EditorAction {
   const { value } = state;
   // Never edit from inside a surrogate pair.
