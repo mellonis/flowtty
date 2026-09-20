@@ -1,6 +1,6 @@
 {
   "name": "@flowtty/inline-tty-backend",
-  "version": "1.0.0-alpha.7",
+  "version": "1.0.0-alpha.8",
   "type": "module",
   "license": "MIT",
   "repository": {
@@ -36,8 +36,8 @@
     "prepublishOnly": "npm run build"
   },
   "dependencies": {
-    "@flowtty/core": "1.0.0-alpha.7",
-    "@flowtty/tty-backend": "1.0.0-alpha.7"
+    "@flowtty/core": "1.0.0-alpha.8",
+    "@flowtty/tty-backend": "1.0.0-alpha.8"
   },
   "devDependencies": {
     "@types/node": "^26",
