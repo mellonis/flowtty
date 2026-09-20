@@ -33,7 +33,7 @@
     "dist"
   ],
   "scripts": {
-    "build": "tsup",
+    "build": "tsup && node scripts/checkDist.mjs",
     "prepublishOnly": "npm run build"
   },
   "peerDependencies": {
