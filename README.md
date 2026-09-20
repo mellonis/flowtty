@@ -25,14 +25,15 @@ bytes per frame instead of the full ~hundreds-of-bytes redraw.
 
 `Style.fg` and `Style.bg` accept:
 
-- Named colors (`'red'`, `'blue'`, `'white'`, …) — emit standard 30-37 / 40-47 codes.
+- Named colors: the 8 ANSI names (`'black'`, `'red'`, `'green'`, `'yellow'`, `'blue'`, `'magenta'`, `'cyan'`, `'white'` — codes 30-37 / 40-47), their bright variants (`'redBright'`, … — 90-97 / 100-107), and `'gray'` / `'grey'` for bright black.
 - 3-digit hex `#rgb` (each digit doubled — `#f80` → `#ff8800`).
 - 6-digit hex `#rrggbb`.
 - CSS-style `rgb(R, G, B)` (each channel 0–255 integer).
 
 24-bit color (`#…` / `rgb(…)`) emits `\x1b[38;2;R;G;Bm` (fg) / `\x1b[48;2;R;G;Bm` (bg).
 Modern terminal required (iTerm2, Terminal.app, Windows Terminal, modern xterm).
-Unknown values are silently ignored.
+An unknown color name paints nothing; the TTY backends list such names in a
+warning when they exit (never mid-frame, where it would corrupt the display).
 
 ### Borders
 

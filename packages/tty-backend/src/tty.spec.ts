@@ -432,3 +432,17 @@ test('TtyBackend: mouse reporting is opt-in — off by default, on with { mouse:
   b.dispose();
   expect(writes.join('')).toContain('\x1b[?1006l\x1b[?1000l');
 });
+
+test('TtyBackend.dispose reports unknown color names once the screen is restored', () => {
+  const { stub: out } = makeStub();
+  const back = new TtyBackend(out, makeStdinStub());
+  const buf = new Buffer(6, 1);
+  buf.set(0, 0, 'x', { fg: 'notacolor' });
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {});
+  back.draw(buf);
+  expect(warn).not.toHaveBeenCalled(); // never while the alt screen is up
+  back.dispose();
+  expect(warn).toHaveBeenCalledTimes(1);
+  expect(String(warn.mock.calls[0]![0])).toContain('notacolor');
+  warn.mockRestore();
+});

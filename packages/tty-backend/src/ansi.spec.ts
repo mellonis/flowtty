@@ -1,5 +1,5 @@
 import { expect, test, describe } from 'vitest';
-import { sgr, RESET, cursorTo, cellsEqual, parseColor, OSC8_CLOSE, osc8Open } from './ansi.js';
+import { sgr, RESET, cursorTo, cellsEqual, parseColor, OSC8_CLOSE, osc8Open, takeUnknownColors } from './ansi.js';
 
 describe('OSC 8 hyperlinks', () => {
   test('osc8Open wraps the URL in the OSC 8 open sequence with an ST terminator', () => {
@@ -152,4 +152,23 @@ describe('sgr truecolor', () => {
     expect(sgr({ fg: 'nonsense' })).toBe('');
     expect(sgr({ bg: '#xyz', bold: true })).toBe('\x1b[1m');
   });
+});
+
+test('sgr knows gray / grey and the bright variants, for fg and bg', () => {
+  expect(sgr({ fg: 'gray' })).toBe('\x1b[90m');
+  expect(sgr({ fg: 'grey' })).toBe('\x1b[90m');
+  expect(sgr({ fg: 'blackBright' })).toBe('\x1b[90m');
+  expect(sgr({ fg: 'redBright' })).toBe('\x1b[91m');
+  expect(sgr({ fg: 'whiteBright' })).toBe('\x1b[97m');
+  expect(sgr({ bg: 'gray' })).toBe('\x1b[100m');
+  expect(sgr({ bg: 'cyanBright' })).toBe('\x1b[106m');
+});
+
+test('an unknown color name is ignored but remembered once, so a backend can report it on exit', () => {
+  takeUnknownColors(); // reset
+  expect(sgr({ fg: 'grayish', bg: 'grayish' })).toBe('');
+  sgr({ fg: 'grayish' });
+  sgr({ bg: 'default' }); // the "no background" sentinel is not a mistake
+  expect(takeUnknownColors()).toEqual(['grayish']);
+  expect(takeUnknownColors()).toEqual([]);
 });

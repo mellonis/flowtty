@@ -10,5 +10,5 @@ export {
   BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF,
   MOUSE_ON, MOUSE_OFF,
   OSC8_CLOSE, osc8Open,
-  sgr, cursorTo, cellsEqual, parseColor,
+  sgr, cursorTo, cellsEqual, parseColor, takeUnknownColors,
 } from './ansi.js';

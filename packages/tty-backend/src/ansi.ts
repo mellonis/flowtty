@@ -12,15 +12,35 @@ export const BRACKETED_PASTE_OFF = '\x1b[?2004l';
 export const MOUSE_ON = '\x1b[?1000h\x1b[?1006h';
 export const MOUSE_OFF = '\x1b[?1006l\x1b[?1000l';
 
+// The 8 ANSI colors plus their bright variants (`redBright` …, 90–97), with
+// `gray` / `grey` as the familiar names for bright black. Background codes are
+// the same numbers + 10.
 const FG: Record<string, number> = {
   black: 30, red: 31, green: 32, yellow: 33,
   blue: 34, magenta: 35, cyan: 36, white: 37,
+  gray: 90, grey: 90,
+  blackBright: 90, redBright: 91, greenBright: 92, yellowBright: 93,
+  blueBright: 94, magentaBright: 95, cyanBright: 96, whiteBright: 97,
 };
 
-const BG: Record<string, number> = {
-  black: 40, red: 41, green: 42, yellow: 43,
-  blue: 44, magenta: 45, cyan: 46, white: 47,
-};
+const BG: Record<string, number> = Object.fromEntries(
+  Object.entries(FG).map(([name, code]) => [name, code + 10]),
+);
+
+// A color that is neither a known name nor parseable paints nothing — silently,
+// which makes a typo (`'grayish'`) look like a layout bug. The names are kept so a
+// backend can report them once it is safe to print (after leaving the alt
+// screen); a warning written mid-frame would corrupt the display. `'default'` is
+// the "no background" sentinel, not a mistake.
+const unknownColors = new Set<string>();
+const noteUnknownColor = (name: string): void => { if (name !== 'default') unknownColors.add(name); };
+
+/** Unknown color names seen since the last call; clears the list. */
+export function takeUnknownColors(): string[] {
+  const names = [...unknownColors];
+  unknownColors.clear();
+  return names;
+}
 
 /**
  * Parse a color string into 0–255 RGB components.
@@ -82,6 +102,7 @@ export function sgr(style: Style): string {
     } else {
       const code = FG[style.fg];
       if (code !== undefined) parts.push(String(code));
+      else noteUnknownColor(style.fg);
     }
   }
   if (style.bg) {
@@ -91,6 +112,7 @@ export function sgr(style: Style): string {
     } else {
       const code = BG[style.bg];
       if (code !== undefined) parts.push(String(code));
+      else noteUnknownColor(style.bg);
     }
   }
   return parts.length ? `\x1b[${parts.join(';')}m` : '';
