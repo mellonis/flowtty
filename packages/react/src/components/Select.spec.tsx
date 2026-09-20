@@ -153,3 +153,21 @@ test('M1c.2 acceptance: Select + MultiSelect + Confirm each fire onSubmit correc
   await flush();
   expect(confirms).toEqual([true]);
 });
+
+test('focused: the cursor marker is colored + bold and its row is bold; unfocused: the marker is dim', async () => {
+  const props = { items: [{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }], value: 'a', onChange: () => {}, onSubmit: () => {} };
+  const focused = new TestBackend(20, 2);
+  await render(createElement(Select<string>, { ...props, isFocused: true }), focused);
+  const f = focused.lastBuffer!;
+  expect(f.get(0, 0).style).toMatchObject({ fg: 'cyan', bold: true });
+  expect(f.get(2, 0).style.bold).toBe(true);
+  expect(f.get(2, 1).style.bold).toBeFalsy();
+
+  const blurred = new TestBackend(20, 2);
+  await render(createElement(Select<string>, { ...props, isFocused: false }), blurred);
+  const b = blurred.lastBuffer!;
+  expect(b.get(0, 0).char).toBe('▸');
+  expect(b.get(0, 0).style.dim).toBe(true);
+  expect(b.get(2, 0).style.bold).toBeFalsy();
+  expect(focused.lastFrame).toBe(blurred.lastFrame);
+});

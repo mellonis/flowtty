@@ -54,11 +54,17 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
   return (
     <Box>
       {state.filter !== '' && <Text>{`filter: ${state.filter}`}</Text>}
-      {visible.map((origIdx, row) => (
-        <Text key={origIdx}>
-          {(row === cursorClamped ? '▸ ' : '  ') + items[origIdx]!.label}
-        </Text>
-      ))}
+      {/* Focus has to be visible (see MultiSelect): colored bold marker + bold row
+          when focused, a dim marker when not; the text is the same either way. */}
+      {visible.map((origIdx, row) => {
+        const isCursor = row === cursorClamped;
+        return (
+          <Box key={origIdx} flexDirection="row">
+            <Text color={isFocused && isCursor ? 'cyan' : undefined} bold={isFocused && isCursor} dim={!isFocused}>{isCursor ? '▸ ' : '  '}</Text>
+            <Text bold={isFocused && isCursor}>{items[origIdx]!.label}</Text>
+          </Box>
+        );
+      })}
     </Box>
   );
 }

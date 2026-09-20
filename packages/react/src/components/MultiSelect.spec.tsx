@@ -197,3 +197,25 @@ test('onAddNew may also return the value synchronously', async () => {
   expect(selected).toEqual(['z']);
   expect(backend.lastFrame).toBe('  [ ] a\n▸ [x] z\n  + add new');
 });
+
+// ─── focus is visible ────────────────────────────────────────────────────────
+
+test('focused: the cursor marker is colored + bold and the cursor row is bold; unfocused: the marker is dim', async () => {
+  const props = { items: [{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }], value: [] as string[], onChange: () => {}, onSubmit: () => {} };
+  const focused = new TestBackend(20, 2);
+  await render(createElement(MultiSelect<string>, { ...props, isFocused: true }), focused);
+  const f = focused.lastBuffer!;
+  expect(f.get(0, 0).char).toBe('▸');
+  expect(f.get(0, 0).style).toMatchObject({ fg: 'cyan', bold: true });
+  expect(f.get(6, 0).style.bold).toBe(true);        // the cursor row's label
+  expect(f.get(6, 1).style.bold).toBeFalsy();       // other rows stay plain
+
+  const blurred = new TestBackend(20, 2);
+  await render(createElement(MultiSelect<string>, { ...props, isFocused: false }), blurred);
+  const b = blurred.lastBuffer!;
+  expect(b.get(0, 0).char).toBe('▸');               // still marks the row…
+  expect(b.get(0, 0).style.dim).toBe(true);         // …but quietly
+  expect(b.get(0, 0).style.fg).toBeUndefined();
+  expect(b.get(6, 0).style.bold).toBeFalsy();
+  expect(focused.lastFrame).toBe(blurred.lastFrame); // same text either way
+});

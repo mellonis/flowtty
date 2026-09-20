@@ -86,18 +86,20 @@ export function MultiSelect<T>(props: MultiSelectProps<T>): ReactNode {
     }
   }, { isActive: isFocused });
 
+  // Focus has to be visible: Tab landing on a list that looks exactly as before
+  // leaves the user lost. Focused → a colored, bold marker and a bold cursor
+  // row; unfocused → the marker is still there (it marks the row) but dim. The
+  // text is identical either way, so layouts don't shift.
+  const row = (isCursor: boolean, label: string, key: string | number) => (
+    <Box key={key} flexDirection="row">
+      <Text color={isFocused && isCursor ? 'cyan' : undefined} bold={isFocused && isCursor} dim={!isFocused}>{isCursor ? '▸ ' : '  '}</Text>
+      <Text bold={isFocused && isCursor}>{label}</Text>
+    </Box>
+  );
   return (
-    <Box>
-      {items.map((it, i) => (
-        <Text key={i}>
-          {(i === cursor ? '▸ ' : '  ') + (value.includes(it.value) ? '[x] ' : '[ ] ') + it.label}
-        </Text>
-      ))}
-      {onAddNew !== undefined && (
-        <Text key="__add__">
-          {(cursor === items.length ? '▸ ' : '  ') + '+ add new'}
-        </Text>
-      )}
+    <Box flexDirection="column">
+      {items.map((it, i) => row(i === cursor, (value.includes(it.value) ? '[x] ' : '[ ] ') + it.label, i))}
+      {onAddNew !== undefined && row(cursor === items.length, '+ add new', '__add__')}
     </Box>
   );
 }
