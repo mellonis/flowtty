@@ -488,7 +488,9 @@ Style mapping (the terminal cell model has no italic — see [Text](#text)):
 | `[text](url)`       | blue + underline; url emitted as an OSC 8 hyperlink (clickable on capable backends) — see [Link](#link) |
 | `![alt](src)`       | dim `alt` text (images can't render in a TTY)|
 | `> quote`           | dim, with a `│ ` gutter                      |
-| `- ` / `1. ` lists  | colored marker + hanging indent on wrap      |
+| `- ` / `1. ` lists  | colored marker + hanging indent on wrap; an indented run nests under the item above it; ordered items keep their source number (`3.` stays `3.`) |
+| `- [ ]` / `- [x]`   | `☐` / green `☑` task checkboxes              |
+| GFM tables          | padded columns, bold header over a dim rule, `:--` / `:-:` / `--:` alignment; a table wider than the width shrinks its widest column and wraps those cells |
 | ` ```lang ` fences  | per-language token colors (js/ts, json)      |
 | `---`               | a dim horizontal rule                        |
 

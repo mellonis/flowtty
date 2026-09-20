@@ -30,7 +30,8 @@ function MdLine({ line }: { line: StyledLine }) {
 /**
  * Render a markdown string as styled terminal text. Best-effort, line-based —
  * supports headings, paragraphs, bold/emphasis/code/links, blockquotes,
- * bullet/ordered lists, fenced code blocks (per-language token colors), and rules.
+ * bullet/ordered/task lists (nested by indentation), GFM tables, fenced code
+ * blocks (per-language token colors), and rules.
  * Content is pre-wrapped to the resolved width so the output is a stable column
  * of rows (a paginating host can slice it — see {@link layoutMarkdown}).
  */

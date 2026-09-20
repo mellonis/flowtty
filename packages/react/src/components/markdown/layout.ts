@@ -4,7 +4,8 @@
 // it gives a stable visual-line count, so a paginating host (e.g. the articles
 // example) can slice the output by row exactly the way it slices raw text.
 
-import { parseMarkdown, highlightCode, type InlineSeg } from './parse.js';
+import { charWidth, stringWidth } from '@flowtty/core';
+import { parseMarkdown, highlightCode, type InlineSeg, type MdList, type MdAlign } from './parse.js';
 
 export interface StyledSpan {
   text: string;
@@ -56,9 +57,18 @@ function segsToChars(segs: InlineSeg[], base: SpanStyle = {}): StyledChar[] {
   return out;
 }
 
-// Greedy word-wrap over styled chars. Words are non-space runs; a single space
-// separates them. Over-long words are hard char-wrapped. Collapses space runs,
-// which is fine because paragraphs are already space-joined by parseMarkdown.
+const cellWidth = (c: StyledChar): number => charWidth(c.ch.codePointAt(0)!);
+
+function charsWidth(chars: StyledChar[]): number {
+  let n = 0;
+  for (const c of chars) n += cellWidth(c);
+  return n;
+}
+
+// Greedy word-wrap over styled chars, measured in display cells (a wide glyph is
+// 2). Words are non-space runs; a single space separates them. Over-long words
+// are hard char-wrapped. Collapses space runs, which is fine because paragraphs
+// are already space-joined by parseMarkdown.
 //
 // Each word remembers the style of the space that preceded it (`sep`), so an
 // interword space *inside* a styled run (e.g. the space in *bare state*) keeps
@@ -88,20 +98,33 @@ function wrapChars(chars: StyledChar[], width: number): StyledChar[][] {
 
   const lines: StyledChar[][] = [];
   let line: StyledChar[] = [];
+  let lineW = 0;
   for (const w of words) {
     let word = w.chars;
-    while (word.length > width) {
-      if (line.length) { lines.push(line); line = []; }
-      lines.push(word.slice(0, width));
-      word = word.slice(width);
+    let wordW = charsWidth(word);
+    while (wordW > width) {
+      if (line.length) { lines.push(line); line = []; lineW = 0; }
+      // Take as many chars as fit — always at least one, so a glyph wider than
+      // the whole line still makes progress.
+      let take = 0;
+      let takeW = 0;
+      while (take < word.length && (take === 0 || takeW + cellWidth(word[take]!) <= width)) {
+        takeW += cellWidth(word[take]!);
+        take++;
+      }
+      lines.push(word.slice(0, take));
+      word = word.slice(take);
+      wordW -= takeW;
     }
     const sep = line.length ? 1 : 0;
-    if (line.length + sep + word.length > width) {
+    if (lineW + sep + wordW > width) {
       if (line.length) lines.push(line);
       line = [...word];
+      lineW = wordW;
     } else {
       if (sep) line.push({ ch: ' ', style: w.sep });
       line.push(...word);
+      lineW += sep + wordW;
     }
   }
   if (line.length || lines.length === 0) lines.push(line);
@@ -119,7 +142,7 @@ export function charsToSpans(chars: StyledChar[]): StyledSpan[] {
 }
 
 function prefixWidth(p?: StyledSpan[]): number {
-  return p ? p.reduce((n, s) => n + [...s.text].length, 0) : 0;
+  return p ? p.reduce((n, s) => n + stringWidth(s.text), 0) : 0;
 }
 
 // Wrap inline content, optionally with a first-line prefix (e.g. a list marker)
@@ -138,6 +161,103 @@ function wrapBlock(
   });
 }
 
+// Render a list and, recursively, its sub-lists. `pad` is the column the list
+// starts in: a sub-list starts under its parent item's text, i.e. past the
+// parent's marker.
+function layoutList(list: MdList, width: number, pad: number, out: StyledLine[]): void {
+  // Source numbers are printed as written, so `3.` stays `3.`. The one exception
+  // is lazy numbering — every item carrying the same number (`1.` `1.` `1.`) —
+  // which counts up from that number the way markdown renderers show it.
+  const nums = list.items.map((it) => it.num);
+  const lazy = nums.length > 1 && nums.every((n) => n === nums[0]);
+  const padSpan: StyledSpan[] = pad > 0 ? [{ text: ' '.repeat(pad) }] : [];
+
+  list.items.forEach((item, idx) => {
+    const start = nums[0] ?? 1;
+    const num = list.ordered ? `${lazy ? start + idx : item.num ?? idx + 1}. ` : '';
+    const marker: StyledSpan[] = [];
+    if (item.checked === undefined) {
+      marker.push({ text: list.ordered ? num : '• ', color: 'yellow' });
+    } else {
+      // GFM task item: `☑ ` (checked, green) / `☐ ` (unchecked). For an
+      // ordered list keep the number, then the box.
+      if (num) marker.push({ text: num, color: 'yellow' });
+      marker.push({ text: item.checked ? '☑ ' : '☐ ', color: item.checked ? 'green' : undefined });
+    }
+    const indent = pad + prefixWidth(marker);
+    out.push(...wrapBlock(item.segs, width, {
+      first: [...padSpan, ...marker],
+      cont: [{ text: ' '.repeat(indent) }],
+    }));
+    for (const child of item.children ?? []) layoutList(child, width, indent, out);
+  });
+}
+
+const TABLE_GUTTER = 2;
+
+// Render a table as space-padded columns: bold header, a dim rule per column,
+// then the rows. Columns are as wide as their widest cell; when that overflows
+// `width` the widest column gives way a cell at a time and its content wraps,
+// so a row can span several lines. Widths are display cells, not code points.
+function layoutTable(
+  align: (MdAlign | undefined)[],
+  header: InlineSeg[][],
+  rows: InlineSeg[][][],
+  width: number,
+  out: StyledLine[],
+): void {
+  const cols = header.length;
+  const cells: StyledChar[][][] = [
+    header.map((c) => segsToChars(c, { bold: true })),
+    ...rows.map((r) => r.map((c) => segsToChars(c))),
+  ];
+
+  const widths = Array.from({ length: cols }, (_, c) => Math.max(1, ...cells.map((r) => charsWidth(r[c]!))));
+  const avail = width - TABLE_GUTTER * (cols - 1);
+  if (width > 0) {
+    let total = widths.reduce((a, b) => a + b, 0);
+    while (total > avail) {
+      const widest = widths.indexOf(Math.max(...widths));
+      if (widths[widest]! <= 1) break; // more columns than cells — let it overflow
+      widths[widest]!--;
+      total--;
+    }
+  }
+
+  const wrapped = cells.map((r) => r.map((c, ci) => wrapChars(c, widths[ci]!)));
+  // Wrapping rarely fills a shrunk column to the last cell — tighten to what's used.
+  for (let c = 0; c < cols; c++) {
+    widths[c] = Math.max(1, ...wrapped.flatMap((r) => r[c]!.map(charsWidth)));
+  }
+
+  const spaces = (n: number): StyledChar[] => Array.from({ length: Math.max(0, n) }, () => ({ ch: ' ', style: {} }));
+  const emitRow = (row: StyledChar[][][]) => {
+    const height = Math.max(...row.map((c) => c.length));
+    for (let ln = 0; ln < height; ln++) {
+      const chars: StyledChar[] = [];
+      for (let c = 0; c < cols; c++) {
+        const cell = row[c]![ln] ?? [];
+        const free = widths[c]! - charsWidth(cell);
+        const left = align[c] === 'right' ? free : align[c] === 'center' ? Math.floor(free / 2) : 0;
+        chars.push(...spaces(left), ...cell, ...spaces(free - left));
+        if (c < cols - 1) chars.push(...spaces(TABLE_GUTTER));
+      }
+      // Padding after the last cell is invisible — don't emit trailing blanks.
+      while (chars.length && chars[chars.length - 1]!.ch === ' ') chars.pop();
+      out.push({ spans: charsToSpans(chars) });
+    }
+  };
+
+  emitRow(wrapped[0]!);
+  const rule: StyledSpan[] = [];
+  widths.forEach((w, c) => {
+    if (c > 0) rule.push({ text: ' '.repeat(TABLE_GUTTER) });
+    rule.push({ text: '─'.repeat(w), dim: true });
+  });
+  out.push({ spans: rule });
+  for (const r of wrapped.slice(1)) emitRow(r);
+}
+
 function headingColor(level: number): string {
   return level <= 1 ? 'magenta' : level === 2 ? 'cyan' : 'blue';
 }
@@ -147,7 +267,9 @@ function headingColor(level: number): string {
  * result is paginatable by simple row slicing. Style mapping (no italic in the
  * terminal cell model): **bold**→bold, *emphasis*→underline, `code`→cyan,
  * [links]→blue underline, images→dim alt text, headings→bold + level color,
- * blockquotes→`│ ` gutter + dim, fenced code→per-language token colors.
+ * blockquotes→`│ ` gutter + dim, fenced code→per-language token colors,
+ * nested lists→indented under the parent item's text, tables→padded columns with
+ * a bold header over a dim rule.
  */
 export function layoutMarkdown(src: string, width: number): StyledLine[] {
   const blocks = parseMarkdown(src);
@@ -175,24 +297,10 @@ export function layoutMarkdown(src: string, width: number): StyledLine[] {
         break;
       }
       case 'list':
-        b.items.forEach((item, idx) => {
-          const num = b.ordered ? `${idx + 1}. ` : '';
-          const first: StyledSpan[] = [];
-          if (item.checked === undefined) {
-            const bullet = b.ordered ? num : '• ';
-            first.push({ text: bullet, color: 'yellow' });
-          } else {
-            // GFM task item: `☑ ` (checked, green) / `☐ ` (unchecked). For an
-            // ordered list keep the number, then the box.
-            if (num) first.push({ text: num, color: 'yellow' });
-            first.push({ text: item.checked ? '☑ ' : '☐ ', color: item.checked ? 'green' : undefined });
-          }
-          const indent = first.reduce((n, s) => n + [...s.text].length, 0);
-          out.push(...wrapBlock(item.segs, width, {
-            first,
-            cont: [{ text: ' '.repeat(indent) }],
-          }));
-        });
+        layoutList(b, width, 0, out);
+        break;
+      case 'table':
+        layoutTable(b.align, b.header, b.rows, width, out);
         break;
       case 'code': {
         const fence = '```';

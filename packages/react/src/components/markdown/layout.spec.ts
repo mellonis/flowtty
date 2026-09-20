@@ -95,4 +95,74 @@ describe('layoutMarkdown', () => {
     expect(span?.underline).toBe(true);
     expect(span?.link).toBe('http://x');
   });
+
+  test('nested list items indent to the parent item\'s content column', () => {
+    const lines = layoutMarkdown('1. one\n2. two\n   - sub a\n   - sub b\n3. three', 40);
+    expect(lines.map(text)).toEqual([
+      '1. one',
+      '2. two',
+      '   • sub a',
+      '   • sub b',
+      '3. three',
+    ]);
+  });
+
+  test('a wrapped nested item hangs under its own text, not under the parent', () => {
+    const lines = layoutMarkdown('- a\n  - alpha beta gamma', 14);
+    expect(lines.map(text)).toEqual(['• a', '  • alpha beta', '    gamma']);
+  });
+
+  test('ordered lists print the source numbers', () => {
+    expect(layoutMarkdown('3. c\n4. d\n9. i', 40).map(text)).toEqual(['3. c', '4. d', '9. i']);
+  });
+
+  test('lazy numbering (every item the same number) counts up from that number', () => {
+    expect(layoutMarkdown('1. a\n1. b\n1. c', 40).map(text)).toEqual(['1. a', '2. b', '3. c']);
+  });
+
+  test('a table renders as padded columns with a bold header and a dim rule', () => {
+    const lines = layoutMarkdown('| Name | Qty |\n| --- | --- |\n| apple | 3 |\n| kiwi | 10 |', 40);
+    expect(lines.map(text)).toEqual([
+      'Name   Qty',
+      '─────  ───',
+      'apple  3',
+      'kiwi   10',
+    ]);
+    expect(lines[0]!.spans.find((s) => s.text.includes('Name'))?.bold).toBe(true);
+    expect(lines[1]!.spans.every((s) => s.dim || s.text.trim() === '')).toBe(true);
+  });
+
+  test('table cells keep inline styles', () => {
+    const lines = layoutMarkdown('| k | v |\n| - | - |\n| **b** | `c` |', 40);
+    const spans = lines[2]!.spans;
+    expect(spans.find((s) => s.text === 'b')?.bold).toBe(true);
+    expect(spans.find((s) => s.text === 'c')?.color).toBe('cyan');
+  });
+
+  test('table columns honor right and center alignment', () => {
+    const lines = layoutMarkdown('| left | right | mid |\n| :-- | --: | :-: |\n| a | b | c |', 40);
+    expect(text(lines[2]!)).toBe('a         b   c');
+  });
+
+  test('table column widths are measured in display cells (wide glyphs count 2)', () => {
+    const lines = layoutMarkdown('| s | n |\n| - | - |\n| ✅ ok | 1 |\n| plain | 2 |', 40);
+    // "✅ ok" is 5 cells wide, same as "plain": both second cells start in one column.
+    expect(text(lines[2]!)).toBe('✅ ok  1');
+    expect(text(lines[3]!)).toBe('plain  2');
+  });
+
+  test('a table wider than the width shrinks its widest column and wraps the cell', () => {
+    const lines = layoutMarkdown('| id | note |\n| - | - |\n| 1 | alpha beta gamma |', 14);
+    expect(lines.map(text)).toEqual([
+      'id  note',
+      '──  ──────────',
+      '1   alpha beta',
+      '    gamma',
+    ]);
+  });
+
+  test('paragraph wrapping counts wide glyphs as two cells', () => {
+    const lines = layoutMarkdown('日本語 日本語', 8);
+    expect(lines.map(text)).toEqual(['日本語', '日本語']);
+  });
 });
