@@ -23,6 +23,12 @@ describe('charWidth', () => {
     expect(charWidth(0xac00)).toBe(2);    // 가 Hangul syllable
     expect(charWidth(0xff21)).toBe(2);    // Ａ fullwidth A
     expect(charWidth(0x1f600)).toBe(2);   // 😀 emoji
+    expect(charWidth(0x2705)).toBe(2);    // ✅ — a BMP emoji that is East Asian Wide
+    expect(charWidth(0x274c)).toBe(2);    // ❌
+    expect(charWidth(0x26a1)).toBe(2);    // ⚡
+    expect(charWidth(0x1f680)).toBe(2);   // 🚀 Transport & Map
+    expect(charWidth(0x2714)).toBe(1);    // ✔ — text-presentation dingbat stays narrow
+    expect(charWidth(0x2611)).toBe(1);    // ☑
   });
 
   test('halfwidth katakana stays width 1 (not caught by the fullwidth block)', () => {
