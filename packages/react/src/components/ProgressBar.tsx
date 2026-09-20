@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 
@@ -30,7 +30,7 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
  */
 export function ProgressBar({
   value, total, width, char = '█', emptyChar = '░', color, showPercent = false,
-}: ProgressBarProps) {
+}: ProgressBarProps): ReactNode {
   const fraction = clamp01(total !== undefined ? (total <= 0 ? 0 : value / total) : value);
   const [measured, setMeasured] = useState(0);
   const fixed = typeof width === 'number';

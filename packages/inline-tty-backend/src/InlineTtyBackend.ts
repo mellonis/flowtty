@@ -44,7 +44,7 @@ export class InlineTtyBackend implements Backend {
    *  backend emits (it's a real TTY, just inline), so <Link> renders clickable
    *  instead of printing a fallback URL. Sniffed from the environment; the
    *  painter writes OSC 8 unconditionally regardless. */
-  readonly hyperlinks = detectHyperlinkSupport();
+  readonly hyperlinks: boolean = detectHyperlinkSupport();
 
   private readonly out: NodeJS.WriteStream;
   private readonly input: NodeJS.ReadStream;
@@ -86,7 +86,7 @@ export class InlineTtyBackend implements Backend {
     this.liveHeight = Math.max(1, options.liveHeight ?? 10);
   }
 
-  size() {
+  size(): { width: number; height: number } {
     return { width: this.out.columns ?? 80, height: this.liveHeight };
   }
 

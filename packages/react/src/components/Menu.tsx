@@ -95,7 +95,7 @@ function itemsAtPath(root: MenuItem[], path: number[]): MenuItem[] {
   return cur;
 }
 
-export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuProps) {
+export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuProps): ReactNode {
   // Capability check: Menu needs full-screen space for its cascading dropdowns.
   // On a bounded-live-region backend (e.g. @flowtty/inline-tty-backend) the
   // hook warns once and returns false. We still have to call every other hook

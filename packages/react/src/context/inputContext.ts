@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createContext, type Context } from 'react';
 import type { Key } from '@flowtty/core';
 
 export type KeySubscriber = (key: Key) => void;
@@ -11,4 +11,4 @@ export interface InputSource {
 // keys (passive view), and useInput's subscribe is a no-op unsubscribe.
 const noopSource: InputSource = { subscribe: () => () => {} };
 
-export const InputContext = createContext<InputSource>(noopSource);
+export const InputContext: Context<InputSource> = createContext<InputSource>(noopSource);

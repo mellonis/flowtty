@@ -20,7 +20,7 @@ export class TtyBackend implements Backend {
    *  printed URL. Sniffed from the environment (Apple Terminal.app, e.g., emits
    *  the bytes but never makes them clickable). The painter writes OSC 8
    *  unconditionally regardless of this flag — it only governs <Link> fallback. */
-  readonly hyperlinks = detectHyperlinkSupport();
+  readonly hyperlinks: boolean = detectHyperlinkSupport();
 
   private readonly subscribers = new Set<(key: Key) => void>();
   // Carries an incomplete escape sequence from one stdin chunk to the next, so
@@ -68,7 +68,7 @@ export class TtyBackend implements Backend {
     this.terminalEntered = true;
   }
 
-  size() {
+  size(): { width: number; height: number } {
     return { width: this.out.columns ?? 80, height: this.out.rows ?? 24 };
   }
 

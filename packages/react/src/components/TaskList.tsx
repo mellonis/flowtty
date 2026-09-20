@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { Spinner, type SpinnerType } from './Spinner.js';
@@ -49,7 +50,7 @@ function TaskRow({ task, spinnerType }: { task: TaskItem; spinnerType: SpinnerTy
  * a task's `state` and re-render to advance it (e.g. as steps of a deploy or
  * build complete).
  */
-export function TaskList({ tasks, spinnerType = 'dots' }: TaskListProps) {
+export function TaskList({ tasks, spinnerType = 'dots' }: TaskListProps): ReactNode {
   return (
     <Box flexDirection="column">
       {tasks.map((t, i) => <TaskRow key={i} task={t} spinnerType={spinnerType} />)}

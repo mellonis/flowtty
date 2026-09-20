@@ -29,7 +29,7 @@ export class ErrorBoundary extends Component<ErrorBoundaryProps, ErrorBoundarySt
     this.props.onError({ error, source: 'react' });
   }
 
-  render() {
+  render(): ReactNode {
     // After an error, render nothing — keep the buffer in whatever state it was
     // pre-error. Cleanup (dispose, exit) happens in onError handler, not here.
     if (this.state.hasError) return null;

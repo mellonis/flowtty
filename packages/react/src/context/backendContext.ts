@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createContext, type Context } from 'react';
 import type { Backend } from '@flowtty/core';
 
 /**
@@ -9,4 +9,4 @@ import type { Backend } from '@flowtty/core';
  * `printStatic`) read this via `useBackend()` and feature-detect the
  * optional methods at runtime.
  */
-export const BackendContext = createContext<Backend | null>(null);
+export const BackendContext: Context<Backend | null> = createContext<Backend | null>(null);

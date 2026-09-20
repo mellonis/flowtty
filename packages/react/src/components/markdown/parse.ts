@@ -3,6 +3,8 @@
 //   highlightCode(line,lang)→ per-line token coloring for fenced code blocks
 // Best-effort, line-based; not a CommonMark-complete implementation.
 
+import type { Color } from '@flowtty/core';
+
 export interface InlineSeg {
   text: string;
   bold?: boolean;
@@ -259,7 +261,7 @@ export function parseMarkdown(src: string): MdBlock[] {
 
 // ─── fenced-code highlighting ───────────────────────────────────────────────
 
-export interface CodeSeg { text: string; color?: string; dim?: boolean }
+export interface CodeSeg { text: string; color?: Color; dim?: boolean }
 
 const JS_KEYWORDS = new Set([
   'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'do',

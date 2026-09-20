@@ -5,13 +5,14 @@
 // example) can slice the output by row exactly the way it slices raw text.
 
 import { parseMarkdown, highlightCode, type InlineSeg, type MdList, type MdAlign } from './parse.js';
+import type { Color } from '@flowtty/core';
 
 export interface StyledSpan {
   text: string;
   bold?: boolean;
   dim?: boolean;
   underline?: boolean;
-  color?: string;
+  color?: Color;
   /** OSC 8 hyperlink target — set on link spans so a renderer can make them
    *  clickable on capable backends. Carried through wrapping like any style. */
   link?: string;

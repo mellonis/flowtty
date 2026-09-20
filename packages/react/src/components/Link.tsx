@@ -26,7 +26,7 @@ export interface LinkProps {
  * can't (the headless test surface, plain pipes), degrades to the styled label
  * plus a dim ` (url)` so the address is still visible.
  */
-export function Link({ href, children, color = 'blue', showUrlFallback = true }: LinkProps) {
+export function Link({ href, children, color = 'blue', showUrlFallback = true }: LinkProps): ReactNode {
   const backend = useBackend();
   const label: ReactNode = children ?? href;
 

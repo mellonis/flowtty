@@ -1,4 +1,5 @@
 import React from "react";
+import type { ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
@@ -9,7 +10,7 @@ import { useTerminalSize } from '../hooks/useTerminalSize.js';
  * box's content rect.
  */
 export interface HRuleProps { char?: string }
-export function HRule(props: HRuleProps) {
+export function HRule(props: HRuleProps): ReactNode {
   const { width } = useTerminalSize();
   const ch = props.char ?? '─';
   return <Box dim width="100%">{ch.repeat(Math.max(0, width))}</Box>;

@@ -1,5 +1,5 @@
 import React from 'react';
-import { useState } from 'react';
+import { useState, type ReactNode } from 'react';
 import { DEFAULT_BORDER_STYLE, GRID_CHARS, windowAround, type BorderStyle } from '@flowtty/core';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
@@ -152,7 +152,7 @@ export function Table<T>({
   border = DEFAULT_BORDER_STYLE, borderColor,
   cellPadding = 1, showHeader = true, headerColor, headerBold = true,
   width, selectedIndex, scrollable = false,
-}: TableProps<T>) {
+}: TableProps<T>): ReactNode {
   const term = useTerminalSize();
   const [measured, setMeasured] = useState(0);
   const [measuredH, setMeasuredH] = useState(0);

@@ -1,4 +1,4 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, type ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { layoutMarkdown, type StyledLine } from './markdown/layout.js';
@@ -35,7 +35,7 @@ function MdLine({ line }: { line: StyledLine }) {
  * Content is pre-wrapped to the resolved width so the output is a stable column
  * of rows (a paginating host can slice it — see {@link layoutMarkdown}).
  */
-export function Markdown({ children = '', width }: MarkdownProps) {
+export function Markdown({ children = '', width }: MarkdownProps): ReactNode {
   const [measured, setMeasured] = useState<number | null>(null);
   const w = width ?? measured;
   const lines = useMemo(() => (w != null ? layoutMarkdown(children, w) : []), [children, w]);

@@ -1,4 +1,5 @@
 import React from 'react';
+import type { ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useTicker } from '../hooks/useTicker.js';
@@ -34,7 +35,7 @@ export interface SpinnerProps {
  * The animation stops automatically on unmount and on whole-app teardown (it
  * rides on useTicker, which honors the root abort signal).
  */
-export function Spinner({ type = 'dots', frames, interval, label, color }: SpinnerProps) {
+export function Spinner({ type = 'dots', frames, interval, label, color }: SpinnerProps): ReactNode {
   const def = SPINNERS[type] ?? SPINNERS.dots;
   const seq = frames && frames.length > 0 ? frames : def.frames;
   const tick = useTicker({ interval: interval ?? def.interval });

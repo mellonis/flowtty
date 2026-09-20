@@ -14,7 +14,7 @@ export interface TextProps {
   wrap?: 'wrap' | 'truncate' | 'none';
 }
 
-export function Text({ children, ...style }: TextProps) {
+export function Text({ children, ...style }: TextProps): ReactNode {
   // An empty string is a blank line, but React creates no host text node for
   // it, so the box would measure to zero rows and the line would vanish. Hold
   // one row open for it. `null` / `false` children (toArray drops them) stay

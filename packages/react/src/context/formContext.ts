@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createContext, type Context } from 'react';
 
 export interface FormFieldRegistration {
   /** Field's validator. Returns null/undefined = valid; string = error to display. */
@@ -52,4 +52,4 @@ const noopApi: FormApi = {
   cancel() {},
 };
 
-export const FormContext = createContext<FormApi>(noopApi);
+export const FormContext: Context<FormApi> = createContext<FormApi>(noopApi);

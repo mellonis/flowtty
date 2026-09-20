@@ -29,7 +29,7 @@ export class TestBackend implements Backend {
     private readonly rows = 10,
   ) {}
 
-  size() {
+  size(): { width: number; height: number } {
     return { width: this.cols, height: this.rows };
   }
 

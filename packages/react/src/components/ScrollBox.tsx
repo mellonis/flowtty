@@ -59,7 +59,7 @@ const sameMetrics = (a: ScrollMetrics | null, b: ScrollMetrics): boolean =>
 export function ScrollBox({
   children, anchor = 'top', offset, onScroll, onMetrics, isActive = true, wheelStep = 3, pageStep,
   scrollbar = false, ref, onLayout, ...boxProps
-}: ScrollBoxProps) {
+}: ScrollBoxProps): ReactNode {
   // Uncontrolled position as an absolute scrollTop, or `null` = resting at the
   // anchored edge. Holding an absolute top (not an offset from the bottom) is
   // what keeps a scrolled-up view still while content is appended below it.

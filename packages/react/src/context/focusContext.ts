@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createContext, type Context } from 'react';
 
 /** API exposed via FocusContext for components to register themselves as focusable
  *  and check whether they're currently focused. */
@@ -22,7 +22,7 @@ const noop: FocusGroupApi = {
 
 /** Outside a FocusGroup, useFocus() reads from this default → always focused
  *  (preserves backward-compat for components used without a FocusGroup). */
-export const FocusContext = createContext<FocusGroupApi>(noop);
+export const FocusContext: Context<FocusGroupApi> = createContext<FocusGroupApi>(noop);
 
 /** Carries the currently-focused id so consumers re-render when focus changes.
  *  Kept separate from FocusContext so the stable api object doesn't need to
@@ -31,4 +31,4 @@ export const FocusContext = createContext<FocusGroupApi>(noop);
  *
  *  null outside a FocusGroup (or when no focusable has registered yet).
  *  Inside a FocusGroup: the id of the focused focusable, or null if none. */
-export const FocusedIdContext = createContext<string | null>(null);
+export const FocusedIdContext: Context<string | null> = createContext<string | null>(null);

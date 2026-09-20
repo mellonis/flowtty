@@ -16,7 +16,7 @@ export function useTerminalSize(): TerminalSize {
 
 /** Wraps a subtree in TerminalSizeContext.Provider. Subscribes to backend.onResize and updates
  *  the context value on each resize. Diff guard prevents re-renders on identical sizes. */
-export function TerminalSizeProvider({ backend, children }: { backend: Backend; children?: ReactNode }) {
+export function TerminalSizeProvider({ backend, children }: { backend: Backend; children?: ReactNode }): ReactNode {
   const [size, setSize] = useState<TerminalSize>(() => backend.size());
 
   useEffect(() => {

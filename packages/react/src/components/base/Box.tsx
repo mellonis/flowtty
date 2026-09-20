@@ -6,7 +6,7 @@ import { InputContext, type InputSource } from '../../context/inputContext.js';
 // to drop a subtree out of input dispatch without affecting layout or paint.
 const MUTED_INPUT: InputSource = { subscribe: () => () => {} };
 
-export function Box({ children, inert, ...rest }: BoxProps & { children?: ReactNode; inert?: boolean }) {
+export function Box({ children, inert, ...rest }: BoxProps & { children?: ReactNode; inert?: boolean }): ReactNode {
   const node = createElement('flowtty-box', rest, children);
   if (inert) {
     return createElement(InputContext.Provider, { value: MUTED_INPUT }, node);

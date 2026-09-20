@@ -1,4 +1,4 @@
-import { createContext } from 'react';
+import { createContext, type Context } from 'react';
 
 /**
  * A per-render-root AbortSignal that fires when the root tears down — on
@@ -10,4 +10,4 @@ import { createContext } from 'react';
  * `.throwIfAborted()`) or forward it to `fetch(url, { signal })` — they cannot
  * abort the whole tree. The controller stays private to render().
  */
-export const AbortContext = createContext<AbortSignal | null>(null);
+export const AbortContext: Context<AbortSignal | null> = createContext<AbortSignal | null>(null);

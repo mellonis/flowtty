@@ -37,7 +37,7 @@ type ReconcilerConfig = Parameters<
   >
 >[0];
 
-export function createReconciler(Yoga: Yoga, onCommit?: () => void) {
+function createReconciler(Yoga: Yoga, onCommit?: () => void) {
   let pending = false;
   const schedulePaint = () => {
     if (pending || !onCommit) return;
@@ -101,20 +101,21 @@ export function createReconciler(Yoga: Yoga, onCommit?: () => void) {
       child: Instance | TextInstance,
       before: Instance | TextInstance,
     ) => {
-      const at = container.children.indexOf(child as Instance);
+      // Only boxes live at the root; narrowing once replaces a cast per use (and
+      // keeps a stray root-level text node out of the box list).
+      if (child.type !== 'box') return;
+      const at = container.children.indexOf(child);
       if (at >= 0) container.children.splice(at, 1);
-      const i = container.children.indexOf(before as Instance);
-      container.children.splice(i < 0 ? container.children.length : i, 0, child as Instance);
+      const i = before.type === 'box' ? container.children.indexOf(before) : -1;
+      container.children.splice(i < 0 ? container.children.length : i, 0, child);
     },
     removeChild: (parent: Instance, child: Instance | TextInstance) => removeChild(parent, child, Yoga),
     removeChildFromContainer: (container: Container, child: Instance | TextInstance) => {
-      const i = container.children.indexOf(child as Instance);
-      if (i >= 0) {
-        container.children.splice(i, 1);
-        if ((child as { type: string }).type === 'box') {
-          (child as Instance).yogaNode.freeRecursive();
-        }
-      }
+      if (child.type !== 'box') return;
+      const i = container.children.indexOf(child);
+      if (i < 0) return;
+      container.children.splice(i, 1);
+      child.yogaNode.freeRecursive();
     },
 
     finalizeInitialChildren: () => false,

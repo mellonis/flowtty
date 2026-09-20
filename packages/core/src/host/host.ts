@@ -331,7 +331,7 @@ export function measureText(text: string): { width: number; height: number } {
 // Concatenate a box's direct text children into one string.
 export function ownText(inst: Instance): string {
   return inst.children
-    .filter((c): c is TextInstance => c.type === 'text')
+    .filter((c) => c.type === 'text')
     .map((c) => c.text)
     .join('');
 }
