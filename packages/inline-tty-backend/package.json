@@ -40,7 +40,7 @@
     "@flowtty/tty-backend": "1.0.0-alpha.2"
   },
   "devDependencies": {
-    "@types/node": "^24",
+    "@types/node": "^26",
     "tsup": "^8"
   }
 }

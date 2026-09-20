@@ -15,11 +15,11 @@
     "@flowtty/react": "*",
     "@flowtty/tty-backend": "*",
     "@flowtty/inline-tty-backend": "*",
-    "react": "^19.2.8"
+    "react": "^19.3.0"
   },
   "devDependencies": {
-    "@types/node": "^24",
-    "@types/react": "^19",
-    "tsx": "^4.23.11"
+    "@types/node": "^26",
+    "@types/react": "^19.3.0",
+    "tsx": "^4.23.15"
   }
 }
