@@ -228,4 +228,22 @@ describe('ScrollBox', () => {
     expect(tops).toEqual([0, -3]); // above the viewport now: the host can tell it left the view
     unmount();
   });
+
+  // Overlays (absolute children, the scrollbar) are positioned by Yoga relative
+  // to the ScrollBox; an ancestor's padding moves the ScrollBox, and the overlays
+  // must move with it instead of being clipped away.
+  test('overlays and the scrollbar still draw when an ancestor has padding', async () => {
+    const { frame, unmount } = await mount(
+      <Box flexDirection="column" width={12} height={6} padding={1}>
+        <ScrollBox flexGrow={1} flexShrink={1} anchor="bottom" scrollbar>
+          <Rows items={lines(20)} />
+          <Box position="absolute" top={0} left={0}><Text>TOP</Text></Box>
+        </ScrollBox>
+      </Box>, 12, 6,
+    );
+    // 12 wide − 1 padding each side = columns 1‥10; the bar sits in column 10.
+    // 20 rows in a 4-row viewport → a one-cell thumb, at the bottom while pinned.
+    expect(await frame()).toEqual(['', ' TOP 16   │', ' row 17   │', ' row 18   │', ' row 19   █']);
+    unmount();
+  });
 });

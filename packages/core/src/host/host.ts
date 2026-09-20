@@ -194,7 +194,16 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   );
 
   // Position type + edge offsets.
-  n.setPositionType(props.position === 'absolute' ? PositionType.Absolute : PositionType.Static);
+  // A scroll viewport is the containing block of its overlays (a scrollbar, a
+  // sticky row): Yoga resolves an absolute child against the nearest non-static
+  // ancestor, and with every box static that is the root — so an ancestor's
+  // padding would shift the overlay out of the viewport and into its clip.
+  const isViewport = props.scrollTop !== undefined || props.scrollBottom !== undefined;
+  n.setPositionType(
+    props.position === 'absolute' ? PositionType.Absolute
+      : isViewport ? PositionType.Relative
+        : PositionType.Static,
+  );
   if (props.top !== undefined) n.setPosition(Edge.Top, props.top);
   if (props.left !== undefined) n.setPosition(Edge.Left, props.left);
   if (props.right !== undefined) n.setPosition(Edge.Right, props.right);
