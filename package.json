@@ -12,6 +12,7 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit",
     "build": "npm run build -ws --if-present",
+    "release:publish": "node scripts/publish.mjs",
     "articles-tui": "npm run articles-tui -w @flowtty/examples",
     "things-tui": "npm run things-tui -w @flowtty/examples",
     "things-tui:ddev": "npm run things-tui:ddev -w @flowtty/examples",

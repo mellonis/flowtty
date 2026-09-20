@@ -92,8 +92,9 @@ Required: `size()`, `draw(buffer)`. Optional (feature-detected, not assumed):
 files staying in sync; change one path, change all three:
 - `tsconfig.base.json` `paths`
 - `vitest.config.ts` `resolve.alias`
-- each package's `package.json` `exports` (currently point at `./src/index.ts`;
-  the publish flow flips them to `dist/`).
+- each package's `package.json` `exports` (point at `./src/index.ts`; `npm run
+  release:publish` flips them to `dist/` for the publish and restores them —
+  never publish by hand, and never commit the flipped form).
 Adding a new `@flowtty/*` package or subpath means editing all three.
 
 **`.tsx` files need `import React from 'react'`.** tsx (the example runner) uses
