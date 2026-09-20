@@ -37,7 +37,7 @@ export function SnakeScene() {
         <Text dim>{`length ${game.snake.length}`}</Text>
         <Text dim>{game.auto ? 'the snake is steering itself — an arrow key takes over' : 'you are steering — press a to let it play'}</Text>
       </Box>
-      <Box flexDirection="column" border="round" borderTitle=" snake — a ticker, fast input, and a frame diff that repaints only what moved ">
+      <Box flexDirection="column" border="round" borderTitle=" snake — a ticker, fast input, a frame diff ">
         {Array.from({ length: H }, (_, y) => {
           // Merge neighbouring cells of one kind into a single <Text>: fewer nodes per row.
           const runs: { kind: Kind; n: number }[] = [];

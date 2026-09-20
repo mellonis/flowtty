@@ -16,6 +16,8 @@ npm install @flowtty/react @flowtty/tty-backend react
 
 ## Showcase
 
+![The flowtty showcase playing itself: layout, a form, a table with markdown, progress, a chat, dialogs, and snake](docs/showcase.gif)
+
 ```bash
 npm run showcase            # a self-playing tour: layout, forms, table + markdown,
                             # progress, a chat, dialogs, and a game of snake
@@ -29,8 +31,10 @@ hands over the keys the moment you press one (`Ctrl+G` gives them back, `Ctrl+N`
 The script is an ordinary list of steps (`type`, `press`, `paste`, `wheel`,
 `waitFor`) fed through a `Backend` wrapper, so the very same script runs against
 `TestBackend` in the test suite: what gets recorded is what gets tested.
-`npm run showcase:record` renders it to `docs/showcase.gif` with
-[vhs](https://github.com/charmbracelet/vhs).
+`npm run showcase:record` runs it in a pseudo-terminal, saves every byte it prints
+with its timestamp as `docs/showcase.cast` (an asciicast — replay it with
+`asciinema play`), and renders `docs/showcase.gif` with `agg`. No browser and no
+screen capture are involved.
 
 ## Status
 

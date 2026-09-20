@@ -22,7 +22,7 @@ export function FormScene() {
           <Text dim>Plan — ↑/↓</Text>
           <Select items={PLANS} value={plan} onChange={setPlan} onSubmit={setPlan} />
           <Text>{''}</Text>
-          <Text dim>Features — Space toggles, Enter on “+ add new” adds one</Text>
+          <Text dim>Features — Space toggles · “+ add new” adds one</Text>
           <MultiSelect
             items={features} value={picked} onChange={setPicked} onSubmit={() => {}}
             onAddNew={() => {
