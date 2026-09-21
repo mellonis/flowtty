@@ -1,0 +1,208 @@
+# The app around the components
+
+Starting and stopping, errors, cancellation, animation, dialogs.
+
+- [Quitting, and work after the UI is gone](#quitting-and-work-after-the-ui-is-gone)
+- [Error handling](#error-handling)
+- [Root abort signal](#root-abort-signal)
+- [Ticker (animation clock)](#ticker-animation-clock)
+- [DialogHost (stack)](#dialoghost-stack)
+
+## Quitting, and work after the UI is gone
+
+`render()` resolves to a handle:
+
+```tsx
+const app = await render(<App />, new TtyBackend());
+const result = await app.waitUntilExit();   // the terminal is restored by now
+console.log('picked:', result);             // prints to the normal screen
+process.exit(0);
+```
+
+- `app.unmount()` tears the tree down and restores the terminal (idempotent).
+- `app.waitUntilExit()` resolves once that has happened — the place to print a
+  summary, flush a file or set an exit code. It resolves with the value passed to
+  `exit(value)`, or `undefined` for a plain unmount, and also after a handled
+  error (the error itself goes to `onError`).
+- Inside a component, `useApp().exit(value?)` quits. It is safe to call from a
+  key handler or an effect:
+
+```tsx
+function Menu() {
+  const { exit } = useApp();
+  useInput((key) => { if (key.name === 'q') exit(); });
+  return <Select items={items} onSubmit={(v) => exit(v)} />;
+}
+```
+
+## Error handling
+
+flowtty wraps the user tree in a React error boundary AND registers process-level
+`uncaughtException` / `unhandledRejection` handlers. When ANY error is caught,
+flowtty calls `backend.dispose()` first (restores the terminal) and then either:
+
+- invokes the `onError` callback if provided in `render(element, backend, { onError })`, OR
+- prints the error to stderr and exits with code 1 (default).
+
+```tsx
+await render(<App />, backend, {
+  onError: ({ error, source }) => {
+    // source: 'react' | 'uncaughtException' | 'unhandledRejection'
+    console.error(`[${source}]`, error);
+    process.exit(1);
+  },
+});
+```
+
+The cleanup runs at most ONCE per render handle — subsequent errors after the
+first are ignored to avoid double-disposal. Process error listeners are removed
+when `handle.unmount()` is called, so multiple `render()` calls in sequence
+(e.g. in tests) don't leak listeners.
+
+**Logging errors to a file (development pattern):**
+
+flowtty intentionally doesn't bake file-logging into the default behavior — `onError` is the escape hatch. Common pattern for development:
+
+```tsx
+import { appendFileSync } from 'node:fs';
+
+await render(<App />, backend, {
+  onError: ({ error, source }) => {
+    const stamp = new Date().toISOString();
+    const trace = error instanceof Error ? (error.stack ?? error.message) : String(error);
+    appendFileSync('./flowtty-errors.log', `[${stamp}] [${source}] ${trace}\n\n`);
+    console.error(error);
+    process.exit(1);
+  },
+});
+```
+
+Then `tail -f flowtty-errors.log` in a second terminal during development. Adjust path / format / rotation per your needs.
+
+Without this safety net, an unhandled error during render or in a useEffect would
+leave the terminal in alt-screen mode with raw input still enabled — recovery
+would require killing the shell or running `reset`.
+
+## Root abort signal
+
+`useRootAbortSignal()` returns the render root's `AbortSignal` — the one flowtty
+fires (once) when the whole tree tears down, on both `handle.unmount()` and the
+error path (just before `backend.dispose()`). It returns `null` when there's no
+flowtty `render()` in scope.
+
+```tsx
+import { useRootAbortSignal } from '@flowtty/react';
+
+function Things() {
+  const signal = useRootAbortSignal();
+  const [data, setData] = useState(null);
+  useEffect(() => {
+    fetch('/things', { signal: signal ?? undefined })
+      .then((r) => r.json())
+      .then(setData)
+      .catch((e) => { if (e.name !== 'AbortError') throw e; });
+  }, [signal]);
+  // …
+}
+```
+
+**Why this instead of `useEffect` cleanup?** It isn't *instead* — they solve
+different problems and are meant to be used together:
+
+- **`useEffect` cleanup (or a `cancelled` flag) is per-component.** It runs when
+  *this* component unmounts — a dialog closing, a list row scrolling out of the
+  window. Its job is to stop a stale `setState` from landing after the component
+  is gone. It does **not** cancel the underlying work; a `fetch` whose `.then`
+  is now a no-op is still holding a socket open.
+- **`useRootAbortSignal()` is whole-app.** It fires only when the entire render
+  root goes away (the process is exiting, or an error tore everything down). Its
+  job is to cancel work *at the I/O layer* so the runtime can actually shut down
+  — an in-flight `fetch` is aborted at the socket, a long timer's callback bails
+  — rather than leaving the event loop alive waiting on requests nobody will
+  read. It's also a ready-made cancellation token for anything that already
+  speaks `AbortSignal` (`fetch`, `addEventListener`, `setTimeout` via wrappers).
+
+So: keep your effect cleanup for per-unmount correctness, and *also* forward the
+root signal to async I/O for clean shutdown. The `things-tui` example wires both
+(see `ThingDetailView` — a `cancelled` flag for the dialog closing plus the root
+signal on the `fetch`).
+
+**Composing with your own controller.** Since the hook returns a plain
+`AbortSignal`, you can merge it with controllers *you* own via `AbortSignal.any()`
+(Node 20.3+) — the combined signal aborts when *either* source fires. This is the
+clean way to fold "this component unmounted", "the user hit cancel", or "the
+request timed out" into the same token as "the app is shutting down":
+
+```tsx
+const root = useRootAbortSignal();
+useEffect(() => {
+  const local = new AbortController();              // per-unmount / cancel button
+  const signal = root ? AbortSignal.any([root, local.signal]) : local.signal;
+  fetch(url, { signal })
+    .then(setData)
+    .catch((e) => { if (e.name !== 'AbortError') throw e; });
+  return () => local.abort();                        // fires on THIS effect's cleanup
+}, [url, root]);
+```
+
+That single combined signal makes the `fetch` abort on a per-component unmount
+(via `local.abort()` in the cleanup) *and* on whole-app teardown (via `root`) —
+collapsing the two-layer pattern above into one cancellation token. Mix in
+`AbortSignal.timeout(ms)` the same way for a deadline.
+
+**It's a signal, not a controller.** The hook hands back an `AbortSignal`, which
+has no `.abort()` — only flowtty's private controller can fire it. A component
+deep in the tree can observe teardown (`.aborted`, `addEventListener('abort')`,
+`.throwIfAborted()`) or forward the signal, but it cannot abort the whole app.
+
+## Ticker (animation clock)
+
+`useTicker()` returns a frame counter that advances by one every `interval` ms.
+It's the base clock under `<Spinner>`, `<ProgressBar>`, and elapsed-time
+displays — anything that needs to repaint on a timer.
+
+```tsx
+import { useTicker, Text } from '@flowtty/react';
+
+function Clock() {
+  const tick = useTicker({ interval: 1000 });   // one tick per second
+  return <Text>elapsed: {tick}s</Text>;
+}
+```
+
+Options:
+
+- `interval` — milliseconds between ticks (default `80`, a common animation cadence).
+- `active` — when `false`, the ticker pauses and the count holds; flip back to
+  `true` to resume (it does not reset). Default `true`.
+
+The interval is torn down on unmount **and** the instant the
+[root abort signal](#root-abort-signal) fires, so an animation can never keep
+ticking — or keep the Node event loop alive — past the tree it belongs to. This
+is the reference implementation of "an interval that respects the root signal".
+
+## DialogHost (stack)
+
+`<DialogHost>` lets components anywhere in its subtree open dialogs via
+`useDialogHost().openDialog(element)`. Each call **pushes** a new dialog on
+top of the stack — previously open dialogs stay alive, render behind the new
+one, and only receive input when they become the top of the stack again.
+
+`useDialog().done(value)` / `.cancel()` **pop** the top dialog, resolving the
+`openDialog` promise it returned. Lower stack entries are untouched.
+
+**Input gating:**
+
+- Host content's `useInput` is muted whenever ANY dialog is open.
+- Lower dialogs' `useInput` is muted while a higher dialog is on top.
+- Only the topmost dialog receives keys.
+
+**Caveat:** all dialogs share a single `dialogApi` instance — calling `done()` or `cancel()` always pops the TOP, regardless of which dialog component triggered it. Since input is gated to the top dialog, normal user-driven flows are safe; the edge case is async side-effects from a lower dialog (e.g. a useEffect / setTimeout) that calls `done` after a new dialog opened on top — it would pop the wrong entry. Wrap async work in `isMounted` guards if you need to be paranoid.
+
+**Backdrop.** `<DialogHost backdrop>` dims everything behind an open floating
+dialog — the host content and any dialog below it — while the dialog itself stays
+bright; `openDialog(el, { floating: true, backdrop: false })` overrides it for one
+dialog. It is built on a `<Box backdrop="dim">` prop, which restyles the cells
+already painted under the box instead of covering them (characters and colors
+stay, `bold` is dropped). `dim` is a flag on a cell, not an opacity, so a stack of
+dialogs never darkens anything twice.

@@ -146,6 +146,11 @@ install-state problem, not a code problem.
 - **Public surface** is the `exports`/`index.ts` of each package. `@flowtty/react`
   re-exports the core types app authors need so consumers have one import. Adapter
   authors import host primitives from `@flowtty/core/host`.
-- `docs/plans/*.md` holds the per-feature design notes (one per milestone/feature);
-  `docs/design.md` is the overview. Read the relevant plan before extending a
-  feature — they capture the why behind the deviations.
+- `docs/` is the public documentation: `layout.md`, `components.md`, `input.md`,
+  `app.md`, `testing.md`, `terminal.md`. The README is the landing page and links
+  into them; reference material goes on a docs page, not into the README.
+- `docs/internal/` holds working artifacts — `design.md` (the original overview)
+  and `plans/*.md` (one design note per milestone/feature, plus `_followups.md`).
+  Read the relevant plan before extending a feature — they capture the why behind
+  the deviations — but they are history, not an authority: code comments and
+  published pages cite `docs/*.md`, never `docs/internal/`.

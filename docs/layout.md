@@ -1,0 +1,226 @@
+# Layout
+
+Every `<Box>` is a Yoga flexbox node. These are the props that size, place, clip and scroll it. Yoga's defaults are not CSS's — most importantly `flexShrink` is `0`, so a child keeps its natural size and overflows unless you give it `flexShrink={1}`.
+
+- [Borders](#borders)
+- [Padding](#padding)
+- [Margin](#margin)
+- [Gap](#gap)
+- [Flex sizing](#flex-sizing)
+- [Flex wrap](#flex-wrap)
+- [Align content](#align-content)
+- [Size constraints](#size-constraints)
+- [Aspect ratio](#aspect-ratio)
+- [Display](#display)
+- [Size awareness](#size-awareness)
+- [zIndex](#zindex)
+- [Overflow](#overflow)
+- [Scrolling](#scrolling)
+
+## Borders
+
+`<Box border>` draws a one-cell border on all four edges. The cells are reserved
+via Yoga's per-edge border slots, so content fits inside the ring automatically.
+
+- `border="single"` → `┌─┐ │ │ └─┘`
+- `border="double"` → `╔═╗ ║ ║ ╚═╝`
+- `border="round"`  → `╭─╮ │ │ ╰─╯`
+- `border="bold"`   → `┏━┓ ┃ ┃ ┗━┛`
+- `border="classic"` → ASCII fallback `+-+ | | +-+`
+
+`borderColor` accepts the same values as `color` (named, `#rrggbb`, `rgb(...)`).
+Boxes smaller than 2×2 silently skip the border.
+
+Border cells share the box's background: they default to the box's effective
+background color (own `backgroundColor`, else the inherited one), so a filled
+modal keeps its fill under the border ring. `borderBackgroundColor` overrides
+that for the border cells only; the `'default'` value keeps them on the
+terminal default background.
+
+## Padding
+
+`<Box>` accepts CSS-style padding props. Per-edge wins over axis wins over shorthand.
+
+- `padding={n}` — all four edges
+- `paddingX={n}` — left + right
+- `paddingY={n}` — top + bottom
+- `paddingTop`, `paddingRight`, `paddingBottom`, `paddingLeft` — per-edge override
+
+Values are integer cell counts. Padding and border combine — a `<Box border="single" padding={1}>` insets content by 2 cells on each side (1 border + 1 padding). `backgroundColor` fills the full rect including padding cells.
+
+## Margin
+
+`<Box>` accepts CSS-style margin props. Same precedence as padding (per-edge > axis > shorthand).
+
+- `margin={n}` — all four edges
+- `marginX={n}` — left + right
+- `marginY={n}` — top + bottom
+- `marginTop`, `marginRight`, `marginBottom`, `marginLeft` — per-edge override
+
+Values are integer cell counts. Negative values are allowed — Yoga supports them for overlap layouts (a child with `marginLeft={-1}` shifts one cell into its preceding sibling's space).
+
+## Gap
+
+`<Box>` accepts CSS-style gap props for spacing between flex children.
+
+- `gap={n}` — both axes
+- `rowGap={n}` — vertical spacing (between rows / column-flex items)
+- `columnGap={n}` — horizontal spacing (between columns / row-flex items)
+
+Per-axis wins over shorthand. Gap applies BETWEEN siblings only — no extra space at the parent's leading or trailing edge. Often cleaner than per-child `marginRight`/`marginBottom` for evenly-spaced lists.
+
+## Flex sizing
+
+`<Box>` accepts the three flex sizing props:
+
+- `flexGrow={n}` — claim a share of leftover space (proportional weight; default `0`)
+- `flexShrink={n}` — claim a share of deficit when siblings overflow (proportional weight; default `0`)
+- `flexBasis={n | 'auto' | '50%'}` — initial size before grow/shrink applies (default `'auto'` — uses `width`/`height`)
+
+**Defaults match Yoga, not CSS.** CSS sets `flex-shrink` to `1` by default — flowtty (via Yoga) leaves it at `0`, so children overflow rather than shrink unless `flexShrink={1}` is set explicitly. Useful when overflow is intentional; surprising if you're used to CSS.
+
+## Flex wrap
+
+`<Box flexWrap>` controls multi-line flex layouts. Default `'nowrap'`.
+
+- `flexWrap="nowrap"` (default) — single line; children overflow or shrink to fit
+- `flexWrap="wrap"` — children flow to additional lines when they exceed the main axis
+- `flexWrap="wrap-reverse"` — same as `wrap`, but wrap lines stack in reverse cross-axis order
+
+When wrap is on, `rowGap` controls spacing between wrap lines (perpendicular to the main axis); `columnGap` continues to control spacing between items on the same line.
+
+## Align content
+
+`<Box alignContent>` controls cross-axis distribution of wrap lines. Only effective when `flexWrap` is `'wrap'` or `'wrap-reverse'` AND the parent has more cross-axis space than the wrap lines need. Default `'flex-start'`.
+
+- `'flex-start'` (default) — lines packed at cross-axis start
+- `'flex-end'` — lines packed at cross-axis end
+- `'center'` — lines centered
+- `'space-between'` — first line at start, last at end, free space between
+- `'space-around'` — equal space around each line
+- `'space-evenly'` — equal space between all lines including edges
+- `'stretch'` — lines stretch to fill cross-axis space
+
+CSS deviation: CSS3 defaults `align-content` to `'stretch'` for flex; flowtty defaults to `'flex-start'` (deterministic, doesn't reflow content unexpectedly).
+
+## Size constraints
+
+`<Box>` accepts four optional min/max size props that clamp Yoga's computed size:
+
+- `minWidth={n | '50%'}` — prevents flexShrink (and content) from shrinking below this
+- `maxWidth={n | '50%'}` — caps flexGrow (and explicit width) at this
+- `minHeight={n | '50%'}` — column-flex analog of `minWidth`
+- `maxHeight={n | '50%'}` — column-flex analog of `maxWidth`
+
+Each accepts a cell count or a percent string. Undefined = no constraint. Useful for responsive layouts (e.g. `maxWidth: '80%'` on a content panel) and for keeping flex-grow children from claiming all available space.
+
+## Aspect ratio
+
+`<Box aspectRatio>` is a number representing `width / height` (CSS convention). When one dimension is constrained (via `width`, `height`, or flex sizing), Yoga derives the other from the ratio.
+
+- `aspectRatio={2}` — twice as wide as tall (e.g., `width=10` → `height=5`)
+- `aspectRatio={0.5}` — twice as tall as wide (e.g., `height=4` → `width=2`)
+- `aspectRatio={1}` — square
+
+Useful for media-style panels where you want a fixed shape regardless of container size — e.g., a flex child with `flexGrow={1} aspectRatio={3}` claims leftover horizontal space and adjusts its height to maintain a 3:1 ratio.
+
+## Display
+
+`<Box display>` controls whether this box (and its subtree) participates in layout. Default `'flex'`.
+
+- `display="flex"` (default) — normal flexbox participation
+- `display="none"` — box and all descendants are removed from layout and skipped by paint. Siblings reflow as if this box didn't exist. React state is preserved (unlike conditionally unmounting).
+
+Useful for tab panels, collapsible sections, and conditional UI where remounting would lose form state, scroll position, or other ephemeral state.
+
+## Size awareness
+
+Two complementary primitives for components that need to know their allocated space.
+
+**`onLayout` (per-box, nested-friendly):**
+
+```tsx
+<Box onLayout={(rect) => {/* rect = { left, top, width, height } */}}>
+```
+
+Fires after layout with this box's computed rect. Use for components inside a flexbox layout (e.g. an `<ArticleReader>` in a 70% panel needs to paginate against the panel's width, not the terminal's). **Diff before `setState`** — onLayout fires on every paint; unconditionally setting state with a new object infinite-loops:
+
+```tsx
+<Box flexGrow={1} onLayout={(r) => {
+  if (!size || size.width !== r.width || size.height !== r.height) setSize(r);
+}}>
+```
+
+**`useTerminalSize()` (whole terminal):**
+
+```tsx
+import { useTerminalSize } from '@flowtty/react';
+
+function App() {
+  const { width, height } = useTerminalSize();
+  return <Box width={width} height={height}>…</Box>;
+}
+```
+
+Returns the current terminal size; re-renders on `backend.onResize` (TTY) or initial-only (TestBackend / fixed-size). Useful for full-screen apps that own the terminal. For nested components, prefer `onLayout`.
+
+## zIndex
+
+`<Box zIndex>` is an integer; higher values paint on top of lower within the same paint pass. Default `0`. Tree order is the natural tiebreaker (later sibling wins).
+
+**Does NOT cross pass boundaries.** Stack-flow children paint first, then absolutes — an absolute with `zIndex={0}` still overlays a stack-flow with `zIndex={999}`. zIndex only reorders siblings within the same pass.
+
+## Overflow
+
+`<Box overflow>` controls whether descendants are clipped to this box's content rect. Default `'visible'`.
+
+- `'visible'` (default) — descendants may extend past this box (current behavior)
+- `'hidden'` — descendants clipped to content rect; ALL descendant writes (backgrounds, borders, own-text, nested children) are gated
+
+`'hidden'` does NOT clip the box's own background or border — those are this box's own area, not its descendants' writes. Clips are intersected across nested `overflow: 'hidden'` ancestors.
+
+## Scrolling
+
+`scrollTop` / `scrollBottom` turn a box into a **scroll viewport**: it clips like
+`overflow="hidden"` and paints its flow children shifted by that many rows.
+
+- `scrollTop={n}` — rows scrolled from the top. `scrollBottom={n}` — rows from the
+  END of the content; `scrollBottom={0}` pins the last rows into view.
+- The value is clamped at paint time against the content's *current* height, so a
+  pinned view follows growing content in the same frame — no catch-up repaint.
+  Content shorter than the viewport never scrolls (it sits at the top).
+- `position="absolute"` children are **overlays**: they don't scroll and don't
+  count as content. That is how a scrollbar or a sticky header row is drawn.
+- `onScrollMetrics({ contentHeight, viewportHeight, scrollTop, maxScrollTop })`
+  fires every paint (diff before `setState`, like `onLayout`).
+- A scrolled child's `onLayout` reports its on-screen row (negative once it is
+  above the viewport) and still fires while it is clipped away.
+
+Most apps want the component instead:
+
+```tsx
+<Box flexDirection="column" height="100%">
+  <Header />
+  <ScrollBox flexGrow={1} flexShrink={1} anchor="bottom" scrollbar>
+    {messages.map((m) => <Message key={m.id} {...m} />)}
+  </ScrollBox>
+  <Prompt />
+</Box>
+```
+
+`<ScrollBox>` sizes like any `<Box>` — with `flexGrow` it takes whatever the
+layout leaves, so the app never adds up sibling heights to know how many rows fit.
+
+| Prop | |
+|---|---|
+| `anchor` | `'top'` (default) or `'bottom'`. Bottom is the chat/log shape: the last rows show and stay in view as content grows — until the user scrolls up, after which new content no longer moves what they are reading. Scrolling back to the end re-pins. |
+| `offset` / `onScroll` | Controlled position, in rows from the anchored edge (0 = at that edge). When `offset` is set the box never moves on its own; keys and the wheel only report through `onScroll(offset, metrics)`. |
+| `onMetrics` | Content / viewport heights changed — for a "↑ more" hint, or a host that clamps its own `offset`. |
+| `isActive` | Handle PgUp / PgDn and the wheel (default `true`). The wheel only counts while the pointer is over the box. |
+| `wheelStep`, `pageStep` | Rows per wheel notch (default 3) and per PgUp/PgDn (default: viewport height − 1). |
+| `scrollbar` | Draw a thumb in the right-hand column while the content overflows. |
+| `ref` | `scrollTo(offset)`, `scrollToStart()`, `scrollToEnd()`. |
+
+Every child is laid out by Yoga (cleanly cached between frames), but only rows
+in view are drawn, so a few thousand rows scroll comfortably. Keep rows cheap to
+re-render — one memoized component per message, not one per line.
