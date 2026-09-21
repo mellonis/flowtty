@@ -1,9 +1,8 @@
-// Framework-free markdown parsing for <Markdown>. Two pure passes:
-//   parseMarkdown(src)      → block structure (headings, lists, code, …)
-//   highlightCode(line,lang)→ per-line token coloring for fenced code blocks
-// Best-effort, line-based; not a CommonMark-complete implementation.
-
-import type { Color } from '@flowtty/core';
+// Framework-free markdown parsing for <Markdown>: parseMarkdown(src) turns a
+// document into block structure (headings, lists, tables, fenced code, …) and
+// parseInline(text) turns one line's markers into styled segments. Best-effort,
+// line-based; not a CommonMark-complete implementation. Coloring the CONTENT of
+// a fenced block is the highlighter's job (see ./highlight).
 
 export interface InlineSeg {
   text: string;
@@ -43,7 +42,10 @@ export type MdBlock =
    *  Every row has exactly `header.length` cells (short rows padded, long cut). */
   | { kind: 'table'; align: (MdAlign | undefined)[]; header: InlineSeg[][]; rows: InlineSeg[][][] }
   | { kind: 'blockquote'; segs: InlineSeg[] }
-  | { kind: 'code'; lang: string; lines: string[] }
+  /** Fenced code. `lang` is the info string's first word (`''` when absent),
+   *  `title` its `title=…` attribute or a bare path-like second word. `closed`
+   *  is false while a streamed block's closing fence has not arrived yet. */
+  | { kind: 'code'; lang: string; title?: string; lines: string[]; closed: boolean }
   | { kind: 'hr' };
 
 // code | ![alt](src) | **bold** | *emphasis* | [text](url). Image is tried before
@@ -82,7 +84,39 @@ export function parseInline(text: string): InlineSeg[] {
 
 const HEADING_RE = /^(#{1,6})\s+(.*)$/;
 const HR_RE = /^(-{3,}|\*{3,}|_{3,})\s*$/;
-const FENCE_RE = /^(```|~~~)\s*([\w-]*)\s*$/;
+// An opening fence: three or more backticks or tildes, then a free-form info
+// string. Three-or-more (rather than exactly three) so a ```` ```` ```` block can
+// hold ``` lines — see `isClosingFence`, which is what actually ends a block.
+const FENCE_RE = /^(`{3,}|~{3,})[ \t]*(.*)$/;
+
+// A fence closes a block only when it uses the SAME character, is at least as
+// long as the opening one, and carries nothing but whitespace after it. That is
+// what keeps a ``` line inside a ~~~ block (or inside a longer ``` fence) as
+// content instead of ending it early.
+function isClosingFence(line: string, marker: string): boolean {
+  const m = /^(`{3,}|~{3,})[ \t]*$/.exec(line);
+  return !!m && m[1]![0] === marker[0] && m[1]!.length >= marker.length;
+}
+
+// `title="src/app.ts"` / `title='…'` / `title=…` anywhere in the info string.
+const TITLE_ATTR_RE = /(?:^|\s)title=(?:"([^"]*)"|'([^']*)'|(\S+))/;
+
+/** Split a fence's info string into the language (its first word) and an
+ *  optional block title. A bare second word counts as a title when it looks
+ *  like a path or a file name (it contains `/` or `.`). */
+export function parseFenceInfo(info: string): { lang: string; title?: string } {
+  let rest = info.trim();
+  let title: string | undefined;
+  const attr = TITLE_ATTR_RE.exec(rest);
+  if (attr) {
+    title = attr[1] ?? attr[2] ?? attr[3] ?? '';
+    rest = (rest.slice(0, attr.index) + ' ' + rest.slice(attr.index + attr[0].length)).trim();
+  }
+  const words = rest.split(/\s+/).filter(Boolean);
+  const lang = words[0] ?? '';
+  if (title === undefined && words[1] && /[/.]/.test(words[1])) title = words[1];
+  return title === undefined ? { lang } : { lang, title };
+}
 const QUOTE_RE = /^>\s?(.*)$/;
 const ULIST_RE = /^(\s*)[-*+]\s+(.*)$/;
 const OLIST_RE = /^(\s*)(\d+)\.\s+(.*)$/;
@@ -189,14 +223,19 @@ export function parseMarkdown(src: string): MdBlock[] {
     if (fence) {
       flushParagraph(para); para = [];
       const marker = fence[1]!;
-      const lang = fence[2] ?? '';
+      const { lang, title } = parseFenceInfo(fence[2] ?? '');
       const code: string[] = [];
       i++;
-      while (i < lines.length && lines[i] !== marker && !FENCE_RE.test(lines[i]!)) {
+      while (i < lines.length && !isClosingFence(lines[i]!, marker)) {
         code.push(lines[i]!); i++;
       }
-      if (i < lines.length) i++; // consume closing fence
-      blocks.push({ kind: 'code', lang, lines: code });
+      // Running out of input mid-block is the streaming case: the block still
+      // renders, marked open, so a reply doesn't flicker when the fence lands.
+      const closed = i < lines.length;
+      if (closed) i++; // consume closing fence
+      blocks.push(title === undefined
+        ? { kind: 'code', lang, lines: code, closed }
+        : { kind: 'code', lang, title, lines: code, closed });
       continue;
     }
     if (line.trim() === '') { flushParagraph(para); para = []; i++; continue; }
@@ -257,63 +296,4 @@ export function parseMarkdown(src: string): MdBlock[] {
   }
   flushParagraph(para);
   return blocks;
-}
-
-// ─── fenced-code highlighting ───────────────────────────────────────────────
-
-export interface CodeSeg { text: string; color?: Color; dim?: boolean }
-
-const JS_KEYWORDS = new Set([
-  'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'do',
-  'switch', 'case', 'break', 'continue', 'new', 'class', 'extends', 'super', 'this',
-  'import', 'from', 'export', 'default', 'async', 'await', 'try', 'catch', 'finally',
-  'throw', 'typeof', 'instanceof', 'in', 'of', 'void', 'delete', 'yield', 'true',
-  'false', 'null', 'undefined', 'interface', 'type', 'enum', 'implements', 'public',
-  'private', 'protected', 'readonly', 'static', 'as', 'namespace', 'declare',
-]);
-
-// One regex, tried left-to-right per match: comment | string | number | word.
-const JS_RE = /(\/\/[^\n]*|\/\*[\s\S]*?\*\/)|('(?:[^'\\]|\\.)*'|"(?:[^"\\]|\\.)*"|`(?:[^`\\]|\\.)*`)|(\b\d+(?:\.\d+)?\b)|([A-Za-z_$][\w$]*)/g;
-
-function highlightJs(line: string): CodeSeg[] {
-  const segs: CodeSeg[] = [];
-  let last = 0;
-  for (const m of line.matchAll(JS_RE)) {
-    const idx = m.index ?? 0;
-    if (idx > last) segs.push({ text: line.slice(last, idx) });
-    if (m[1]) segs.push({ text: m[0], dim: true });
-    else if (m[2]) segs.push({ text: m[0], color: 'green' });
-    else if (m[3]) segs.push({ text: m[0], color: 'yellow' });
-    else if (m[4]) segs.push(JS_KEYWORDS.has(m[0]) ? { text: m[0], color: 'magenta' } : { text: m[0] });
-    last = idx + m[0].length;
-  }
-  if (last < line.length) segs.push({ text: line.slice(last) });
-  return segs;
-}
-
-// key | string | number/bool/null | punctuation passthrough.
-const JSON_RE = /("(?:[^"\\]|\\.)*"\s*:)|("(?:[^"\\]|\\.)*")|(\b(?:true|false|null)\b|-?\b\d+(?:\.\d+)?\b)/g;
-
-function highlightJson(line: string): CodeSeg[] {
-  const segs: CodeSeg[] = [];
-  let last = 0;
-  for (const m of line.matchAll(JSON_RE)) {
-    const idx = m.index ?? 0;
-    if (idx > last) segs.push({ text: line.slice(last, idx) });
-    if (m[1]) segs.push({ text: m[0], color: 'cyan' });
-    else if (m[2]) segs.push({ text: m[0], color: 'green' });
-    else if (m[3]) segs.push({ text: m[0], color: 'yellow' });
-    last = idx + m[0].length;
-  }
-  if (last < line.length) segs.push({ text: line.slice(last) });
-  return segs;
-}
-
-export function highlightCode(line: string, lang: string): CodeSeg[] {
-  const l = lang.toLowerCase();
-  if (l === 'js' || l === 'jsx' || l === 'ts' || l === 'tsx' || l === 'javascript' || l === 'typescript') {
-    return highlightJs(line);
-  }
-  if (l === 'json') return highlightJson(line);
-  return [{ text: line, dim: true }];
 }

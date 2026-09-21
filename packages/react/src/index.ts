@@ -70,7 +70,11 @@ export { Table, type TableProps, type TableColumn, type TableAlign, type TableCe
 export { Link, type LinkProps } from './components/Link.js';
 export { ScrollBox, type ScrollBoxProps, type ScrollBoxHandle } from './components/ScrollBox.js';
 export { Markdown, type MarkdownProps } from './components/Markdown.js';
-export { layoutMarkdown, type StyledLine, type StyledSpan } from './components/markdown/layout.js';
+export { layoutMarkdown, layoutMarkdownDetailed, type StyledLine, type StyledSpan } from './components/markdown/layout.js';
+export type {
+  MarkdownOptions, MarkdownLayout, MarkdownCodeBlock, MarkdownCodeFence, MarkdownCodeWrap,
+} from './components/markdown/layout.js';
 export { highlightMarkdownSource, type SourceLine } from './components/markdown/source.js';
-export { parseMarkdown, parseInline, highlightCode } from './components/markdown/parse.js';
-export type { MdBlock, MdList, MdListItem, MdAlign, InlineSeg, CodeSeg } from './components/markdown/parse.js';
+export { parseMarkdown, parseInline } from './components/markdown/parse.js';
+export type { MdBlock, MdList, MdListItem, MdAlign, InlineSeg } from './components/markdown/parse.js';
+export { HIGHLIGHTED_LANGUAGES, type HighlightedLanguage } from './components/markdown/highlight/index.js';

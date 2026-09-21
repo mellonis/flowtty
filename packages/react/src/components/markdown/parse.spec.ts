@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { parseInline, parseMarkdown, highlightCode } from './parse.js';
+import { parseInline, parseMarkdown } from './parse.js';
 
 describe('parseInline', () => {
   test('splits bold / emphasis / code / link runs', () => {
@@ -59,7 +59,52 @@ describe('parseMarkdown', () => {
 
   test('fenced code keeps lang and raw lines', () => {
     const blocks = parseMarkdown('```ts\nconst x = 1;\n```');
-    expect(blocks).toEqual([{ kind: 'code', lang: 'ts', lines: ['const x = 1;'] }]);
+    expect(blocks).toEqual([{ kind: 'code', lang: 'ts', lines: ['const x = 1;'], closed: true }]);
+  });
+
+  test('the info string yields the language from its first word only', () => {
+    expect(parseMarkdown('```ts twoslash\nx\n```')).toEqual([
+      { kind: 'code', lang: 'ts', lines: ['x'], closed: true },
+    ]);
+  });
+
+  test('title="…" / title=\'…\' / title=… in the info string becomes the block title', () => {
+    for (const info of ['ts title="src/app.ts"', "ts title='src/app.ts'", 'ts title=src/app.ts']) {
+      expect(parseMarkdown('```' + info + '\nx\n```')).toEqual([
+        { kind: 'code', lang: 'ts', title: 'src/app.ts', lines: ['x'], closed: true },
+      ]);
+    }
+  });
+
+  test('a bare second word that looks like a path or file name is the title', () => {
+    expect(parseMarkdown('```ts src/app.ts\nx\n```')).toEqual([
+      { kind: 'code', lang: 'ts', title: 'src/app.ts', lines: ['x'], closed: true },
+    ]);
+    expect(parseMarkdown('```ts Makefile.in\nx\n```')).toEqual([
+      { kind: 'code', lang: 'ts', title: 'Makefile.in', lines: ['x'], closed: true },
+    ]);
+    // A plain word (no `/`, no `.`) is not a file name — it stays an unused flag.
+    expect(parseMarkdown('```ts twoslash\nx\n```')).toEqual([
+      { kind: 'code', lang: 'ts', lines: ['x'], closed: true },
+    ]);
+  });
+
+  test('a streaming fence with no closing fence yet is still a code block', () => {
+    expect(parseMarkdown('```ts\nconst x = 1;\nconst y = 2;')).toEqual([
+      { kind: 'code', lang: 'ts', lines: ['const x = 1;', 'const y = 2;'], closed: false },
+    ]);
+  });
+
+  test('a tilde fence is closed by tildes, not by backticks', () => {
+    expect(parseMarkdown('~~~ts\n```\nx\n~~~')).toEqual([
+      { kind: 'code', lang: 'ts', lines: ['```', 'x'], closed: true },
+    ]);
+  });
+
+  test('a longer fence can hold shorter fences as content', () => {
+    expect(parseMarkdown('````md\n```\nx\n```\n````')).toEqual([
+      { kind: 'code', lang: 'md', lines: ['```', 'x', '```'], closed: true },
+    ]);
   });
 
   test('unordered and ordered lists', () => {
@@ -202,23 +247,5 @@ describe('parseMarkdown', () => {
   test('blockquote and hr', () => {
     expect(parseMarkdown('> quoted')).toEqual([{ kind: 'blockquote', segs: [{ text: 'quoted' }] }]);
     expect(parseMarkdown('---')).toEqual([{ kind: 'hr' }]);
-  });
-});
-
-describe('highlightCode', () => {
-  test('colors js keywords / strings / numbers', () => {
-    const segs = highlightCode("const x = 'hi';", 'ts');
-    expect(segs.find((s) => s.text === 'const')?.color).toBe('magenta');
-    expect(segs.find((s) => s.text === "'hi'")?.color).toBe('green');
-  });
-
-  test('json keys vs strings', () => {
-    const segs = highlightCode('"k": "v"', 'json');
-    expect(segs.find((s) => s.text.startsWith('"k"'))?.color).toBe('cyan');
-    expect(segs.find((s) => s.text === '"v"')?.color).toBe('green');
-  });
-
-  test('unknown language is dimmed verbatim', () => {
-    expect(highlightCode('whatever', 'rust')).toEqual([{ text: 'whatever', dim: true }]);
   });
 });

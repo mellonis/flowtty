@@ -1,9 +1,14 @@
-import React, { useMemo, useState, type ReactNode } from 'react';
+import React, { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
-import { layoutMarkdown, type StyledLine } from './markdown/layout.js';
+import {
+  layoutMarkdownDetailed,
+  type MarkdownCodeBlock,
+  type MarkdownOptions,
+  type StyledLine,
+} from './markdown/layout.js';
 
-export interface MarkdownProps {
+export interface MarkdownProps extends MarkdownOptions {
   /** Markdown source. */
   children?: string;
   /**
@@ -12,6 +17,13 @@ export interface MarkdownProps {
    * extra paint on first mount and on every resize.
    */
   width?: number;
+  /**
+   * Called with the document's fenced code blocks whenever that list changes —
+   * the hook for a "copy this block" affordance, since each block carries its
+   * raw source and the rows it occupies. Compared by content, so a repaint that
+   * leaves the blocks alone doesn't call it again.
+   */
+  onCodeBlocks?: (blocks: MarkdownCodeBlock[]) => void;
 }
 
 function MdLine({ line }: { line: StyledLine }) {
@@ -19,7 +31,10 @@ function MdLine({ line }: { line: StyledLine }) {
   return (
     <Box flexDirection="row">
       {line.spans.map((s, i) => (
-        <Text key={i} color={s.color} bold={s.bold} dim={s.dim} underline={s.underline} link={s.link}>
+        <Text
+          key={i} color={s.color} backgroundColor={s.background}
+          bold={s.bold} dim={s.dim} underline={s.underline} link={s.link}
+        >
           {s.text}
         </Text>
       ))}
@@ -31,14 +46,38 @@ function MdLine({ line }: { line: StyledLine }) {
  * Render a markdown string as styled terminal text. Best-effort, line-based —
  * supports headings, paragraphs, bold/emphasis/code/links, blockquotes,
  * bullet/ordered/task lists (nested by indentation), GFM tables, fenced code
- * blocks (per-language token colors), and rules.
+ * blocks (a dim label over a dim `│ ` gutter, with per-language token colors),
+ * and rules.
  * Content is pre-wrapped to the resolved width so the output is a stable column
  * of rows (a paginating host can slice it — see {@link layoutMarkdown}).
  */
-export function Markdown({ children = '', width }: MarkdownProps): ReactNode {
+export function Markdown({
+  children = '',
+  width,
+  codeFence,
+  codeWrap,
+  maxCodeRows,
+  lineNumbers,
+  onCodeBlocks,
+}: MarkdownProps): ReactNode {
   const [measured, setMeasured] = useState<number | null>(null);
   const w = width ?? measured;
-  const lines = useMemo(() => (w != null ? layoutMarkdown(children, w) : []), [children, w]);
+  const { lines, blocksKey, blocks } = useMemo(() => {
+    if (w == null) return { lines: [] as StyledLine[], blocksKey: null, blocks: [] as MarkdownCodeBlock[] };
+    const opts: MarkdownOptions = { codeFence, codeWrap, maxCodeRows, lineNumbers };
+    const laid = layoutMarkdownDetailed(children, w, opts);
+    return { lines: laid.lines, blocksKey: JSON.stringify(laid.codeBlocks), blocks: laid.codeBlocks };
+  }, [children, w, codeFence, codeWrap, maxCodeRows, lineNumbers]);
+
+  // Report the blocks from an effect, never during render, and key the effect on
+  // the serialized list — a re-render that produces an equal list must not fire
+  // it again (the `onLayout` feedback loop, one layer up).
+  const latest = useRef({ blocks, onCodeBlocks });
+  useEffect(() => { latest.current = { blocks, onCodeBlocks }; });
+  useEffect(() => {
+    if (blocksKey == null) return; // still measuring — don't report a phantom []
+    latest.current.onCodeBlocks?.(latest.current.blocks);
+  }, [blocksKey]);
 
   return (
     <Box

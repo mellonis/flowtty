@@ -6,6 +6,9 @@ import type { Color } from '@flowtty/core';
 export interface TextProps {
   children?: ReactNode;
   color?: Color;
+  /** Cell background behind this text. `'default'` paints the terminal's own
+   *  background, masking whatever was under it. */
+  backgroundColor?: Color;
   bold?: boolean;
   dim?: boolean;
   underline?: boolean;

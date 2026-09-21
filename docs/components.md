@@ -227,9 +227,9 @@ Style mapping (the terminal cell model has no italic):
 | `![alt](src)`       | dim `alt` text (images can't render in a TTY)|
 | `> quote`           | dim, with a `│ ` gutter                      |
 | `- ` / `1. ` lists  | colored marker + hanging indent on wrap; an indented run nests under the item above it; ordered items keep their source number (`3.` stays `3.`) |
-| `- [ ]` / `- [x]`   | `☐` / green `☑` task checkboxes              |
+| `- [ ]` / `- [x]`   | `☐` / green `☑` task checkboxes — at any nesting depth, and after the number on an ordered item. The label stays plain text: a checked item is not struck through or dimmed |
 | GFM tables          | padded columns, bold header over a dim rule, `:--` / `:-:` / `--:` alignment; a table wider than the width shrinks its widest column and wraps those cells |
-| ` ```lang ` fences  | per-language token colors (js/ts, json)      |
+| ` ```lang ` fences  | a dim label row over a dim `│ ` gutter, with per-language token colors — see [Fenced code blocks](#fenced-code-blocks) |
 | `---`               | a dim horizontal rule                        |
 
 > Wrapping and table columns are measured in **code points**, matching flowtty's
@@ -257,6 +257,223 @@ measure-and-relayout paint.
 > uses `highlightMarkdownSource(src, width, wrap)`, the source-preserving
 > counterpart to `layoutMarkdown` (it never collapses whitespace, so code
 > indentation survives, and it hard-wraps rather than word-wraps).
+
+### Fenced code blocks
+
+A fenced block is framed **quietly**: no literal backticks. The first row is a
+dim label — the language, the title, or `lang · title` when the info string
+carries both — and every code row sits behind a dim `│ ` gutter. There is no
+closing row. A block with neither a language nor a title gets no label row at
+all, just the gutter.
+
+```
+ts · src/app.ts
+│ export function greet(name: string) {
+│   return `hi ${name}`;
+│ }
+```
+
+The gutter is the only glyph added to a code row (two cells, so the code has
+`width - 2` to live in), which keeps the block copyable by eye — and copyable
+exactly via [`onCodeBlocks`](#reading-the-blocks-back-out). Unlike the
+blockquote gutter it carries no color and does **not** dim the code behind it.
+
+**Highlighted languages.** The fence label picks the highlighter, matched
+case-insensitively (` ```TS ` works). Anything not listed — and a block with no
+label at all — renders as **normal text**: not dim, not colored. Dim inside a
+code block means one thing only: a comment.
+
+| Language | Other labels | Colored |
+|----------|--------------|---------|
+| `diff` | `patch` | added lines green, removed red, hunk headers cyan, file headers bold |
+| `javascript` | `js`, `jsx`, `mjs`, `cjs`, `node` | keywords, strings, numbers, comments, JSX tags and attributes |
+| `typescript` | `ts`, `tsx` | keywords, strings, numbers, comments, JSX tags and attributes |
+| `json` | `jsonc`, `json5` | keys, strings, numbers, true / false / null |
+| `html` | `htm`, `svg`, `vue` | tags, components, attribute names and values, comments, entities |
+| `xml` | `xhtml`, `xsd`, `xsl`, `xslt`, `plist`, `pom`, `rss` | tags, attributes, the XML declaration, DOCTYPE, CDATA, comments, entities |
+| `css` | `scss`, `less`, `sass` | selectors, property names, values, @rules, comments |
+| `shell` | `sh`, `bash`, `zsh`, `ksh` | the leading command, keywords, strings, variables, comments |
+| `console` | `shell-session`, `shellsession`, `terminal` | prompt lines highlighted as shell, output dim |
+| `yaml` | `yml` | keys, strings, numbers, booleans, comments |
+| `toml` | `ini`, `cfg`, `conf` | section headers, keys, strings, numbers, comments |
+| `sql` | `psql`, `mysql`, `postgres`, `postgresql`, `sqlite` | keywords (case-insensitive), strings, numbers, comments |
+| `python` | `py` | keywords, strings (including triple-quoted), numbers, decorators, comments |
+| `go` | `golang` | keywords, strings (including raw backticks), numbers, comments |
+| `rust` | `rs` | keywords, strings (including raw), lifetimes, macros, numbers, comments |
+| `c` | `h` | keywords, strings, numbers, comments, preprocessor directives |
+| `cpp` | `c++`, `cc`, `cxx`, `hpp`, `hh`, `hxx` | keywords, strings, numbers, comments, preprocessor directives |
+| `java` | — | keywords, strings (including text blocks), numbers, annotations, comments |
+| `kotlin` | `kt`, `kts` | keywords, strings (including triple-quoted), numbers, annotations, comments |
+| `swift` | — | keywords, strings (including triple-quoted), numbers, attributes, comments |
+| `csharp` | `cs` | keywords, strings, numbers, attributes, comments |
+| `pmc` | — | Post machine source: keywords, step labels, calls, numbers, comments |
+| `pma` | — | Post machine assembly: directives, mnemonics, labels, symbols, numbers, comments |
+| `tmc` | — | Turing machine source: keywords, symbol literals, numbers, doc and line comments |
+| `tma` | — | Turing machine assembly: directives, mnemonics, labels, numbers, comments |
+
+`text`, `log`, `plain`, `txt` and `none` are explicitly plain — a way to say "do
+not highlight this" rather than a language nobody has written a highlighter for.
+The last four entries are the Post / Turing tape-machine toolchains: a source
+language (`pmc` / `tmc`) and an assembly stage (`pma` / `tma`) for each machine.
+
+The list is exported as `HIGHLIGHTED_LANGUAGES`, so an app can tell its users
+what to expect (a `/languages` command, a settings pane) without duplicating it:
+
+```ts
+import { HIGHLIGHTED_LANGUAGES, type HighlightedLanguage } from '@flowtty/react';
+
+for (const lang of HIGHLIGHTED_LANGUAGES) {
+  console.log(lang.name, [lang.name, ...lang.aliases].join(' '), lang.colors);
+}
+```
+
+**Highlighting is line- and table-based, not a parser.** Each language is a small
+table of keywords, comment markers, string rules and a few regexes, run over the
+block one line at a time with just enough state carried across lines to close a
+block comment or a triple-quoted string. That is what keeps it dependency-free
+and fast (thousands of lines in a few milliseconds), and it has a price — the
+known rough edges:
+
+- Text *between* JSX tags stays plain; the tags, attributes and `{…}`
+  expressions are colored.
+- `<T,>(x) => x` — the trailing-comma type parameter written to disambiguate a
+  generic arrow in a `.tsx` file — mis-colors one segment as a tag.
+- A nested CSS block written on one line (`a { b { color: red } }`) can read the
+  inner name as a declaration instead of a selector.
+- A shell heredoc body is highlighted as shell, not as the text it usually is.
+- In a `console` block a leading `>` is **not** a prompt: tool output is full of
+  lines like `> pkg@1.0.0 test`, and reading those as commands is the worse
+  mistake. `$` and `#` prompts work.
+
+**Info string.** The language is the **first word only**; everything after it is
+metadata. A title (shown in the label) can be written four ways:
+
+| Info string                        | Language | Title        |
+|------------------------------------|----------|--------------|
+| ` ```ts `                          | `ts`     | —            |
+| ` ```ts title="src/app.ts" `       | `ts`     | `src/app.ts` |
+| ` ```ts title='src/app.ts' `       | `ts`     | `src/app.ts` |
+| ` ```ts title=src/app.ts `         | `ts`     | `src/app.ts` |
+| ` ```ts src/app.ts `               | `ts`     | `src/app.ts` |
+| ` ```ts twoslash `                 | `ts`     | — (a bare word with no `/` or `.` is not a file name) |
+
+**Streaming.** An opening fence with no closing fence yet is still a code block
+through the end of the input, so a reply that streams in doesn't render as a
+paragraph and then jump to a block when the fence lands. The block reports
+`closed: false` until it does. Tilde fences (`~~~`) work the same way, and a
+fence of four or more characters can hold shorter fences as content — a fence
+closes a block only when it uses the same character and is at least as long.
+
+**Options.** Every option below is accepted both as a `<Markdown>` prop and as
+`layoutMarkdown(src, width, options)`'s third argument:
+
+| Option        | Type                    | Default  | Effect |
+|---------------|-------------------------|----------|--------|
+| `codeFence`   | `'bar' \| 'literal'`    | `'bar'`  | `'literal'` restores the old look: the ` ``` ` fences printed literally and dim, no label row, no gutter, code at the full width |
+| `codeWrap`    | `'wrap' \| 'truncate'`  | `'wrap'` | `'wrap'` hard-breaks an over-long code line onto more rows, carrying token colors across the break. `'truncate'` keeps one row per source line and ends a cut one with `…`, styled like the text it replaced |
+| `maxCodeRows` | `number`                | unset    | Caps the **rendered** rows of one block. Past the cap the block ends with a dim `… N more lines` row (behind the gutter), where N counts the **source** lines left out |
+| `lineNumbers` | `boolean`               | `false`  | Dim, right-aligned source line numbers between the gutter and the code (`│  7 code`). The gutter sizes itself from the largest number and takes that width off the code; a wrapped continuation row keeps the bar and leaves the number blank. A diff is numbered from its hunk headers — see [Diff blocks](#diff-blocks) |
+| `diffBackground` | `boolean`            | `true`   | Faint green / red bands behind a diff's added / removed rows. Off, those rows are exactly as they would be with no bands — see [Diff blocks](#diff-blocks) |
+
+```tsx
+<Markdown codeWrap="truncate" maxCodeRows={20} lineNumbers>{reply}</Markdown>
+```
+
+> In `'literal'` mode a block's title is not printed (there is no room for it on
+> a ` ```lang ` line), a `~~~` block is drawn with backtick fences, and the label
+> of an auto-detected diff is not added — the fence is shown as written. The
+> other options apply in both modes; with `'literal'`, line numbers appear
+> without a bar.
+
+### Diff blocks
+
+A ` ```diff ` (or ` ```patch `) block is read a row at a time — that is what a
+diff *is* — and each row is colored by its leading character: added rows green,
+removed red, `@@ … @@` hunk headers cyan, file headers (`diff --git`, `index`,
+`+++`, `---`, `new file mode`, `rename …`) bold. Context rows are normal text.
+
+**Auto-detection.** A block with **no label** that carries a hunk header or a
+`diff --git` line is highlighted as a diff, and its label row then reads a dim
+`diff` — the rows are colored as a patch, and nothing else on screen would say
+why. A bare `+ … / - …` block does not count: far more often that is a list.
+
+**Row bands.** Added and removed rows wear a faint background across the full
+width of the code area — padded out, so the band is solid on a short line and on
+every wrapped continuation row. The gutter and the line-number column stay
+outside it. The band only decorates the row; it never rewrites it, so the `+` /
+`-` characters still carry the meaning on their own.
+
+The two colors are dark 24-bit values (`#003b00` / `#3b0000`) chosen for how they
+**downgrade**, since the layout cannot know what the terminal can show:
+
+| Terminal            | Added band        | Removed band      | Still readable?                                                                                      |
+|---------------------|-------------------|-------------------|------------------------------------------------------------------------------------------------------|
+| truecolor           | `#003b00`         | `#3b0000`         | yes — faint, with green / red text on top                                                             |
+| 256 colors          | dark green (`22`) | dark red (`52`)   | yes, though red on dark red is the tightest pairing                                                   |
+| 16 colors           | black             | black             | the text is unharmed, but both bands go neutral — the `+` / `-` and the text colors carry the meaning |
+| `NO_COLOR` / no TTY | none              | none              | yes — the row text is unchanged, `+` / `-` only                                                       |
+
+Because a 16-color terminal has no faint green, the bands there become plain
+black: invisible on a black background, a dark stripe on a light one. Set
+`diffBackground={false}` when that is the wrong trade — the rows are then exactly
+as they would be with no bands at all.
+
+**Line numbers.** With `lineNumbers`, a diff is numbered the way the patch
+numbers it rather than 1..n: each `@@ -a,b +c,d @@` header restarts the count, a
+removed row shows its line in the **old** file, an added or context row its line
+in the **new** one, and hunk / file header rows leave the gutter blank. A diff
+that carries no hunk header has nothing to count from, so its numbers stay blank.
+
+```
+diff
+│    --- a/src/app.ts
+│    +++ b/src/app.ts
+│    @@ -10,3 +20,4 @@
+│ 20  const app = start();
+│ 11 -app.listen(3000);
+│ 21 +app.listen(port);
+│ 22  export default app;
+```
+
+### Reading the blocks back out
+
+`layoutMarkdownDetailed(src, width, options)` returns `layoutMarkdown`'s rows
+**and** a descriptor per fenced block, so a host can offer "copy this block".
+`layoutMarkdown` is a thin wrapper over it.
+
+```ts
+interface MarkdownCodeBlock {
+  lang: string;
+  title?: string;
+  /** The block as written — no gutter, no wrapping, no row cap. */
+  source: string;
+  /** Index of the block's first output row, label row included. */
+  startLine: number;
+  /** Index one past its last output row. */
+  endLine: number;
+  /** False while a streamed block's closing fence hasn't arrived. */
+  closed: boolean;
+}
+```
+
+The range is half-open and indexes the same array a paginating host slices, so
+`lines.slice(startLine, endLine)` is exactly the block's rows — enough to
+highlight the one under the cursor.
+
+`<Markdown onCodeBlocks>` surfaces the same list. It fires when the list
+*changes* (compared by content, not identity), so a repaint that leaves the
+blocks alone doesn't call it again:
+
+```tsx
+const [blocks, setBlocks] = useState<MarkdownCodeBlock[]>([]);
+useInput((key) => {
+  if (key.name === 'y' && blocks[0]) copyToClipboard(blocks[0].source);
+});
+return <Markdown onCodeBlocks={setBlocks}>{reply}</Markdown>;
+```
+
+Getting the text onto the system clipboard is the app's business — an OSC 52
+write, `pbcopy`, whatever the host prefers. `<Markdown>` only hands you `source`.
 
 ## Link
 
