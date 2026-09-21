@@ -3,6 +3,7 @@ import { wrapText, type WrapMode } from '../wrap.js';
 import type { BorderStyle } from './borders.js';
 import type { Rect } from './layout.js';
 import type { Color } from '../colors.js';
+import { noteWarning } from '../warnings.js';
 
 // The host has a single element type by design: Text is sugar for Box.
 export type HostType = 'flowtty-box';
@@ -23,6 +24,11 @@ export interface BoxProps {
   /** Cross-axis alignment of children. */
   alignItems?: 'flex-start' | 'flex-end' | 'center' | 'stretch';
 
+  /** The box's text as styled pieces of ONE line of text: they are joined,
+   *  measured and wrapped together as a single paragraph, and each piece paints
+   *  with its own style on top of the box's text style. `<Text>` builds this from
+   *  `<Span>` children. When set, it replaces the box's direct text children. */
+  runs?: TextRun[];
   // Text wrap mode for direct text children (default: 'none').
   wrap?: 'wrap' | 'truncate' | 'none';
   // Text styling applied to direct text children:
@@ -145,6 +151,19 @@ export interface ScrollMetrics {
   maxScrollTop: number;
 }
 
+/** One styled piece of a box's text — see `BoxProps.runs`. */
+export interface TextRun {
+  text: string;
+  color?: Color;
+  backgroundColor?: Color;
+  bold?: boolean;
+  dim?: boolean;
+  underline?: boolean;
+  inverse?: boolean;
+  strikethrough?: boolean;
+  link?: string;
+}
+
 export interface Instance {
   type: 'box';
   props: BoxProps;
@@ -182,6 +201,7 @@ export function createTextInstance(text: string, _Yoga: Yoga): TextInstance {
 }
 
 export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
+  const hadRuns = inst.props?.runs !== undefined;
   inst.props = props;
   const n = inst.yogaNode;
 
@@ -282,6 +302,11 @@ export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   // Alignment.
   n.setJustifyContent(jcMap(props.justifyContent));
   n.setAlignItems(aiMap(props.alignItems));
+
+  // Runs are text that arrives as a PROP, so nothing else re-measures the box
+  // when they appear, change or go away (child text goes through appendChild /
+  // commitTextUpdate).
+  if (hadRuns || props.runs !== undefined) refreshMeasure(inst, _Yoga);
 }
 
 function wrapMap(v: BoxProps['flexWrap']): number {
@@ -335,8 +360,9 @@ export function measureText(text: string): { width: number; height: number } {
   return { width, height: lines.length };
 }
 
-// Concatenate a box's direct text children into one string.
+// The box's text: its runs joined, or else its direct text children joined.
 export function ownText(inst: Instance): string {
+  if (inst.props.runs !== undefined) return inst.props.runs.map((r) => r.text).join('');
   return inst.children
     .filter((c) => c.type === 'text')
     .map((c) => c.text)
@@ -345,8 +371,19 @@ export function ownText(inst: Instance): string {
 
 // Install/clear a Yoga measure func: text-only boxes measure to their text.
 export function refreshMeasure(inst: Instance, _Yoga: Yoga): void {
-  const hasText = inst.children.some((c) => c.type === 'text');
+  const hasText = inst.props.runs !== undefined || inst.children.some((c) => c.type === 'text');
   const hasBox = inst.children.some((c) => c.type === 'box');
+  // Text and child boxes in one box do not flow together: a box lays its children
+  // out as flex items, and <Text> is a box, not an inline span — so the pieces
+  // land on top of each other or in a column. Say so once, instead of leaving a
+  // broken layout to be puzzled over.
+  if (hasText && hasBox) {
+    noteWarning(
+      'flowtty: a box has both text and child boxes (e.g. <Text>a <Text bold>b</Text></Text>). '
+      + '<Text> is a box, not an inline span, so they do not flow as one line. '
+      + 'Use <Span> for styled pieces inside a <Text>, or put separate <Text>s in a <Box flexDirection="row">.',
+    );
+  }
   if (hasText && !hasBox) {
     const text = ownText(inst);
     const mode = (inst.props.wrap ?? 'none') as WrapMode;

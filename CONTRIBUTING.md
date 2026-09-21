@@ -53,8 +53,9 @@ To add to the library rather than fix it, start from
 
 - **Yoga's defaults are not CSS's.** `flexShrink` is `0` — a child keeps its
   natural size and overflows unless you say `flexShrink={1}`. A box is a column
-  by default, and `<Text>` is a box, not an inline span: two styled runs on one
-  line need a `flexDirection="row"` parent.
+  by default, and `<Text>` is a box, not an inline span: styled pieces inside a
+  line are `<Span>`s; separate `<Text>`s side by side need a `flexDirection="row"`
+  parent.
 - **Every `.tsx` file imports React** (`import React from 'react'`). The example
   runner uses the classic JSX transform; without the import the tests pass and the
   example crashes with "React is not defined".

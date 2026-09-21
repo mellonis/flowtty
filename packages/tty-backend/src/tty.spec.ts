@@ -528,3 +528,18 @@ test('TtyBackend downgrades 24-bit colors to the terminal\'s depth, in the full 
   expect(all).not.toContain('38;2;');
   back.dispose();
 });
+
+test('TtyBackend.dispose prints deferred developer warnings — after the screen is restored, never before', async () => {
+  const { noteWarning } = await import('../../core/src/warnings.js');
+  const { stub: out, writes } = makeStub();
+  const back = new TtyBackend(out, makeStdinStub());
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {
+    expect(writes.join('')).toContain(ALT_SCREEN_OFF); // the alt screen is already gone
+  });
+  noteWarning('flowtty: something worth knowing');
+  back.draw(new Buffer(6, 1));
+  expect(warn).not.toHaveBeenCalled();
+  back.dispose();
+  expect(warn.mock.calls.map((c) => String(c[0]))).toContain('flowtty: something worth knowing');
+  warn.mockRestore();
+});

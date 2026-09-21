@@ -1,5 +1,5 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
-import { stringWidth, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
+import { stringWidth, takeWarnings, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
 import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, takeUnknownColors } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
@@ -244,6 +244,8 @@ export class TtyBackend implements Backend {
       this.terminalEntered = false;
     }
     // Only now is it safe to print: the alt screen is gone.
+    // eslint-disable-next-line no-console
+    for (const warning of takeWarnings()) console.warn(warning);
     const unknown = takeUnknownColors();
     if (unknown.length > 0) {
       console.warn(`flowtty: unknown color name${unknown.length > 1 ? 's' : ''} ignored: ${unknown.join(', ')} — use a named color, '#rgb' / '#rrggbb' or 'rgb(r, g, b)'.`);

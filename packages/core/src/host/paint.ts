@@ -2,7 +2,7 @@ import { Buffer, type Style } from '../cells.js';
 import { wrapText, type WrapMode } from '../wrap.js';
 import { BORDER_CHARS } from './borders.js';
 import { layoutOf, type Rect } from './layout.js';
-import { ownText, type Instance, type Container } from './host.js';
+import { ownText, type Instance, type Container, type TextRun } from './host.js';
 import { Edge } from './yoga.js';
 
 export function paint(container: Container, width: number, height: number): Buffer {
@@ -25,6 +25,25 @@ function textStyleOf(inst: Instance): Style {
   if (p.link !== undefined) style.link = p.link;
   if (p.backgroundColor !== undefined) style.bg = p.backgroundColor;
   return style;
+}
+
+// One Style per character of the joined runs: the box's text style, with whatever
+// the run sets laid over it.
+function runStyles(runs: readonly TextRun[], base: Style): Style[] {
+  const out: Style[] = [];
+  for (const run of runs) {
+    const style: Style = { ...base };
+    if (run.color !== undefined) style.fg = run.color;
+    if (run.backgroundColor !== undefined) style.bg = run.backgroundColor;
+    if (run.bold !== undefined) style.bold = run.bold;
+    if (run.dim !== undefined) style.dim = run.dim;
+    if (run.underline !== undefined) style.underline = run.underline;
+    if (run.inverse !== undefined) style.inverse = run.inverse;
+    if (run.strikethrough !== undefined) style.strikethrough = run.strikethrough;
+    if (run.link !== undefined) style.link = run.link;
+    for (const _ch of run.text) out.push(style);
+  }
+  return out;
 }
 
 // Gate a buffer write on a clip rect. If clip is null, write unconditionally.
@@ -209,19 +228,33 @@ function paintInstance(
     if (textStyle.bg === undefined && effectiveBg !== undefined) {
       textStyle.bg = effectiveBg;
     }
+    // With runs, every character has its own style: the run's on top of the box's.
+    const styles = inst.props.runs !== undefined ? runStyles(inst.props.runs, textStyle) : null;
+    const source = styles ? [...text] : null;
+    let at = 0; // position in `source` of the next character to be painted
     for (let row = 0; row < lines.length; row++) {
-      if (row >= content.height) break;
       const chars = [...(lines[row] ?? '')];
       for (let col = 0; col < chars.length; col++) {
-        if (col >= content.width) break;
+        const ch = chars[col]!;
+        let style = textStyle;
+        if (styles && source) {
+          // Wrapping only ever DROPS characters (the space or line break it
+          // breaks at) or adds the truncation ellipsis — so walk the source
+          // forward to this character. One that isn't there (the ellipsis)
+          // takes the style of the text it cuts.
+          let found = at;
+          while (found < source.length && source[found] !== ch) found++;
+          if (found < source.length) { style = styles[found]!; at = found + 1; }
+          else style = styles[Math.min(at, styles.length - 1)] ?? textStyle;
+        }
+        if (row >= content.height || col >= content.width) continue;
         // Sanitize C0 control bytes (NUL..US): emitting them to a TTY moves /
         // resets the cursor (e.g. \r → col 0, \b → back) and corrupts subsequent
         // cells in the diff-emitted stream. Substitute a space so the cell is
         // still occupied but inert. Tab/newline included — splitting is handled
         // upstream by wrapText.
-        const ch = chars[col]!;
         const safe = ch.charCodeAt(0) < 0x20 ? ' ' : ch;
-        setClipped(buffer, content.left + col, content.top + row, safe, textStyle, clip);
+        setClipped(buffer, content.left + col, content.top + row, safe, style, clip);
       }
     }
   }

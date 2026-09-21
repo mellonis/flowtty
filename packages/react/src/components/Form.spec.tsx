@@ -38,7 +38,7 @@ test('register/setValue/setError reflect in api state', async () => {
     createElement(Form, { onSubmit: () => {} }, createElement(Probe)),
     backend,
   );
-  await flushAsync();
+  await flushAsync(backend);
   expect(api!.values).toEqual({ name: 'alice' });
 });
 
@@ -57,7 +57,7 @@ test('first registered field becomes focused (focusedField === first name)', asy
     createElement(Form, { onSubmit: () => {} }, createElement(Probe)),
     backend,
   );
-  await flushAsync();
+  await flushAsync(backend);
   expect(api!.focusedField).toBe('a');
 });
 
@@ -80,9 +80,9 @@ test('advance(name) moves focus to next; advance from LAST fires onSubmit(values
       createElement(Probe)),
     backend,
   );
-  await flushAsync();
+  await flushAsync(backend);
   api!.advance('a');
-  await flushAsync();
+  await flushAsync(backend);
   expect(api!.focusedField).toBe('b');
   expect(submitted).toEqual([]);
   api!.advance('b');
@@ -105,20 +105,20 @@ test('Tab moves focus forward; Shift-Tab backward (and wraps)', async () => {
     createElement(Form, { onSubmit: () => {} }, createElement(Probe)),
     backend,
   );
-  await flushAsync();
+  await flushAsync(backend);
   expect(api!.focusedField).toBe('a');
 
   backend.press({ name: 'tab' });
-  await flushAsync();
+  await flushAsync(backend);
   expect(api!.focusedField).toBe('b');
 
   backend.press({ name: 'tab', shift: true });
-  await flushAsync();
+  await flushAsync(backend);
   expect(api!.focusedField).toBe('a');
 
   // Shift-Tab from the first field wraps to the last.
   backend.press({ name: 'tab', shift: true });
-  await flushAsync();
+  await flushAsync(backend);
   expect(api!.focusedField).toBe('c');
 });
 
@@ -138,13 +138,13 @@ test('unregistering the focused field moves focus to the next, not the first', a
     createElement(Form, { onSubmit: () => {} }, createElement(Probe)),
     backend,
   );
-  await flushAsync();
+  await flushAsync(backend);
   api!.focus('b');
-  await flushAsync();
+  await flushAsync(backend);
   expect(api!.focusedField).toBe('b');
   // Removing the focused middle field lands focus on 'c' (the next), not 'a'.
   api!.unregister('b');
-  await flushAsync();
+  await flushAsync(backend);
   expect(api!.focusedField).toBe('c');
 });
 
@@ -161,7 +161,7 @@ test('cancel() fires onCancel', async () => {
       createElement(Probe)),
     backend,
   );
-  await flushAsync();
+  await flushAsync(backend);
   api!.cancel();
   expect(cancelled).toBe(true);
 });

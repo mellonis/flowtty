@@ -2,6 +2,7 @@
 
 The building blocks beyond `<Box>` and `<Text>`. Forms, focus and buttons are in [input.md](input.md); dialogs are in [app.md](app.md).
 
+- [Text and Span](#text-and-span)
 - [TextInput](#textinput)
 - [Select](#select)
 - [MultiSelect](#multiselect)
@@ -12,6 +13,37 @@ The building blocks beyond `<Box>` and `<Text>`. Forms, focus and buttons are in
 - [Spinner](#spinner)
 - [ProgressBar](#progressbar)
 - [TaskList](#tasklist)
+
+## Text and Span
+
+`<Text>` is a box that holds text: it takes the text-style props (`color`,
+`backgroundColor`, `bold`, `dim`, `underline`, `inverse`, `strikethrough`, `link`)
+and `wrap` — `'none'` (default), `'wrap'` (by word, a too-long word by character)
+or `'truncate'` (one line, `…` in the last cell).
+
+**It is a box, not an inline span.** A `<Text>` inside a `<Text>` does not flow in
+the line — a box lays its children out as flex items. For styled pieces *inside* a
+line there is `<Span>`:
+
+```tsx
+<Text wrap="wrap">
+  Press <Span bold color="cyan">q</Span> to quit, <Span bold color="cyan">Tab</Span> to move on.
+  See <Span link="https://example.com/docs" underline>the docs</Span>.
+</Text>
+```
+
+The spans and the text around them are joined into one line that is measured and
+wrapped as a single paragraph, and a span's style carries across a line break.
+Separate `<Text>`s in a `<Box flexDirection="row">` cannot do that: each wraps on
+its own. Spans nest (the inner one adds to the outer one's style), the `<Text>`'s
+own style is the base for all of them, and numbers, `{cond && …}` and `null` work
+as in any JSX. A `<Span>` rendered on its own, outside a `<Text>`, is simply styled
+text.
+
+Only strings, numbers and `<Span>`s can be inlined. Put any other component inside
+a `<Text>` and flowtty notes a warning — printed when the app exits, never over a
+frame — that names this fix. Under the hood `<Text>` hands the host a `runs` prop
+(`TextRun[]`), which custom components can pass to a `<Box>` directly.
 
 ## TextInput
 

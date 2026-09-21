@@ -1,5 +1,5 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
-import { stringWidth, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
+import { stringWidth, takeWarnings, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
 import {
   decodeKeys,
   detectHyperlinkSupport,
@@ -190,6 +190,9 @@ export class InlineTtyBackend implements Backend {
       this.out.write(SHOW_CURSOR + RESET + '\n');
       this.cursorHidden = false;
     }
+    // The live region is gone — now a warning cannot land in the middle of it.
+    // eslint-disable-next-line no-console
+    for (const warning of takeWarnings()) console.warn(warning);
   }
 
   // ── Internals ────────────────────────────────────────────────────────────

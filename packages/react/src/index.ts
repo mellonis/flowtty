@@ -6,7 +6,8 @@ export type { ErrorSource } from './components/ErrorBoundary.js';
 export { useTerminalSize, type TerminalSize } from './hooks/useTerminalSize.js';
 export { Box } from './components/base/Box.js';
 export { Text } from './components/base/Text.js';
-export type { BoxProps, ScrollMetrics, InputRow, EditorOptions } from '@flowtty/core';
+export { Span, type SpanProps } from './components/base/Span.js';
+export type { BoxProps, ScrollMetrics, InputRow, EditorOptions, TextRun } from '@flowtty/core';
 export { inputRows, caretPosition, rowIndexAt } from '@flowtty/core';
 // Re-export core types from @flowtty/core so consumers using only @flowtty/react
 // have a single import surface for everything they typically need.
