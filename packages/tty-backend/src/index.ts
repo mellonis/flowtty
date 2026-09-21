@@ -1,5 +1,6 @@
 export { TtyBackend, type TtyBackendOptions } from './tty.js';
 export { detectHyperlinkSupport } from './hyperlinks.js';
+export { isInteractive } from './interactive.js';
 export { parseKeypress, decodeKeys } from './key-parser.js';
 // ANSI helpers — exposed so sibling TTY backends (e.g. @flowtty/inline-tty-backend)
 // can reuse the SGR / cursor / screen-control sequences instead of duplicating.

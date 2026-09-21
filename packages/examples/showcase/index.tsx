@@ -6,7 +6,7 @@
 //   npm run showcase -- --exit        quit when the script ends (what the recording uses)
 import React from 'react';
 import { render } from '@flowtty/react';
-import { TtyBackend } from '@flowtty/tty-backend';
+import { TtyBackend, isInteractive } from '@flowtty/tty-backend';
 import { App, FRAME } from './App.js';
 import { Autopilot } from './autopilot.js';
 import { ScriptedBackend, play } from './director.js';
@@ -20,6 +20,10 @@ const exitWhenDone = args.includes('--exit');
 const speedAt = args.indexOf('--speed');
 const speed = speedAt >= 0 ? Number(args[speedAt + 1]) || 1 : 1;
 
+if (!isInteractive(process.stdout)) {
+  console.error('flowtty showcase: needs an interactive terminal (stdout is piped or redirected, or TERM=dumb)');
+  process.exit(1);
+}
 const backend = new ScriptedBackend(new TtyBackend(process.stdout, process.stdin, { mouse: true }));
 // In a terminal smaller than the frame the app only shows a "make it bigger"
 // message, so there is nothing to play into: every waitFor would sit out its

@@ -7,6 +7,7 @@ import { InlineTtyBackend } from './InlineTtyBackend.js';
 // + a 'resize' event emitter shape.
 function mockStdout(columns = 40) {
   const e: any = new EventEmitter();
+  e.isTTY = true; // the mock stands in for a terminal
   e.columns = columns;
   e.rows = 24;
   e.writes = [] as string[];
@@ -197,6 +198,28 @@ describe('InlineTtyBackend', () => {
     b.draw(buf);
     expect(out.captured()).toContain('\x1b[1m');
     expect(out.captured()).not.toContain('31m');
+    b.dispose();
+  });
+
+  // Not a terminal (a pipe, a file, CI): the app already separates what is
+  // permanent (<Static> lines) from what is live, so the log still makes sense —
+  // print the permanent lines as plain text and skip the live region entirely.
+  test('stdout is not a terminal: static lines print as plain text, the live region is skipped, no control codes at all', () => {
+    const out = mockStdout();
+    (out as unknown as { isTTY: boolean }).isTTY = false;
+    const b = new InlineTtyBackend({ out, in: mockStdin(), liveHeight: 3 });
+    expect(b.logOnly).toBe(true);
+    b.onKey(() => {});
+    b.draw(newBuffer(10, 3, 'live'));
+    b.printStatic(['built a.ts', 'built b.ts']);
+    b.draw(newBuffer(10, 3, 'live2'));
+    b.dispose();
+    expect(out.captured()).toBe('built a.ts\nbuilt b.ts\n');
+  });
+
+  test('a terminal is not log-only', () => {
+    const b = new InlineTtyBackend({ out: mockStdout(), in: mockStdin() });
+    expect(b.logOnly).toBe(false);
     b.dispose();
   });
 });

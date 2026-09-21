@@ -2,6 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { Buffer } from '@flowtty/core';
 import { TtyBackend } from './tty.js';
+import { isInteractive } from './interactive.js';
 import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open } from './ansi.js';
 
 function makeStdinStub() {
@@ -24,6 +25,7 @@ function makeStub(cols = 6, rows = 1) {
   const writes: string[] = [];
   const emitter = new EventEmitter();
   const stub = Object.assign(emitter, {
+    isTTY: true, // the stub stands in for a terminal
     columns: cols,
     rows,
     write(s: string) {
@@ -481,5 +483,34 @@ test('TtyBackend reads NO_COLOR from the environment unless told otherwise', () 
   } finally {
     if (saved.NO_COLOR === undefined) delete process.env.NO_COLOR; else process.env.NO_COLOR = saved.NO_COLOR;
     if (saved.FORCE_COLOR !== undefined) process.env.FORCE_COLOR = saved.FORCE_COLOR;
+  }
+});
+
+// ─── not a terminal ──────────────────────────────────────────────────────────
+
+test('isInteractive: a TTY stream, and TERM is not dumb', () => {
+  expect(isInteractive({ isTTY: true }, {})).toBe(true);
+  expect(isInteractive({ isTTY: true }, { TERM: 'xterm-256color' })).toBe(true);
+  expect(isInteractive({ isTTY: false }, {})).toBe(false);
+  expect(isInteractive({}, {})).toBe(false);                       // a pipe / file has no isTTY at all
+  expect(isInteractive({ isTTY: true }, { TERM: 'dumb' })).toBe(false);
+});
+
+test('TtyBackend refuses a stdout that is not a terminal — and writes nothing into it', () => {
+  const { stub: out, writes } = makeStub();
+  (out as unknown as { isTTY: boolean }).isTTY = false;
+  expect(() => new TtyBackend(out, makeStdinStub())).toThrow(/not a terminal/);
+  expect(writes).toEqual([]);
+});
+
+test('TtyBackend refuses TERM=dumb the same way', () => {
+  const saved = process.env.TERM;
+  process.env.TERM = 'dumb';
+  try {
+    const { stub: out, writes } = makeStub();
+    expect(() => new TtyBackend(out, makeStdinStub())).toThrow(/TERM=dumb/);
+    expect(writes).toEqual([]);
+  } finally {
+    if (saved === undefined) delete process.env.TERM; else process.env.TERM = saved;
   }
 });

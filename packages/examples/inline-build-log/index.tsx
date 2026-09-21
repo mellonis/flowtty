@@ -27,7 +27,9 @@ function App({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     let i = 0;
     const id = setInterval(() => {
-      setLogs((prev) => [...prev, `[${i}] compiled module`]);
+      // Capture the number now: the updater below may run later, after `i++`.
+      const n = i;
+      setLogs((prev) => [...prev, `[${n}] compiled module`]);
       i++;
       if (i >= 5) {
         clearInterval(id);

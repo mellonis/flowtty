@@ -4,6 +4,7 @@ import {
   decodeKeys,
   detectHyperlinkSupport,
   detectColorSupport,
+  isInteractive,
   RESET, HIDE_CURSOR, SHOW_CURSOR,
   BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF,
   OSC8_CLOSE, osc8Open,
@@ -85,10 +86,19 @@ export class InlineTtyBackend implements Backend {
   private cursorHidden = false;
   private disposed = false;
   private readonly sgrOptions: { color: boolean };
+  /**
+   * True when stdout is not an interactive terminal (piped, redirected, CI,
+   * `TERM=dumb`). The app has already split its output into permanent lines
+   * (`<Static>`) and a live region, so the backend degrades the way build tools
+   * do in CI: the permanent lines are printed as plain text, the live region is
+   * skipped, and no control sequence is ever written. Keys are not read.
+   */
+  readonly logOnly: boolean;
 
   constructor(options: InlineTtyBackendOptions = {}) {
     this.sgrOptions = { color: options.color ?? detectColorSupport() };
     this.out = options.out ?? process.stdout;
+    this.logOnly = !isInteractive(this.out);
     this.input = options.in ?? process.stdin;
     this.liveHeight = Math.max(1, options.liveHeight ?? 10);
   }
@@ -98,6 +108,7 @@ export class InlineTtyBackend implements Backend {
   }
 
   draw(buffer: Buffer): void {
+    if (this.logOnly) return;
     this.ensureCursorHidden();
     // Erase the previous live region (cursor up + clear-from-cursor) and
     // write the new one in its place. The cursor sits at the start of the
@@ -120,6 +131,7 @@ export class InlineTtyBackend implements Backend {
    */
   printStatic(lines: string[]): void {
     if (lines.length === 0) return;
+    if (this.logOnly) { this.out.write(lines.join('\n') + '\n'); return; }
     let out = this.eraseLiveRegion();
     out += lines.join('\n') + '\n';
     // Now redraw the live region beneath the new static lines.
@@ -139,6 +151,7 @@ export class InlineTtyBackend implements Backend {
   }
 
   onKey(handler: (key: Key) => void): () => void {
+    if (this.logOnly) return () => {}; // nobody is typing into a pipe
     if (!this.inputAttached) {
       if (this.input.isTTY) this.input.setRawMode(true);
       this.input.on('data', this.inputDataHandler);

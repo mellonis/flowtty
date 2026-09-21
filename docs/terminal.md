@@ -46,6 +46,29 @@ text (styling lives in the cell, not the string).
 
 ## Environment
 
+**Not a terminal** — stdout is piped or redirected, the app runs in CI, or
+`TERM=dumb`. `isInteractive(stream)` (from `@flowtty/tty-backend`) is the test,
+and the two backends apply it differently, because the two kinds of app differ:
+
+- **`TtyBackend` refuses**, with an error that says why, before writing a single
+  byte — so a log never fills with control sequences. A full-screen app cannot
+  degrade on its own: there is nowhere to repaint and no keys to read, and what a
+  piped run should print is the app's call. Branch first:
+
+  ```ts
+  if (!isInteractive(process.stdout)) { printPlainReport(); process.exit(0); }
+  await render(<App />, new TtyBackend());
+  ```
+
+- **`InlineTtyBackend` degrades**, the way build tools do in CI. An inline app
+  has already split its output into permanent lines (`<Static>`) and a live
+  region, so the permanent lines are printed as plain text and the live region —
+  spinners, progress bars, prompts — is skipped. No control sequence is written
+  and keys are not read; `backend.logOnly` is `true`. The app's code does not
+  change: the same spinner that animates in a terminal simply isn't there in a
+  log. (A spinner *cannot* exist in a pipe — it is drawn by overwriting a cell.)
+  For a sign of life in CI, emit a `<Static>` line on a timer.
+
 **Color.** `NO_COLOR` — present and non-empty — turns color off; `FORCE_COLOR`
 overrides it in either direction (`0` = off, anything else = on). Without color
 the backends still emit bold, dim, underline, inverse and strikethrough, so
