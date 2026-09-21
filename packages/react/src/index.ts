@@ -1,5 +1,7 @@
 export { render } from './internal/render.js';
 export type { RenderOptions, RenderHandle } from './internal/render.js';
+export { renderToString } from './internal/renderToString.js';
+export type { RenderToStringOptions } from './internal/renderToString.js';
 export { useApp } from './hooks/useApp.js';
 export type { AppApi } from './context/appContext.js';
 export type { ErrorSource } from './components/ErrorBoundary.js';

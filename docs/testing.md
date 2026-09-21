@@ -68,6 +68,17 @@ expect(backend.lastBuffer!.get(0, 0).style).toMatchObject({ fg: 'cyan', bold: tr
 The grid is one cell per code point, so `x` in `get(x, y)` is a character index
 into the row — see [Display width](terminal.md#display-width).
 
+For a component that takes no input, there is a shorter way: `renderToString`
+mounts it, waits for its effects and returns the frame — a snapshot with no
+backend and no unmount to remember, as tall as the content, so nothing is cut off.
+
+```tsx
+expect(await renderToString(<Report data={rows} />, { width: 60 })).toMatchSnapshot();
+```
+
+See [Rendering to a string](app.md#rendering-to-a-string). Reach for
+`TestBackend` when the test presses keys.
+
 ## Sending input
 
 ```tsx

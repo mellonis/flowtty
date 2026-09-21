@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from 'react';
 import { type Backend, type Key } from '@flowtty/core';
-import { getYoga, computeLayout, paint } from '@flowtty/core/host';
+import { getYoga, computeLayout, contentHeight, paint } from '@flowtty/core/host';
 import { createRoot, type Root } from './reconciler.js';
 import { InputContext, type InputSource } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
@@ -91,8 +91,13 @@ export async function render(
   const draw = () => {
     if (unmounted) return;
     const { width, height } = backend.size();
-    computeLayout(container, width, height);
-    backend.draw(paint(container, width, height));
+    // A non-finite height means an unbounded surface: lay out with the height
+    // left auto (Yoga grows the tree to its content) and paint a buffer exactly
+    // as tall as what came out. Infinity must never reach paint() — the buffer
+    // allocates width × height cells.
+    const bounded = Number.isFinite(height) ? height : undefined;
+    computeLayout(container, width, bounded);
+    backend.draw(paint(container, width, bounded ?? contentHeight(container)));
   };
 
   const { container, root } = createRoot(Yoga, draw);

@@ -60,7 +60,7 @@ import type { Backend, Buffer } from '@flowtty/react';
  * It implements only what the contract requires (`size`, `draw`) plus `dispose`.
  * No `onKey`: nobody is typing, so `useInput` handlers simply never fire.
  */
-export class FinalFrameBackend implements Backend {
+export class LastFrameBackend implements Backend {
   // Not a full-screen surface: components that need one (Menu, non-floating
   // dialogs) check this flag and step aside.
   readonly fullScreen = false;
@@ -94,11 +94,11 @@ export class FinalFrameBackend implements Backend {
 import React from 'react';
 import { test, expect } from 'vitest';
 import { render, Box, Text } from '@flowtty/react';
-import { FinalFrameBackend } from './FinalFrameBackend.js';
+import { LastFrameBackend } from './LastFrameBackend.js';
 
 test('prints nothing while running, and the last frame as plain text on unmount', async () => {
   const written: string[] = [];
-  const backend = new FinalFrameBackend(20, 4, (t) => written.push(t));
+  const backend = new LastFrameBackend(20, 4, (t) => written.push(t));
   const app = await render(
     <Box flexDirection="column" border="round" width={20}>
       <Text color="green" bold>3 passed</Text>
@@ -112,6 +112,11 @@ test('prints nothing while running, and the last frame as plain text on unmount'
   expect(written.join('')).not.toContain('\x1b');
 });
 ```
+
+The library ships this backend grown up: `FinalFrameBackend` from
+`@flowtty/tty-backend` keeps the styling, sizes the frame to its content and
+prints deferred warnings after it — see
+[Terminal specifics](terminal.md#which-backend-for-which-app).
 
 ## Wrapping a backend
 

@@ -5,6 +5,17 @@ import type { Key } from './keys.js';
 // and the inline static-region API are optional capabilities — detect at
 // runtime via the optional methods rather than typing the backend.
 export interface Backend {
+  /**
+   * The render area, in cells.
+   *
+   * `height` may be `Infinity`: an unbounded surface — a report printed once
+   * rather than a screen to fit into. The renderer then lays the tree out with
+   * no height constraint (percent heights have nothing to resolve against and
+   * fall back to auto) and draws a buffer exactly as tall as the content, so a
+   * frame can be any number of rows. `useTerminalSize()` reports `Infinity`
+   * for the height too, which is what a component should branch on when it
+   * would otherwise size itself to the screen.
+   */
   size(): { width: number; height: number };
   draw(buffer: Buffer): void;
   /**

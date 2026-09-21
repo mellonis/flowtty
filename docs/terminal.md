@@ -75,6 +75,18 @@ and the two backends apply it differently, because the two kinds of app differ:
   await render(<App />, new TtyBackend());
   ```
 
+  The refusal is a `NotInteractiveError` (exported from `@flowtty/tty-backend`),
+  so an app that would rather not ask first can catch it instead. `error.reason`
+  is the short why — `'TERM=dumb'`, or stdout not being a terminal:
+
+  ```tsx
+  try { await render(<App />, new TtyBackend()); }
+  catch (error) {
+    if (!(error instanceof NotInteractiveError)) throw error;
+    (await render(<Report />, new FinalFrameBackend())).unmount();
+  }
+  ```
+
 - **`InlineTtyBackend` degrades**, the way build tools do in CI. An inline app
   has already split its output into permanent lines (`<Static>`) and a live
   region, so the permanent lines are printed as plain text and the live region —
@@ -103,10 +115,47 @@ and the two backends apply it differently, because the two kinds of app differ:
   A test runs it exactly that way — as a real process with its stdout piped — and
   compares the log byte for byte.
 
+### Which backend for which app
+
+| The app | Backend | Without a terminal |
+| --- | --- | --- |
+| Full-screen, interactive — a menu, an editor, a dashboard | `TtyBackend` | throws `NotInteractiveError`; the app decides what to print instead |
+| Progress while it works, then a result — a build, a deploy | `InlineTtyBackend` | the `<Static>` log lines only; the live region is skipped |
+| A report, nothing to ask — a summary, a table, a diff | `FinalFrameBackend`, or `renderToString` with `format: bufferToAnsi` | the same output, without colors |
+
+`FinalFrameBackend` shows nothing while the app runs and prints the last frame
+once, when the app is done, into the normal screen — so the report stays in the
+scrollback and reads the same in a pipe or in CI. Its height defaults to
+`Infinity`, an unbounded surface, so the frame is as tall as its content instead
+of being cut off at 24 rows. Nothing is repainted, so a spinner has nothing to
+animate: that is the inline backend's job. Color is off unless the stream is a
+terminal — a pipe and a CI log get the text, with bold, dim and underline kept;
+`FORCE_COLOR=1` or `color: true` prints the colors anyway.
+
+```tsx
+import { render } from '@flowtty/react';
+import { FinalFrameBackend } from '@flowtty/tty-backend';
+
+const app = await render(<Report />, new FinalFrameBackend());
+app.unmount();                // the frame is printed here — nothing before it
+await app.waitUntilExit();    // the output has been written by now
+```
+
+The frame is printed when the app exits, so the app has to exit: a report that
+finishes by itself calls `useApp().exit()` and the caller only awaits
+`waitUntilExit()` (see [The app around the components](app.md#quitting-and-work-after-the-ui-is-gone)).
+When you want the text rather than the printing, `renderToString` gives you the
+frame as a string — pass `format: bufferToAnsi` to keep the styling (see
+[The app around the components](app.md#rendering-to-a-string)).
+`bufferToAnsi(buffer, { color, depth, hyperlinks })` is exported on its own too:
+it turns a `Buffer` into styled lines for the normal screen — no cursor moves, no
+clear, `RESET` before every newline so a background never bleeds to the edge, and
+trailing blanks trimmed unless they carry a background.
+
 **Color.** `NO_COLOR` — present and non-empty — turns color off; `FORCE_COLOR`
 overrides it in either direction (`0` = off, anything else = on). Without color
 the backends still emit bold, dim, underline, inverse and strikethrough, so
-emphasis survives. Both TTY backends take a `color` option that overrides the
+emphasis survives. All three backends take a `color` option that overrides the
 environment: `new TtyBackend(stdout, stdin, { color: false })`.
 `detectColorSupport(env)` and `sgr(style, { color })` are exported for custom
 backends.
@@ -125,8 +174,11 @@ exit 130".
 - Wide-character **rendering**: the grid is still one cell per code point. The
   backends back the cursor up one column after a double-width glyph (measured via
   `stringWidth`) so the row stays column-aligned instead of shifting right — but
-  this overlaps the glyph's second column with the next cell. Cell-accurate
-  CJK/emoji layout waits on paint reserving the second cell.
+  this overlaps the glyph's second column with the next cell. Text printed into
+  the normal screen (`FinalFrameBackend`, `bufferToAnsi`) does not do that — a
+  backspace would survive into the log file — so such a row runs one column
+  longer per wide glyph. Cell-accurate CJK/emoji layout waits on paint reserving
+  the second cell.
 - Scrolling-region optimization for log-stream apps.
 - Column-only cursor moves (`CSI <col>G`) when row is unchanged — small extra perf nibble.
 - `position: 'relative'`.

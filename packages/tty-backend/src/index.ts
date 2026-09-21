@@ -1,6 +1,8 @@
 export { TtyBackend, type TtyBackendOptions } from './tty.js';
+export { FinalFrameBackend, type FinalFrameBackendOptions } from './FinalFrameBackend.js';
+export { bufferToAnsi, type BufferToAnsiOptions } from './bufferToAnsi.js';
 export { detectHyperlinkSupport } from './hyperlinks.js';
-export { isInteractive } from './interactive.js';
+export { isInteractive, NotInteractiveError } from './interactive.js';
 export { detectColorDepth, rgbToAnsi256, rgbToAnsi16, type ColorDepth } from './colorDepth.js';
 export { parseKeypress, decodeKeys } from './key-parser.js';
 // ANSI helpers — exposed so sibling TTY backends (e.g. @flowtty/inline-tty-backend)

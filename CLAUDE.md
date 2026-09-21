@@ -84,6 +84,9 @@ Required: `size()`, `draw(buffer)`. Optional (feature-detected, not assumed):
   wire one of these — call ALL hooks first, then `return null` after, to keep hook
   order stable.
 - `<Static>` calls `backend.printStatic?.(...)`; it no-ops if the backend lacks it.
+- `size().height === Infinity` → an unbounded surface (`FinalFrameBackend`,
+  `renderToString`): layout runs with auto height and the buffer is as tall as the
+  content (`contentHeight`). `Infinity` must never reach `paint` / `new Buffer`.
 
 ## Non-obvious invariants (will bite you)
 

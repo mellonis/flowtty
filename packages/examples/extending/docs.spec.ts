@@ -12,7 +12,7 @@ test('docs/writing-a-component.md shows Stepper.tsx and its spec as they are', (
   expect(page('writing-a-component.md')).toContain(file('Stepper.spec.tsx'));
 });
 
-test('docs/writing-a-backend.md shows FinalFrameBackend.ts and its spec as they are', () => {
-  expect(page('writing-a-backend.md')).toContain(file('FinalFrameBackend.ts'));
-  expect(page('writing-a-backend.md')).toContain(file('FinalFrameBackend.spec.tsx'));
+test('docs/writing-a-backend.md shows LastFrameBackend.ts and its spec as they are', () => {
+  expect(page('writing-a-backend.md')).toContain(file('LastFrameBackend.ts'));
+  expect(page('writing-a-backend.md')).toContain(file('LastFrameBackend.spec.tsx'));
 });

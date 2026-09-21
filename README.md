@@ -55,7 +55,7 @@ terminal is back to normal — so the last line prints on the ordinary screen.
 | **Layout** | flexbox via Yoga, borders with titles, padding / margin / gap, wrap, absolute positioning, `zIndex`, `overflow`, scroll viewports, a dimming backdrop — [docs/layout.md](docs/layout.md) |
 | **Components** | `ScrollBox`, `TextInput`, `TextArea`, `Select`, `MultiSelect`, `Table`, `Markdown` (GFM tables, nested lists, highlighted code), `Spinner`, `ProgressBar`, `TaskList`, `Link`, `Static` — [docs/components.md](docs/components.md) |
 | **Input, focus, forms** | keys with modifiers, bracketed paste as one event, the mouse wheel, `FocusGroup` + `Button`, `Form` with validation (Zod-friendly) — [docs/input.md](docs/input.md) |
-| **The app around them** | `render` / `waitUntilExit` / `useApp().exit`, error handling, a root abort signal, a ticker for animation, `DialogHost` with stacked dialogs — [docs/app.md](docs/app.md) |
+| **The app around them** | `render` / `waitUntilExit` / `useApp().exit`, `renderToString` for one-shot output, error handling, a root abort signal, a ticker for animation, `DialogHost` with stacked dialogs — [docs/app.md](docs/app.md) |
 | **Testing** | `TestBackend`: frames as strings, cells with styles, `press` / `paste` / `wheel`; scripts that drive a whole app — [docs/testing.md](docs/testing.md) |
 | **Extending** | [writing a component](docs/writing-a-component.md), [writing a backend](docs/writing-a-backend.md), and [CONTRIBUTING](CONTRIBUTING.md) |
 | **Terminal specifics** | named and 24-bit color, glyph width, OSC 8 hyperlinks, what is not there yet — [docs/terminal.md](docs/terminal.md) |

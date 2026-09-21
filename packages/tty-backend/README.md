@@ -31,6 +31,12 @@ await render(
 );
 ```
 
+Also exported:
+
+- `FinalFrameBackend` — for an app that asks nothing: it shows nothing while the app runs and prints the **last frame** once, when the app is done, into the normal screen. The report stays in the scrollback and reads the same in a pipe or in CI, without the colors. Its height defaults to `Infinity`, so the frame is as tall as its content.
+- `bufferToAnsi(buffer, options)` — turns a cell `Buffer` into styled lines of text for the normal screen: no cursor addressing, no alt screen. It is what `FinalFrameBackend` prints, and what to pass as `renderToString`'s `format` to keep the styling.
+- `NotInteractiveError` — what `TtyBackend` throws when its stream is not a terminal, alongside `isInteractive(stream)` for asking before rendering.
+
 Pasted text arrives as one `{ name: 'paste', text }` key (bracketed paste is enabled automatically). Pass `{ mouse: true }` as the third constructor argument to receive `wheelup` / `wheeldown` keys — off by default because mouse reporting takes over the terminal's native text selection.
 
 For an **inline** (non-alt-screen) live region with append-only log lines above it, use [`@flowtty/inline-tty-backend`](https://github.com/mellonis/flowtty/tree/master/packages/inline-tty-backend) instead.

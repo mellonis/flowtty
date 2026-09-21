@@ -3,7 +3,7 @@ import { stringWidth, takeWarnings, type Buffer, type Style, type Backend, type 
 import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, takeUnknownColors } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
-import { isInteractive, notInteractiveReason } from './interactive.js';
+import { isInteractive, NotInteractiveError } from './interactive.js';
 import { detectColorDepth, type ColorDepth } from './colorDepth.js';
 
 export interface TtyBackendOptions {
@@ -76,13 +76,7 @@ export class TtyBackend implements Backend {
     // repaint and no keys to read, and what a piped run should print is the
     // app's call, not the backend's. Fail before writing a single byte, so a log
     // never fills with control sequences. (`isInteractive` lets an app branch first.)
-    if (!isInteractive(out)) {
-      throw new Error(
-        `flowtty: TtyBackend needs an interactive terminal — ${notInteractiveReason(out)}. `
-        + 'Check isInteractive(process.stdout) before render() and print plain output instead, '
-        + 'or use InlineTtyBackend, which falls back to printing its <Static> lines.',
-      );
-    }
+    if (!isInteractive(out)) throw new NotInteractiveError(out);
     this.sgrOptions = { color: options.color ?? detectColorSupport(), depth: options.colorDepth ?? detectColorDepth() };
     // Enter the alternate screen buffer + hide cursor, atomic write.
     // Alt-screen ensures full-frame redraws happen in place and the user's

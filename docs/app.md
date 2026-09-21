@@ -3,6 +3,7 @@
 Starting and stopping, errors, cancellation, animation, dialogs.
 
 - [Quitting, and work after the UI is gone](#quitting-and-work-after-the-ui-is-gone)
+- [Rendering to a string](#rendering-to-a-string)
 - [Error handling](#error-handling)
 - [Root abort signal](#root-abort-signal)
 - [Ticker (animation clock)](#ticker-animation-clock)
@@ -34,6 +35,69 @@ function Menu() {
   return <Select items={items} onSubmit={(v) => exit(v)} />;
 }
 ```
+
+## Rendering to a string
+
+Not every terminal program is an app. A summary at the end of a build, a table a
+script prints and forgets, an example in a README — those want one frame of
+output, in the scrollback, that survives being piped into a file. `renderToString`
+gives you that: it mounts the tree, lets its effects settle, takes the frame and
+unmounts. Nothing stays running, and no terminal is touched.
+
+```tsx
+import { renderToString, Box, Text, Table } from '@flowtty/react';
+
+const report = await renderToString(
+  <Box border="round" padding={1} flexDirection="column">
+    <Text bold>Build finished</Text>
+    <Table data={rows} columns={columns} />
+  </Box>,
+);
+console.log(report);
+```
+
+Options:
+
+- `width` — columns to lay out in. Default `80`. Pass `process.stdout.columns`
+  to match the terminal, and a fixed number when the output must not change with
+  the window (a snapshot, a file).
+- `height` — rows. By default there is no limit: the frame is exactly as tall as
+  its content, so a 200-row table comes back in full. Give a number to lay out
+  against a fixed height instead.
+- `format` — turns the final `Buffer` into text. The default is plain text
+  (`buffer.toString()`), which drops trailing spaces on every line. Colors and
+  attributes live in the buffer's cells, not in that string, so to keep them
+  pass a formatter that writes escapes:
+
+```tsx
+import { bufferToAnsi } from '@flowtty/tty-backend';
+
+const colored = await renderToString(<Report />, {
+  format: (buffer) => bufferToAnsi(buffer, { color: true }),
+});
+```
+
+`bufferToAnsi` is the same painter the TTY backend uses, so the styling matches
+what an app would show. It takes an options object — `color` to force escapes on
+or off, `depth` to bring 24-bit colors down to what a terminal can show; see
+[docs/terminal.md](terminal.md) for the depths. Passed bare
+(`{ format: bufferToAnsi }`) it decides both by sniffing the environment, which
+means no color at all when the output is a pipe — say `{ color: true }` when the
+colors are the point.
+
+The returned string never ends in a newline; `console.log` adds the one you want.
+
+An error thrown anywhere in the tree rejects the promise instead of taking the
+process down, so a failed report is a `catch` like any other.
+
+The unbounded height is a backend capability, not a trick of this function: any
+backend whose `size()` reports `Infinity` for the height gets a frame as tall as
+its content. Percent heights then have nothing to resolve against and fall back
+to auto, and `useTerminalSize()` reports `Infinity` — which is what a component
+that would otherwise size itself to the screen should branch on.
+
+For snapshot tests, `renderToString` is often all you need; `TestBackend` is for
+apps you drive with input (see [docs/testing.md](testing.md)).
 
 ## Error handling
 

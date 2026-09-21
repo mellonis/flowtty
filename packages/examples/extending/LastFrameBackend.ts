@@ -8,7 +8,7 @@ import type { Backend, Buffer } from '@flowtty/react';
  * It implements only what the contract requires (`size`, `draw`) plus `dispose`.
  * No `onKey`: nobody is typing, so `useInput` handlers simply never fire.
  */
-export class FinalFrameBackend implements Backend {
+export class LastFrameBackend implements Backend {
   // Not a full-screen surface: components that need one (Menu, non-floating
   // dialogs) check this flag and step aside.
   readonly fullScreen = false;

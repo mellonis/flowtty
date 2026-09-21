@@ -27,7 +27,7 @@ export { getYoga } from './yoga.js';
 export type { Yoga, YogaNode } from './yoga.js';
 
 // Layout pass + rect type
-export { computeLayout, layoutOf } from './layout.js';
+export { computeLayout, contentHeight, layoutOf } from './layout.js';
 export type { Rect } from './layout.js';
 
 // Paint pass: Instance tree + size → Buffer

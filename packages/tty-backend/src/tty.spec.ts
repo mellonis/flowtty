@@ -2,7 +2,7 @@ import { expect, test, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
 import { Buffer } from '@flowtty/core';
 import { TtyBackend } from './tty.js';
-import { isInteractive } from './interactive.js';
+import { isInteractive, NotInteractiveError } from './interactive.js';
 import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open } from './ansi.js';
 
 function makeStdinStub() {
@@ -510,6 +510,43 @@ test('TtyBackend refuses TERM=dumb the same way', () => {
     const { stub: out, writes } = makeStub();
     expect(() => new TtyBackend(out, makeStdinStub())).toThrow(/TERM=dumb/);
     expect(writes).toEqual([]);
+  } finally {
+    if (saved === undefined) delete process.env.TERM; else process.env.TERM = saved;
+  }
+});
+
+test('the refusal is a NotInteractiveError that carries the reason, so an app can catch it', () => {
+  const { stub: out } = makeStub();
+  (out as unknown as { isTTY: boolean }).isTTY = false;
+  let thrown: unknown;
+  try {
+    new TtyBackend(out, makeStdinStub());
+  } catch (error) {
+    thrown = error;
+  }
+  expect(thrown).toBeInstanceOf(NotInteractiveError);
+  expect(thrown).toBeInstanceOf(Error);
+  const error = thrown as NotInteractiveError;
+  expect(error.name).toBe('NotInteractiveError');
+  expect(error.reason).toBe('stdout is not a terminal (piped, redirected, or running in CI)');
+  expect(error.message).toContain(error.reason);
+  // The advice names the two ways out: branch first, or render something printable.
+  expect(error.message).toContain('isInteractive(process.stdout)');
+  expect(error.message).toContain('FinalFrameBackend');
+});
+
+test('NotInteractiveError reports TERM=dumb as its reason', () => {
+  const saved = process.env.TERM;
+  process.env.TERM = 'dumb';
+  try {
+    const { stub: out } = makeStub();
+    let thrown: unknown;
+    try {
+      new TtyBackend(out, makeStdinStub());
+    } catch (error) {
+      thrown = error;
+    }
+    expect((thrown as NotInteractiveError).reason).toBe('TERM=dumb');
   } finally {
     if (saved === undefined) delete process.env.TERM; else process.env.TERM = saved;
   }
