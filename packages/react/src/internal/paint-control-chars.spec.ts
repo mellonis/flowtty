@@ -7,11 +7,7 @@ import { createElement } from 'react';
 import { describe, test, expect } from 'vitest';
 import { render } from './render.js';
 import { Box } from '../components/base/Box.js';
-import { TestBackend } from '@flowtty/core/testing';
-
-function flushAsync(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 0));
-}
+import { TestBackend, flushAsync } from '@flowtty/core/testing';
 
 describe('paint: C0 control char sanitization', () => {
   test('\\r in text content is replaced with space (not stored in cell)', async () => {
@@ -20,7 +16,7 @@ describe('paint: C0 control char sanitization', () => {
     );
     const backend = new TestBackend(30, 1);
     await render(tree, backend);
-    await flushAsync();
+    await flushAsync(backend);
     // Row should read 'abc def' (with the \r masked to a space), NOT contain a
     // literal \r — if it did, emitting to a real terminal would reset cursor
     // to col 0 and 'def' would overwrite 'abc'.
@@ -35,7 +31,7 @@ describe('paint: C0 control char sanitization', () => {
     );
     const backend = new TestBackend(20, 1);
     await render(tree, backend);
-    await flushAsync();
+    await flushAsync(backend);
     const line = backend.lastFrame.split('\n')[0]!;
     // None of the C0 bytes should appear in the rendered output.
     for (let code = 0; code < 0x20; code++) {

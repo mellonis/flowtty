@@ -26,15 +26,15 @@ describe('DialogHost stack', () => {
       createElement(DialogHost, {}, createElement(Host)),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     const a = openA(createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'red' }));
     const b = openA(createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'blue' }));
-    await flushAsync();
-    // Race a non-promise tick — neither should be resolved yet.
+    await flushAsync(backend);
+    // Let the tree settle — neither dialog should have resolved.
     let resolvedA = false; let resolvedB = false;
     a.then(() => { resolvedA = true; });
     b.then(() => { resolvedB = true; });
-    await flushAsync();
+    await flushAsync(backend);
     expect(resolvedA).toBe(false);
     expect(resolvedB).toBe(false);
     handle.unmount();
@@ -57,18 +57,18 @@ describe('DialogHost stack', () => {
       createElement(DialogHost, {}, createElement(Host)),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     // Stack: a (bottom), b (top)
     const a = openD<string>(createElement('flowtty-box', { width: 1, height: 1, backgroundColor: 'red' }));
     const b = openD<string>(createElement(CaptureApi));
-    await flushAsync();
+    await flushAsync(backend);
     expect(topApi).not.toBeNull();
     let aResult: DialogResult<string> | null = null;
     let bResult: DialogResult<string> | null = null;
     a.then((r) => { aResult = r; });
     b.then((r) => { bResult = r; });
     topApi!.done('top-result');
-    await flushAsync();
+    await flushAsync(backend);
     // b resolved; a still pending
     expect(bResult).not.toBeNull();
     expect(bResult).toEqual({ status: 'done', value: 'top-result' });
@@ -94,12 +94,12 @@ describe('DialogHost stack', () => {
       createElement(DialogHost, {}, createElement(Host)),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     // Stack: a (bottom), b (top). Each binds its own result API.
     const a = openD<string>(createElement(Capture, { into: (api: DialogResultApi) => { apiA = api; } }));
-    await flushAsync();
+    await flushAsync(backend);
     const b = openD<string>(createElement(Capture, { into: (api: DialogResultApi) => { apiB = api; } }));
-    await flushAsync();
+    await flushAsync(backend);
     expect(apiA).not.toBeNull();
     expect(apiB).not.toBeNull();
     let aResult: DialogResult<string> | null = null;
@@ -109,7 +109,7 @@ describe('DialogHost stack', () => {
     // Resolve the LOWER dialog (simulating an async timer in a non-top dialog).
     // The old shared API would have popped b (the top); the per-entry API pops a.
     apiA!.done('from-lower');
-    await flushAsync();
+    await flushAsync(backend);
     expect(aResult).toEqual({ status: 'done', value: 'from-lower' });
     expect(bResult).toBeNull(); // top dialog stays open
     handle.unmount();
@@ -132,13 +132,13 @@ describe('DialogHost stack', () => {
       createElement(DialogHost, {}, createElement(Host)),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     const p1 = openD<string>(createElement(CaptureApi));
-    await flushAsync();
+    await flushAsync(backend);
     const p2 = openD<string>(createElement(CaptureApi));
-    await flushAsync();
+    await flushAsync(backend);
     const p3 = openD<string>(createElement(CaptureApi));
-    await flushAsync();
+    await flushAsync(backend);
     // Apis array now has at least 3 entries (one per mount); the LAST one is
     // the top dialog's. Easier path: each Capture appends; the most recently
     // pushed one is the top.
@@ -149,7 +149,7 @@ describe('DialogHost stack', () => {
     p3.then((r) => { results[2] = r; });
     // Pop p3
     topApi.done('three');
-    await flushAsync();
+    await flushAsync(backend);
     expect(results[2]).toEqual({ status: 'done', value: 'three' });
     expect(results[1]).toBeNull();
     expect(results[0]).toBeNull();
@@ -158,12 +158,12 @@ describe('DialogHost stack', () => {
     // index apis.length - 2 (before the p3 capture). All dialog components
     // share dialogApi which always pops top — so call apis[<any>].done.
     apis[apis.length - 2]!.done('two');
-    await flushAsync();
+    await flushAsync(backend);
     expect(results[1]).toEqual({ status: 'done', value: 'two' });
     expect(results[0]).toBeNull();
     // Pop p1
     apis[apis.length - 3]!.done('one');
-    await flushAsync();
+    await flushAsync(backend);
     expect(results[0]).toEqual({ status: 'done', value: 'one' });
     handle.unmount();
   });
@@ -190,13 +190,13 @@ describe('DialogHost stack', () => {
       createElement(DialogHost, {}, createElement(Host)),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     openD(createElement(LowerDialog));
-    await flushAsync();
+    await flushAsync(backend);
     openD(createElement(UpperDialog));
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'x', sequence: 'x', ctrl: false, meta: false, shift: false });
-    await flushAsync();
+    await flushAsync(backend);
     expect(upperKeys).toEqual(['x']);
     expect(lowerKeys).toEqual([]); // muted while upper is on top
     handle.unmount();
@@ -216,16 +216,16 @@ describe('DialogHost stack', () => {
       createElement(DialogHost, {}, createElement(Host)),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     // Before any dialog: host receives keys.
     backend.press({ name: 'a', sequence: 'a', ctrl: false, meta: false, shift: false });
-    await flushAsync();
+    await flushAsync(backend);
     expect(hostKeys).toEqual(['a']);
     // Open a dialog; host is now muted.
     openD(createElement('flowtty-box', { width: 1, height: 1 }));
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'b', sequence: 'b', ctrl: false, meta: false, shift: false });
-    await flushAsync();
+    await flushAsync(backend);
     expect(hostKeys).toEqual(['a']); // 'b' did NOT reach host
     handle.unmount();
   });
@@ -323,11 +323,11 @@ describe('DialogHost stack', () => {
           return null;
         }
         const handle = await render(createElement(DialogHost, null, createElement(Inner)), inlineLike);
-        await flushAsync();
+        await flushAsync(tb);
         void host!.openDialog(createElement(Box, null, 'x'));
         // Same call signature → should NOT warn a second time.
         void host!.openDialog(createElement(Box, null, 'y'));
-        await flushAsync();
+        await flushAsync(tb);
         expect(warn).toHaveBeenCalledTimes(1);
         expect(String(warn.mock.calls[0]?.[0] ?? '')).toContain('floating: true');
         handle.unmount();
@@ -347,9 +347,9 @@ describe('DialogHost stack', () => {
           return null;
         }
         const handle = await render(createElement(DialogHost, null, createElement(Inner)), inlineLike);
-        await flushAsync();
+        await flushAsync(tb);
         void host!.openDialog(createElement(Box, null, 'x'), { floating: true, minWidth: 10 });
-        await flushAsync();
+        await flushAsync(tb);
         expect(warn).not.toHaveBeenCalled();
         handle.unmount();
       } finally {
@@ -365,13 +365,14 @@ describe('DialogHost stack', () => {
           host = useDialogHost();
           return null;
         }
+        const backend = new TestBackend(40, 4);
         const handle = await render(
           createElement(DialogHost, null, createElement(Inner)),
-          new TestBackend(40, 4),
+          backend,
         );
-        await flushAsync();
+        await flushAsync(backend);
         void host!.openDialog(createElement(Box, null, 'x'));
-        await flushAsync();
+        await flushAsync(backend);
         expect(warn).not.toHaveBeenCalled();
         handle.unmount();
       } finally {

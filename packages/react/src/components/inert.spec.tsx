@@ -4,11 +4,7 @@ import { describe, test, expect, vi } from 'vitest';
 import { render } from '../internal/render.js';
 import { Box } from './base/Box.js';
 import { useInput } from '../hooks/useInput.js';
-import { TestBackend } from '@flowtty/core/testing';
-
-function flushAsync(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 0));
-}
+import { TestBackend, flushAsync } from '@flowtty/core/testing';
 
 describe('Box inert prop', () => {
   test('inert={true} suppresses useInput subscribers in the subtree', async () => {
@@ -21,9 +17,9 @@ describe('Box inert prop', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'a' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(cb).not.toHaveBeenCalled();
   });
 
@@ -37,9 +33,9 @@ describe('Box inert prop', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'a' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(cb).toHaveBeenCalledTimes(1);
   });
 
@@ -56,14 +52,14 @@ describe('Box inert prop', () => {
     }
     const backend = new TestBackend(10, 1);
     await render(createElement(Host), backend);
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'a' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(cb).toHaveBeenCalledTimes(1);
     setInert(true);
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'b' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(cb).toHaveBeenCalledTimes(1);  // still 1, ignored
   });
 });

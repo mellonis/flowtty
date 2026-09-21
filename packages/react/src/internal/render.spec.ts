@@ -61,7 +61,7 @@ describe('render error handling', () => {
     const onError = vi.fn();
     function Boom(): never { throw new Error('render boom'); }
     await render(createElement(Boom), backend, { onError });
-    await flushAsync();
+    await flushAsync(backend);
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0]![0]!.source).toBe('react');
     expect(String(onError.mock.calls[0]![0]!.error)).toContain('render boom');
@@ -76,7 +76,7 @@ describe('render error handling', () => {
       return createElement('flowtty-box', { width: 1, height: 1 });
     }
     await render(createElement(Boom), backend, { onError });
-    await flushAsync();
+    await flushAsync(backend);
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0]![0]!.source).toBe('react');
   });
@@ -85,7 +85,7 @@ describe('render error handling', () => {
     const backend = new TestBackend(10, 3);
     const onError = vi.fn();
     const handle = await render(createElement('flowtty-box', { width: 1, height: 1 }), backend, { onError });
-    await flushAsync();
+    await flushAsync(backend);
     process.emit('uncaughtException', new Error('uncaught boom'));
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0]![0]!.source).toBe('uncaughtException');
@@ -97,7 +97,7 @@ describe('render error handling', () => {
     const backend = new TestBackend(10, 3);
     const onError = vi.fn();
     const handle = await render(createElement('flowtty-box', { width: 1, height: 1 }), backend, { onError });
-    await flushAsync();
+    await flushAsync(backend);
     process.emit('unhandledRejection', new Error('promise boom'), Promise.resolve());
     expect(onError).toHaveBeenCalledTimes(1);
     expect(onError.mock.calls[0]![0]!.source).toBe('unhandledRejection');
@@ -108,7 +108,7 @@ describe('render error handling', () => {
     const backend = new TestBackend(10, 3);
     const onError = vi.fn();
     const handle = await render(createElement('flowtty-box', { width: 1, height: 1 }), backend, { onError });
-    await flushAsync();
+    await flushAsync(backend);
     process.emit('uncaughtException', new Error('first'));
     process.emit('uncaughtException', new Error('second'));
     process.emit('unhandledRejection', new Error('third'), Promise.resolve());
@@ -124,7 +124,7 @@ describe('render error handling', () => {
     const onError = vi.fn();
     function Boom(): never { throw new Error('leak boom'); }
     await render(createElement(Boom), backend, { onError });
-    await flushAsync();
+    await flushAsync(backend);
     expect(onError).toHaveBeenCalledTimes(1);
     // render()'s listeners must be gone even though onError didn't exit the process.
     expect(process.listenerCount('uncaughtException')).toBe(baseUncaught);
@@ -138,7 +138,7 @@ describe('render error handling', () => {
     const backend = new TestBackend(10, 3);
     const onError = vi.fn();
     const handle = await render(createElement('flowtty-box', { width: 1, height: 1 }), backend, { onError });
-    await flushAsync();
+    await flushAsync(backend);
     handle.unmount();
     // After unmount, emit shouldn't reach onError
     process.emit('uncaughtException', new Error('after-unmount'));

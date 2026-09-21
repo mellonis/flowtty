@@ -3,14 +3,10 @@ import { createElement } from 'react';
 import { describe, test, expect } from 'vitest';
 import { render } from '../internal/render.js';
 import { Box } from './base/Box.js';
-import { TestBackend } from '@flowtty/core/testing';
+import { TestBackend, flushAsync } from '@flowtty/core/testing';
 import { Title } from './Title.js';
 import { HRule } from './HRule.js';
 import { HelpBar } from './HelpBar.js';
-
-function flushAsync(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 0));
-}
 
 describe('chrome primitives', () => {
   test('Title renders bold text at the left of a sized parent row', async () => {
@@ -21,21 +17,21 @@ describe('chrome primitives', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toBe('Hello');
   });
 
   test('HRule paints "─" across the full terminal width', async () => {
     const backend = new TestBackend(8, 1);
     await render(createElement(HRule, {}), backend);
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toBe('────────');
   });
 
   test('HelpBar pads its text to full width (so inverse bg covers the row)', async () => {
     const backend = new TestBackend(15, 1);
     await render(createElement(HelpBar, null, 'q quit'), backend);
-    await flushAsync();
+    await flushAsync(backend);
     // The visible chars are the text; the rest are trailing spaces (trimmed by
     // toString) — so we assert the text appears at the start and the cell
     // count matches.
@@ -45,7 +41,7 @@ describe('chrome primitives', () => {
   test('HRule with a custom char', async () => {
     const backend = new TestBackend(5, 1);
     await render(createElement(HRule, { char: '=' }), backend);
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toBe('=====');
   });
 
@@ -60,7 +56,7 @@ describe('chrome primitives', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     const rows = backend.lastFrame.split('\n');
     expect(rows[0]).toBe('X');
     expect(rows[1]).toBe('────────────');

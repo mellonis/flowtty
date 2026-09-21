@@ -31,17 +31,17 @@ test('a subscription swap committed before a key applies to that key', async () 
   }
 
   const handle = await render(createElement(App), backend);
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'a', sequence: 'a', ctrl: false, meta: false, shift: false });
-  await flushAsync();
+  await flushAsync(backend);
   expect(received).toEqual(['a']);
   setMuted(true);
   // Deliberately a single macrotask round: the mute COMMITS here, but its
   // passive effects (the re-subscription) may still be pending — the
   // pre-dispatch flush inside the key path must cover that gap.
-  await flushAsync();
+  await flushAsync(backend);
   backend.press({ name: 'b', sequence: 'b', ctrl: false, meta: false, shift: false });
-  await flushAsync();
+  await flushAsync(backend);
   expect(received).toEqual(['a']); // 'b' must not reach the now-muted subscriber
   handle.unmount();
 });

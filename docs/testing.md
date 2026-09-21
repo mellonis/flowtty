@@ -44,8 +44,13 @@ A key handler runs synchronously, but the repaint is coalesced into a microtask.
   settle: it keeps yielding until two rounds in a row add no new frame. Use it
   after mount, after anything that goes through `useEffect` (a form field
   registering, a component measuring itself with `onLayout`), and whenever
-  `flush()` leaves you with a stale frame. Pass the backend — without it, it is a
-  single `setTimeout(0)`.
+  `flush()` leaves you with a stale frame. Always pass the backend: it is what
+  makes the wait adaptive.
+- `await flushAsync()` — the bare form waits a fixed amount (one `setTimeout(0)`)
+  instead of watching for frames. It cannot settle an effect cascade, and on a
+  loaded machine it can return before the repaint it was meant to wait for, so a
+  test written against it passes locally and fails now and then in CI. Use it only
+  where there is genuinely no backend to watch.
 
 For work on a real timer (a spinner, a streamed reply) wait for the *text* you
 expect rather than for a duration — see the script runner below.

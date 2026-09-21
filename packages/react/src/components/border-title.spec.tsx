@@ -4,11 +4,7 @@ import { describe, test, expect } from 'vitest';
 import { render } from '../internal/render.js';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
-import { TestBackend } from '@flowtty/core/testing';
-
-function flushAsync(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 0));
-}
+import { TestBackend, flushAsync } from '@flowtty/core/testing';
 
 describe('Box borderTitle', () => {
   test('paints title on top border line', async () => {
@@ -19,7 +15,7 @@ describe('Box borderTitle', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     const rows = backend.lastFrame.split('\n');
     // Top row: corner + edge + " Hi " + edges + corner
     expect(rows[0]).toBe('┌─ Hi ─────────────┐');
@@ -34,7 +30,7 @@ describe('Box borderTitle', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     const rows = backend.lastFrame.split('\n');
     // avail = 10 - 4 = 6 cells. " WayTo… " gets truncated to fit 6 chars,
     // last drawn char becomes '…'. Border corner + edge on each side preserved.
@@ -53,7 +49,7 @@ describe('Box borderTitle', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     // No border → no title overlay → no 'X' anywhere.
     expect(backend.lastFrame).not.toContain('X');
   });
@@ -66,7 +62,7 @@ describe('Box borderTitle', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     const rows = backend.lastFrame.split('\n');
     // Top row: full border, no title.
     expect(rows[0]).toBe('┌──┐');

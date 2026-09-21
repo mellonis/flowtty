@@ -2,13 +2,9 @@ import React from "react";
 import { createElement } from 'react';
 import { describe, test, expect, vi } from 'vitest';
 import { render } from '../internal/render.js';
-import { TestBackend } from '@flowtty/core/testing';
+import { TestBackend, flushAsync } from '@flowtty/core/testing';
 import { DialogHost } from './DialogHost.js';
 import { Menu, type MenuItem } from './Menu.js';
-
-function flushAsync(): Promise<void> {
-  return new Promise((r) => setTimeout(r, 0));
-}
 
 describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () => {
   test('refuses to render on backends declaring fullScreen=false (e.g. inline) and warns once', async () => {
@@ -22,7 +18,7 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
       await render(createElement(DialogHost, null,
         createElement(Menu, { items }),
       ), inlineLike);
-      await flushAsync();
+      await flushAsync(tb);
       // Menu returned null → nothing rendered in the live region.
       expect(tb.lastFrame.trim()).toBe('');
       // Warning fired (exactly once, with the component name).
@@ -44,7 +40,7 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
     await render(createElement(DialogHost, null,
       createElement(Menu, { items }),
     ), backend);
-    await flushAsync();
+    await flushAsync(backend);
     const rows = backend.lastFrame.split('\n');
     const bar = rows.find((r) => r.includes('Alpha'));
     expect(bar).toMatch(/ Alpha {2}Beta/);
@@ -59,19 +55,19 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
     await render(createElement(DialogHost, null,
       createElement(Menu, { items }),
     ), backend);
-    await flushAsync();
+    await flushAsync(backend);
     // Idle: pressing ↓ should NOT open the (non-existent for A) submenu, just no-op.
     backend.press({ name: 'down' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).not.toContain('Child');
     // Engage with F10.
     backend.press({ name: 'f10' });
-    await flushAsync();
+    await flushAsync(backend);
     // Now navigate to B and open its submenu.
     backend.press({ name: 'right' });
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'down' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('Child');
   });
 
@@ -85,11 +81,11 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
     await render(createElement(DialogHost, null,
       createElement(Menu, { items }),
     ), backend);
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'f10' });    // engage
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'down' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('╭'); // default round border
     expect(backend.lastFrame).toContain('Aaa');
   });
@@ -103,21 +99,21 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
     await render(createElement(DialogHost, null,
       createElement(Menu, { items, onExit }),
     ), backend);
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'f10' });          // engage
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'return' });       // open submenu
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('Child');
     backend.press({ name: 'escape' });       // close submenu
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).not.toContain('Child');
     expect(onExit).not.toHaveBeenCalled();
     backend.press({ name: 'escape' });       // disengage (no onExit yet)
-    await flushAsync();
+    await flushAsync(backend);
     expect(onExit).not.toHaveBeenCalled();
     backend.press({ name: 'escape' });       // disengaged → onExit
-    await flushAsync();
+    await flushAsync(backend);
     expect(onExit).toHaveBeenCalledTimes(1);
   });
 
@@ -129,14 +125,14 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
     await render(createElement(DialogHost, null,
       createElement(Menu, { items }),
     ), backend);
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'f10' });
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('C');
     backend.press({ name: 'f10' });          // toggle off → panels collapse
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).not.toContain('C');
   });
 
@@ -150,13 +146,13 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
     await render(createElement(DialogHost, null,
       createElement(Menu, { items }),
     ), backend);
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'f10' });
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'tab' });
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(onB).toHaveBeenCalledTimes(1);
   });
 
@@ -169,14 +165,14 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
     await render(createElement(DialogHost, null,
       createElement(Menu, { items }),
     ), backend);
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'f10' });
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('Leaf');
     backend.press({ name: 'return' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(cb).toHaveBeenCalledTimes(1);
     expect(backend.lastFrame).not.toContain('Leaf');
   });
@@ -194,15 +190,15 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
     await render(createElement(DialogHost, null,
       createElement(Menu, { items }),
     ), backend);
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'f10' });
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'right' });    // to 'Things'
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'down' });     // open Things
-    await flushAsync();
+    await flushAsync(backend);
     backend.press({ name: 'right' });    // cascade
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('Today');
     const rows = backend.lastFrame.split('\n');
     const todayRow = rows.find((r) => r.includes('Today'));

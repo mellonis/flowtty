@@ -37,7 +37,7 @@ describe('FocusGroup + useFocus', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     const frame = backend.lastFrame!;
     // A is focused (*A), B is not ( B)
     expect(frame).toContain('*A');
@@ -56,19 +56,19 @@ describe('FocusGroup + useFocus', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('*A');
     backend.press({ name: 'tab' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('*B');
     backend.press({ name: 'tab' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('*C');
     backend.press({ name: 'tab' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('*A'); // cycled
     backend.press({ name: 'tab', shift: true });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('*C'); // back
   });
 
@@ -78,7 +78,7 @@ describe('FocusGroup + useFocus', () => {
       createElement(Reporter, { label: 'X' }),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     // Outside a FocusGroup the noop default returns true → component is focused
     expect(backend.lastFrame).toContain('*X');
   });
@@ -94,10 +94,10 @@ describe('FocusGroup + useFocus', () => {
       ),
       backend,
     );
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('*A');
     backend.press({ name: 'tab' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('*A'); // unchanged
   });
 
@@ -121,10 +121,10 @@ describe('FocusGroup + useFocus', () => {
     }
 
     await render(createElement(App), backend);
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('*A');
     backend.press({ name: 'd' });
-    await flushAsync();
+    await flushAsync(backend);
     // A unmounted; B should become focused.
     expect(backend.lastFrame).toContain('*B');
   });
@@ -150,14 +150,14 @@ describe('FocusGroup + useFocus', () => {
     }
 
     await render(createElement(App), backend);
-    await flushAsync();
+    await flushAsync(backend);
     // Move focus to the middle item B.
     backend.press({ name: 'tab' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('*B');
     // Unmount B — focus must land on C (the next sibling), NOT back on A.
     backend.press({ name: 'd' });
-    await flushAsync();
+    await flushAsync(backend);
     expect(backend.lastFrame).toContain('*C');
     expect(backend.lastFrame).toContain(' A');
   });

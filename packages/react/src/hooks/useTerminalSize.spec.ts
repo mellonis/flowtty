@@ -14,7 +14,7 @@ describe('useTerminalSize', () => {
       return createElement('flowtty-box', { width: 20, height: 1 }, `${width}x${height}`);
     }
     const { unmount } = await render(createElement(SizeReader), backend);
-    await flushAsync();
+    await flushAsync(backend);
     const buf = backend.lastBuffer!;
     // Read first 4 chars: "20x5"
     let text = '';

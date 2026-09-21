@@ -4,6 +4,9 @@ import { createElement, useEffect } from 'react';
 import { getYoga } from '@flowtty/core/host';
 import { createRoot } from '../internal/reconciler.js';
 import { ErrorBoundary } from './ErrorBoundary.js';
+// These tests drive `createRoot` directly, with no draw hook and no backend, so
+// there are no frames to settle against: `flushAsync()` here is deliberately the
+// bare form — a single macrotask yield — and not the backend-driven one.
 import { flushAsync } from '@flowtty/core/testing';
 
 describe('ErrorBoundary', () => {
