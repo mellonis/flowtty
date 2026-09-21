@@ -8,6 +8,7 @@ It implements [`@flowtty/core`](https://github.com/mellonis/flowtty/tree/master/
 - **Frame diffing** — writes only the cells that changed since the previous frame; adjacent changes share one cursor move, and no-op repaints write nothing.
 - Reads **raw input** and parses key sequences (arrows, function keys via xterm tilde sequences, Ctrl/Alt modifiers).
 - Restores cooked mode and shows the cursor on `dispose()`.
+- **Asks for attention** — `bell()` (rate-limited to one per second) and `notify(title, body?)`, a desktop notification posted through the terminal, with the text sanitized.
 
 This is the backend you pass to `render()` for CLI tools and full-screen terminal apps.
 
@@ -37,7 +38,9 @@ Also exported:
 - `bufferToAnsi(buffer, options)` — turns a cell `Buffer` into styled lines of text for the normal screen: no cursor addressing, no alt screen. It is what `FinalFrameBackend` prints, and what to pass as `renderToString`'s `format` to keep the styling.
 - `NotInteractiveError` — what `TtyBackend` throws when its stream is not a terminal, alongside `isInteractive(stream)` for asking before rendering.
 
-Pasted text arrives as one `{ name: 'paste', text }` key (bracketed paste is enabled automatically). Pass `{ mouse: true }` as the third constructor argument to receive `wheelup` / `wheeldown` keys — off by default because mouse reporting takes over the terminal's native text selection.
+- `detectNotificationProtocol(env)`, `notificationSequence(title, body, protocol)`, `sanitizeNotificationText(text)` and `createAttention(write, options)` — the bell and desktop notifications as plain text-to-bytes, for custom backends.
+
+Pasted text arrives as one `{ name: 'paste', text }` key (bracketed paste is enabled automatically). The third constructor argument takes the options: `{ mouse: true }` to receive `wheelup` / `wheeldown` keys — off by default because mouse reporting takes over the terminal's native text selection — and `{ notifications }` (`'auto'` by default, or `'osc9'` / `'osc777'` / `'none'`) to choose which escape sequence `notify()` uses.
 
 For an **inline** (non-alt-screen) live region with append-only log lines above it, use [`@flowtty/inline-tty-backend`](https://github.com/mellonis/flowtty/tree/master/packages/inline-tty-backend) instead.
 

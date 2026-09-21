@@ -5,6 +5,7 @@ import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
 import { isInteractive, NotInteractiveError } from './interactive.js';
 import { detectColorDepth, type ColorDepth } from './colorDepth.js';
+import { createAttention, type Attention, type NotificationProtocol } from './notification.js';
 
 export interface TtyBackendOptions {
   /**
@@ -22,6 +23,12 @@ export interface TtyBackendOptions {
    *  the environment (`detectColorDepth`) — truecolor only where the terminal
    *  announces it. `#hex` / `rgb()` colors are brought down to fit. */
   colorDepth?: ColorDepth;
+  /** Which escape sequence `notify()` posts a desktop notification with.
+   *  `'auto'` (the default) picks one from the environment
+   *  (`detectNotificationProtocol`); `'none'` never posts one — and, unlike an
+   *  auto-detected `'none'`, does not fall back to the bell. `bell()` is
+   *  unaffected. See docs/terminal.md (notifications). */
+  notifications?: NotificationProtocol | 'auto';
 }
 
 export class TtyBackend implements Backend {
@@ -66,6 +73,10 @@ export class TtyBackend implements Backend {
   };
   private resizeAttached = false;
   private previousBuffer: Buffer | null = null;
+  // The bell + desktop notifications. Assigned in the constructor rather than
+  // here, because it reads `options` — a constructor parameter property.
+  private readonly attention: Attention;
+  private disposed = false;
 
   constructor(
     private readonly out: NodeJS.WriteStream = process.stdout,
@@ -83,6 +94,7 @@ export class TtyBackend implements Backend {
     // pre-launch terminal content is restored on dispose.
     this.out.write(ALT_SCREEN_ON + HIDE_CURSOR);
     this.terminalEntered = true;
+    this.attention = createAttention((bytes) => this.out.write(bytes), { notifications: options.notifications });
   }
 
   size(): { width: number; height: number } {
@@ -188,6 +200,33 @@ export class TtyBackend implements Backend {
     }
   }
 
+  /**
+   * Ring the terminal bell, as one write, at most once per second — a loop
+   * cannot turn the terminal into a buzzer, and the calls in between are
+   * dropped rather than queued. Nothing is written once the backend is
+   * disposed: the terminal is no longer ours.
+   *
+   * BEL moves no cursor and changes no cell, and goes out on its own write, so
+   * ringing it between two frames leaves the frame-diff baseline valid.
+   */
+  bell(): void {
+    if (this.disposed) return;
+    this.attention.bell();
+  }
+
+  /**
+   * Post a desktop notification, as one write. Title and body are sanitized
+   * (controls stripped, one line, capped) and carried by the protocol the
+   * `notifications` option chose. Where no protocol reaches the terminal — a
+   * multiplexer, a bare console — this rings the bell instead, unless
+   * `notifications: 'none'` asked for silence. Nothing is written after
+   * dispose. See docs/app.md (getting attention).
+   */
+  notify(title: string, body?: string): void {
+    if (this.disposed) return;
+    this.attention.notify(title, body);
+  }
+
   onResize(handler: () => void): () => void {
     // Lazy: only attach the underlying 'resize' listener when the first
     // subscriber arrives. `tty.WriteStream` emits 'resize' on SIGWINCH.
@@ -219,6 +258,9 @@ export class TtyBackend implements Backend {
   }
 
   dispose(): void {
+    // Set first: from here on the terminal is being handed back, so a late
+    // bell() or notify() has nowhere to write.
+    this.disposed = true;
     if (this.inputAttached) {
       this.input.removeListener('data', this.inputDataHandler);
       if (this.input.isTTY) this.input.setRawMode(false);

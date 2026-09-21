@@ -222,4 +222,51 @@ describe('InlineTtyBackend', () => {
     expect(b.logOnly).toBe(false);
     b.dispose();
   });
+
+  test('bell and notify each write once, and nothing after dispose', () => {
+    const out = mockStdout();
+    const b = new InlineTtyBackend({ out, in: mockStdin(), notifications: 'osc777' });
+    out.writes.length = 0;
+    b.bell();
+    b.notify('4;x', 'a\x1b]b\x07c');
+    expect(out.writes).toEqual(['\x07', '\x1b]777;notify;4,x;a]bc\x1b\\']);
+    b.dispose();
+    out.writes.length = 0;
+    b.bell();
+    b.notify('Build', 'done');
+    expect(out.writes).toEqual([]);
+  });
+
+  test('log-only: bell and notify write nothing at all', () => {
+    const out = mockStdout();
+    (out as unknown as { isTTY: boolean }).isTTY = false;
+    const b = new InlineTtyBackend({ out, in: mockStdin(), notifications: 'osc9' });
+    b.bell();
+    b.notify('Build', 'done');
+    b.dispose();
+    expect(out.captured()).toBe('');
+  });
+
+  test('a notification between two frames leaves the next live-region write unchanged', () => {
+    const quietOut = mockStdout();
+    const quiet = new InlineTtyBackend({ out: quietOut, in: mockStdin(), liveHeight: 1 });
+    quiet.draw(newBuffer(4, 1, 'aaa'));
+    quietOut.writes.length = 0;
+    quiet.draw(newBuffer(4, 1, 'bbb'));
+    const quietFrame = quietOut.captured();
+    quiet.dispose();
+
+    const noisyOut = mockStdout();
+    const noisy = new InlineTtyBackend({ out: noisyOut, in: mockStdin(), liveHeight: 1, notifications: 'osc9' });
+    noisy.draw(newBuffer(4, 1, 'aaa'));
+    noisyOut.writes.length = 0;
+    noisy.bell();
+    noisy.notify('Build', 'done');
+    noisyOut.writes.length = 0;
+    noisy.draw(newBuffer(4, 1, 'bbb'));
+    const noisyFrame = noisyOut.captured();
+    noisy.dispose();
+
+    expect(noisyFrame).toBe(quietFrame);
+  });
 });

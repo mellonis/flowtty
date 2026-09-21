@@ -5,6 +5,7 @@ Color, glyph width, and what the renderer does not do yet.
 - [Truecolor](#truecolor)
 - [Display width](#display-width)
 - [Environment](#environment)
+- [Notifications](#notifications)
 - [Still deferred (later milestones)](#still-deferred-later-milestones)
 
 ## Truecolor
@@ -168,6 +169,65 @@ If the app has installed its own handler for the signal, flowtty only restores
 the terminal and leaves the outcome to that handler. In raw mode Ctrl-C arrives
 as a key, not as `SIGINT`; `TtyBackend` treats it (and Ctrl-D) as "restore and
 exit 130".
+
+## Notifications
+
+`useApp().bell()` and `useApp().notify(title, body?)` (see
+[The app around the components](app.md#getting-attention)) are the app's side of
+this. The bell is one byte every terminal understands. A desktop notification is
+not: there is no single escape sequence for it, so the TTY backends pick one from
+the environment.
+
+| Where | What is sent | Why |
+| --- | --- | --- |
+| `TERM=foot*`, `TERM=rxvt-unicode*` | `OSC 777` — `ESC ] 777 ; notify ; title ; body ST` | the terminal's own protocol, documented by it, and it keeps title and body apart |
+| `TERM=dumb`, `TERM=linux` | nothing (the bell instead) | no escape handling at all, or a bare console with no desktop behind it to notify |
+| tmux, GNU screen (`TMUX`, `STY`, `TERM=tmux*` / `screen*`) | nothing (the bell instead) | see below |
+| everything else | `OSC 9` — `ESC ] 9 ; text ST` | the widest-understood form (iTerm2's), which kitty, WezTerm, ghostty, rio and VS Code read too; a terminal that does not understand it swallows the OSC rather than printing it |
+
+The table is deliberately short. A terminal is listed only where its own
+documentation says which protocol it speaks; everything else falls through to the
+default, which is inert where it is not understood. No terminal is on a
+"prints garbage" list, because none could be confirmed to print an unknown OSC as
+text — `TERM=dumb` and the Linux console are excluded for having nothing to
+notify, not for making a mess. OSC 99 (kitty's own protocol) is not implemented:
+a title and a body need two chunked sequences to be correct, and kitty documents
+that it reads OSC 9 as well, so the default already reaches it.
+
+With `OSC 9` the title and body are joined into the one field it carries
+(`title: body`). ConEmu and Windows Terminal read `OSC 9 ; <digits> ; …` as a
+numbered sub-command — `9;4` is a progress report — so a message whose first
+field would be numeric gets a leading space, and is shown rather than obeyed.
+With `OSC 777` a `;` inside the title or body would move the rest into the next
+field, so it becomes a comma.
+
+**tmux and screen.** Both swallow an OSC they do not know unless the pane has
+passthrough turned on, which it does not by default (`allow-passthrough` is off
+in tmux, and screen's passthrough is a different, size-limited form). Rather than
+write bytes that would be dropped — or, with the wrong guess, land in the pane as
+text — a multiplexer is detected and `notify()` rings the bell instead. The bell
+is not a consolation prize there: tmux turns it into a bell flag on the window in
+its status line, which is exactly "something happened in the window you are not
+looking at". Forcing a protocol (below) inside tmux sends it wrapped in tmux's
+DCS passthrough, for a pane configured with `allow-passthrough on`; under screen
+a forced protocol is sent unwrapped and will not reach the terminal.
+
+**The option.** Both TTY backends take `notifications: 'auto' | 'osc9' |
+'osc777' | 'none'` (default `'auto'`, the table above):
+
+```ts
+new TtyBackend(process.stdout, process.stdin, { notifications: 'osc777' });
+new InlineTtyBackend({ notifications: 'none' });
+```
+
+`'none'` asked for explicitly means silence — `notify()` does nothing at all. A
+`'none'` that detection arrived at means "no protocol reaches this terminal", and
+there `notify()` rings the bell. `bell()` is unaffected by the option either way,
+and both are silent in `InlineTtyBackend`'s log-only mode and after `dispose()`.
+`detectNotificationProtocol(env)`, `notificationSequence(title, body, protocol)`
+and `sanitizeNotificationText(text)` are exported from `@flowtty/tty-backend` for
+custom backends, alongside `createAttention(write, options)`, which is what both
+backends drive their `bell()` and `notify()` from.
 
 ## Still deferred (later milestones)
 

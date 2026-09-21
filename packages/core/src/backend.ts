@@ -39,6 +39,26 @@ export interface Backend {
    */
   printStatic?(lines: string[]): void;
   /**
+   * Ring the terminal bell (BEL). The one attention-getter every terminal has:
+   * a sound, a flash, a marked tab — whatever the person configured. Backends
+   * that can write to a terminal implement it and rate-limit it (flowtty's TTY
+   * backends: at most one per second); headless ones omit it.
+   *
+   * Never called from inside `draw()`, and the bytes go out as one write, so a
+   * bell between two frames leaves a frame-diffing backend's baseline valid.
+   */
+  bell?(): void;
+  /**
+   * Post a desktop notification through the terminal — what an app reaches for
+   * when the person is looking at another window. `title` is the line the
+   * notification leads with; `body` the optional rest.
+   *
+   * Which escape sequence carries it is the backend's business (see
+   * docs/terminal.md), as is sanitizing the text: an embedded ESC or BEL would
+   * end the sequence early. Backends with no terminal to write to omit this.
+   */
+  notify?(title: string, body?: string): void;
+  /**
    * Whether this backend owns the entire render area — i.e. components can
    * use the full `size()` for layout and overlay larger panels (Menu cascade,
    * full-screen DialogHost) on top.

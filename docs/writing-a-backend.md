@@ -21,6 +21,8 @@ interface Backend {
   onResize?(handler: () => void): () => void;        // call it when size() would change
   dispose?(): void;                                  // undo whatever the constructor did
   printStatic?(lines: string[]): void;               // permanent lines above a live region
+  bell?(): void;                                     // BEL — the portable "over here"
+  notify?(title: string, body?: string): void;       // a desktop notification
   fullScreen?: boolean;                              // false = a bounded region, not the whole screen
   hyperlinks?: boolean;                              // the terminal honors OSC 8
 }
@@ -43,6 +45,13 @@ Only `size` and `draw` are required; everything else is feature-detected.
 - **`fullScreen: false`** tells components that want the whole screen (`Menu`, a
   non-floating dialog) that they don't have it.
 - **`printStatic`** is what `<Static>` calls; without it `<Static>` does nothing.
+- **`bell`** and **`notify`** are what `useApp().bell()` / `.notify(…)` call, for
+  an app asking for attention while the person looks at another window. Omit them
+  and those calls are silent. If you implement them: sanitize the text, rate-limit
+  the bell, write each as ONE write and never from inside `draw()` — that keeps a
+  frame-diffing baseline valid. `createAttention(write, options)` from
+  `@flowtty/tty-backend` does all of that; see
+  [Terminal specifics](terminal.md#notifications).
 
 ## A complete backend
 
@@ -129,5 +138,5 @@ with a `TestBackend` inside, in the test suite. The same shape gives you a backe
 that records frames, throttles repaints, or mirrors the screen somewhere else.
 
 When wrapping, forward the optional members only if the inner backend has them
-(`onResize`, `printStatic`), and copy the `fullScreen` / `hyperlinks` flags —
-components feature-detect all of these.
+(`onResize`, `printStatic`, `bell`, `notify`), and copy the `fullScreen` /
+`hyperlinks` flags — components feature-detect all of these.

@@ -73,6 +73,10 @@ expect(backend.lastBuffer!.get(0, 0).style).toMatchObject({ fg: 'cyan', bold: tr
 The grid is one cell per code point, so `x` in `get(x, y)` is a character index
 into the row — see [Display width](terminal.md#display-width).
 
+- `backend.bells` — how many times the app rang the bell; `backend.notifications`
+  — every `{ title, body? }` it posted, in order, exactly as the app passed them
+  (see [Getting attention](app.md#getting-attention)).
+
 For a component that takes no input, there is a shorter way: `renderToString`
 mounts it, waits for its effects and returns the frame — a snapshot with no
 backend and no unmount to remember, as tall as the content, so nothing is cut off.

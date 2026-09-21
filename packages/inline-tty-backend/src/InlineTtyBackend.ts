@@ -11,6 +11,7 @@ import {
   BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF,
   OSC8_CLOSE, osc8Open,
   sgr,
+  createAttention, type Attention, type NotificationProtocol,
 } from '@flowtty/tty-backend';
 
 export interface InlineTtyBackendOptions {
@@ -30,6 +31,12 @@ export interface InlineTtyBackendOptions {
   /** Color depth in bits: 4, 8 or 24. Default: from the environment —
    *  truecolor only where the terminal announces it. */
   colorDepth?: ColorDepth;
+  /** Which escape sequence `notify()` posts a desktop notification with.
+   *  `'auto'` (the default) picks one from the environment
+   *  (`detectNotificationProtocol`); `'none'` never posts one — and, unlike an
+   *  auto-detected `'none'`, does not fall back to the bell. Both are silent in
+   *  log-only mode. See docs/terminal.md (notifications). */
+  notifications?: NotificationProtocol | 'auto';
 }
 
 /**
@@ -90,6 +97,7 @@ export class InlineTtyBackend implements Backend {
   private liveLines: string[] = [];
   private cursorHidden = false;
   private disposed = false;
+  private readonly attention: Attention;
   private readonly sgrOptions: { color: boolean; depth: ColorDepth };
   /**
    * True when stdout is not an interactive terminal (piped, redirected, CI,
@@ -106,6 +114,7 @@ export class InlineTtyBackend implements Backend {
     this.logOnly = !isInteractive(this.out);
     this.input = options.in ?? process.stdin;
     this.liveHeight = Math.max(1, options.liveHeight ?? 10);
+    this.attention = createAttention((bytes) => this.out.write(bytes), { notifications: options.notifications });
   }
 
   size(): { width: number; height: number } {
@@ -144,6 +153,28 @@ export class InlineTtyBackend implements Backend {
       out += this.liveLines.join('\n');
     }
     this.out.write(out);
+  }
+
+  /**
+   * Ring the terminal bell, as one write, at most once per second (the calls in
+   * between are dropped). Silent in log-only mode — a pipe has no bell — and
+   * after dispose. BEL changes no cell and moves no cursor, so it never
+   * disturbs the live region it lands between.
+   */
+  bell(): void {
+    if (this.logOnly || this.disposed) return;
+    this.attention.bell();
+  }
+
+  /**
+   * Post a desktop notification, as one write, with the title and body
+   * sanitized. Where no protocol reaches the terminal this rings the bell
+   * instead, unless `notifications: 'none'` asked for silence. Silent in
+   * log-only mode and after dispose. See docs/app.md (getting attention).
+   */
+  notify(title: string, body?: string): void {
+    if (this.logOnly || this.disposed) return;
+    this.attention.notify(title, body);
   }
 
   onResize(handler: () => void): () => void {

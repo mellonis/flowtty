@@ -5,6 +5,7 @@ Starting and stopping, errors, cancellation, animation, dialogs.
 - [Quitting, and work after the UI is gone](#quitting-and-work-after-the-ui-is-gone)
 - [Rendering to a string](#rendering-to-a-string)
 - [Error handling](#error-handling)
+- [Getting attention](#getting-attention)
 - [Root abort signal](#root-abort-signal)
 - [Ticker (animation clock)](#ticker-animation-clock)
 - [DialogHost (stack)](#dialoghost-stack)
@@ -146,6 +147,76 @@ Then `tail -f flowtty-errors.log` in a second terminal during development. Adjus
 Without this safety net, an unhandled error during render or in a useEffect would
 leave the terminal in alt-screen mode with raw input still enabled — recovery
 would require killing the shell or running `reset`.
+
+## Getting attention
+
+A reminder fires, a long build finishes, a deploy wants a yes — and the person is
+looking at another window. Two ways to reach them, both on `useApp()` and on the
+render handle:
+
+```tsx
+function Build() {
+  const { bell, notify } = useApp();
+  useEffect(() => {
+    run().then(() => notify('Build finished', '12 packages, 0 errors'));
+  }, [notify]);
+  useInput((key) => { if (key.name === 'x') bell(); });
+  // …
+}
+```
+
+```tsx
+const app = await render(<Build />, new TtyBackend());
+app.notify('Build started');       // the same two, from outside the tree
+```
+
+- **`bell()`** writes BEL. Every terminal has one, and what it does is the
+  person's setting: a sound, a flash, a marked tab, a bounce in the dock. It also
+  travels through tmux, which turns it into a bell flag on the window in its
+  status line.
+- **`notify(title, body?)`** posts a desktop notification through the terminal.
+  Which escape sequence carries it depends on the terminal — see
+  [Terminal specifics](terminal.md#notifications) for the protocols, the
+  `notifications` option, and what happens inside tmux.
+
+**The text is sanitized.** Control characters are stripped (an embedded `ESC` or
+`BEL` would end the sequence early and let the rest be read as terminal input),
+newlines and runs of whitespace collapse to a single space, and each of title and
+body is capped at 256 code points. Write what you mean; a log line pasted in
+verbatim cannot break out.
+
+**The bell is rate-limited** to one per second. A loop that rings it faster gets
+one ring, not a buzzer — the calls in between are dropped, not queued.
+Notifications are not rate-limited: one notification is one thing the person
+asked to be told.
+
+**Both are silent when there is nothing to interrupt**, and an app never has to
+check which backend it is running on:
+
+| Where | `bell()` | `notify()` |
+| --- | --- | --- |
+| `TtyBackend`, `InlineTtyBackend` in a terminal | rings | posts, or rings the bell where no protocol reaches the terminal |
+| `InlineTtyBackend` in a pipe or CI (`logOnly`) | nothing | nothing |
+| `FinalFrameBackend`, `renderToString` | nothing | nothing |
+| after `unmount()` | nothing | nothing |
+| `TestBackend` | counted | recorded |
+
+Neither writes from inside `draw()`, and each goes out as a single write that
+moves no cursor and changes no cell — so asking for attention between two frames
+leaves a frame-diffing backend's baseline exactly as it was.
+
+**In a test**, `TestBackend` records both instead of writing anything:
+
+```tsx
+const backend = new TestBackend(40, 3);
+const app = await render(<Build />, backend);
+await flushAsync(backend);
+expect(backend.bells).toBe(1);
+expect(backend.notifications).toEqual([{ title: 'Build finished', body: '12 packages, 0 errors' }]);
+```
+
+The recorded text is what the app passed, not what a terminal would receive —
+sanitizing is a TTY backend's job (see [Testing](testing.md)).
 
 ## Root abort signal
 

@@ -65,6 +65,14 @@ export interface RenderHandle {
    * resolves after a handled error (the error itself goes to `onError`).
    */
   waitUntilExit(): Promise<unknown>;
+  /** Ring the terminal bell, from outside the tree — the same thing
+   *  `useApp().bell()` does. Silent when the backend cannot ring one, and after
+   *  unmount. See docs/app.md (getting attention). */
+  bell(): void;
+  /** Post a desktop notification, from outside the tree — the same thing
+   *  `useApp().notify()` does. Silent when the backend cannot post one, and
+   *  after unmount. See docs/app.md (getting attention). */
+  notify(title: string, body?: string): void;
 }
 
 export async function render(
@@ -188,11 +196,18 @@ export async function render(
   const withAbort = createElement(AbortContext.Provider, { value: abortController.signal }, withBackend);
   // exit() is usually called from a key handler, i.e. inside flushSync — tearing
   // the tree down there is unsafe, so the unmount is deferred to a microtask.
+  // Both are feature-detected on the backend and drop through when it has
+  // neither — an app asks for attention the same way whatever it renders into.
+  // After unmount there is no terminal of ours left to interrupt.
+  const bell = () => { if (!unmounted) backend.bell?.(); };
+  const notify = (title: string, body?: string) => { if (!unmounted) backend.notify?.(title, body); };
   const appApi: AppApi = {
     exit: (result) => {
       exitResult = result;
       queueMicrotask(() => handle.unmount());
     },
+    bell,
+    notify,
   };
   const withApp = createElement(AppContext.Provider, { value: appApi }, withAbort);
   const tree = createElement(TerminalSizeProvider, { backend }, withApp);
@@ -208,6 +223,8 @@ export async function render(
 
   const handle: RenderHandle = {
     waitUntilExit: () => exited,
+    bell,
+    notify,
     unmount() {
       if (unmounted) return;
       unmounted = true;

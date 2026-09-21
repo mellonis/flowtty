@@ -78,3 +78,15 @@ test('TestBackend.press accepts every named key, any single character, and the d
   for (const name of [...NAMED_KEYS, ' ', ':', 'a', 'ж', '😀', 'csi-u']) b.press({ name });
   expect(got).toHaveLength(NAMED_KEYS.length + 6);
 });
+
+test('TestBackend records bells and notifications instead of writing them anywhere', () => {
+  const b = new TestBackend(4, 1);
+  expect(b.bells).toBe(0);
+  expect(b.notifications).toEqual([]);
+  b.bell();
+  b.bell();
+  b.notify('Build', 'done');
+  b.notify('Reminder');
+  expect(b.bells).toBe(2);
+  expect(b.notifications).toEqual([{ title: 'Build', body: 'done' }, { title: 'Reminder' }]);
+});

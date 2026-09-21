@@ -5,6 +5,13 @@ export { detectHyperlinkSupport } from './hyperlinks.js';
 export { isInteractive, NotInteractiveError } from './interactive.js';
 export { detectColorDepth, rgbToAnsi256, rgbToAnsi16, type ColorDepth } from './colorDepth.js';
 export { parseKeypress, decodeKeys } from './key-parser.js';
+// The bell and desktop notifications — pure text-to-bytes, plus the small
+// factory both TTY backends drive their `bell()` / `notify()` from. Exposed so
+// a sibling backend can reuse them instead of assembling OSC sequences itself.
+export {
+  createAttention, detectNotificationProtocol, notificationSequence, sanitizeNotificationText,
+  type Attention, type AttentionOptions, type NotificationProtocol,
+} from './notification.js';
 // ANSI helpers — exposed so sibling TTY backends (e.g. @flowtty/inline-tty-backend)
 // can reuse the SGR / cursor / screen-control sequences instead of duplicating.
 // App code typically should not assemble escape sequences itself.

@@ -30,6 +30,8 @@ export class ScriptedBackend implements Backend {
   onRealKey: ((key: Key) => void) | undefined;
   onResize: Backend['onResize'];
   printStatic: Backend['printStatic'];
+  bell: Backend['bell'];
+  notify: Backend['notify'];
 
   private readonly subscribers = new Set<(key: Key) => void>();
   private unsubscribeInner: (() => void) | undefined;
@@ -39,6 +41,8 @@ export class ScriptedBackend implements Backend {
     this.hyperlinks = inner.hyperlinks;
     if (inner.onResize) this.onResize = (h) => inner.onResize!(h);
     if (inner.printStatic) this.printStatic = (lines) => inner.printStatic!(lines);
+    if (inner.bell) this.bell = () => inner.bell!();
+    if (inner.notify) this.notify = (title, body) => inner.notify!(title, body);
   }
 
   size(): { width: number; height: number } { return this.inner.size(); }

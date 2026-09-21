@@ -21,6 +21,10 @@ function assertRealKeyName(name: string): void {
 
 export class TestBackend implements Backend {
   frames: string[] = [];
+  /** How many times the app rang the bell. Nothing is written anywhere. */
+  bells: number = 0;
+  /** Every notification the app posted, in order — `body` absent when it was. */
+  notifications: { title: string; body?: string }[] = [];
   private buffers: Buffer[] = [];
   private readonly subscribers = new Set<(key: Key) => void>();
 
@@ -79,6 +83,18 @@ export class TestBackend implements Backend {
   /** Deliver `text` as ONE 'paste' key — what a TTY backend emits for a bracketed paste. */
   paste(text: string): void {
     this.press({ name: 'paste', text: text.replace(/\r\n?/g, '\n') });
+  }
+
+  /** Count a bell instead of writing one. */
+  bell(): void {
+    this.bells += 1;
+  }
+
+  /** Record a notification instead of posting one. The text is kept exactly as
+   *  the app passed it — sanitizing is a TTY backend's job, and a test wants to
+   *  see what the app asked for. */
+  notify(title: string, body?: string): void {
+    this.notifications.push(body === undefined ? { title } : { title, body });
   }
 
   /** Deliver one mouse-wheel step at cell (x, y) — what a TTY backend with `mouse` on emits. */

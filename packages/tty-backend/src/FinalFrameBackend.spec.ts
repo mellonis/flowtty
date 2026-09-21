@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { Buffer } from '@flowtty/core';
+import { Buffer, type Backend } from '@flowtty/core';
 import { FinalFrameBackend } from './FinalFrameBackend.js';
 import { RESET } from './ansi.js';
 
@@ -129,4 +129,10 @@ test('the printed frame is plain lines — no cursor addressing, no alt screen, 
   expect(out).toBe('a\nb\n');
   expect(out).not.toContain('\x1b[?1049h');
   expect(/\x1b\[\d+;\d+H/u.test(out)).toBe(false);
+});
+
+test('FinalFrameBackend offers neither bell nor notify — there is no live terminal to interrupt', () => {
+  const backend: Backend = new FinalFrameBackend(makeStdoutStub().stub);
+  expect(backend.bell).toBeUndefined();
+  expect(backend.notify).toBeUndefined();
 });

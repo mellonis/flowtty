@@ -580,3 +580,88 @@ test('TtyBackend.dispose prints deferred developer warnings — after the screen
   expect(warn.mock.calls.map((c) => String(c[0]))).toContain('flowtty: something worth knowing');
   warn.mockRestore();
 });
+
+test('TtyBackend.bell writes BEL as one write, and not after dispose', () => {
+  const { stub, writes } = makeStub();
+  const back = new TtyBackend(stub);
+  writes.length = 0;
+  back.bell();
+  expect(writes).toEqual(['\x07']);
+  back.dispose();
+  writes.length = 0;
+  back.bell();
+  expect(writes).toEqual([]);
+});
+
+test('TtyBackend.bell rings at most once per second; the calls in between are dropped', () => {
+  const nowSpy = vi.spyOn(Date, 'now').mockReturnValue(10_000);
+  try {
+    const { stub, writes } = makeStub();
+    const back = new TtyBackend(stub);
+    writes.length = 0;
+    back.bell();
+    back.bell();
+    nowSpy.mockReturnValue(10_999);
+    back.bell();
+    expect(writes).toEqual(['\x07']);
+    nowSpy.mockReturnValue(11_000);
+    back.bell();
+    expect(writes).toEqual(['\x07', '\x07']);
+    back.dispose();
+  } finally {
+    nowSpy.mockRestore();
+  }
+});
+
+test('TtyBackend.notify writes the sanitized sequence as one write', () => {
+  const { stub, writes } = makeStub();
+  const back = new TtyBackend(stub, process.stdin, { notifications: 'osc9' });
+  writes.length = 0;
+  back.notify('4;x', 'a\x1b]b\x07c');
+  expect(writes).toEqual(['\x1b]9; 4;x: a]bc\x1b\\']);
+  back.dispose();
+});
+
+test('TtyBackend with notifications: none stays silent, and not after dispose either', () => {
+  const { stub, writes } = makeStub();
+  const back = new TtyBackend(stub, process.stdin, { notifications: 'none' });
+  writes.length = 0;
+  back.notify('Build', 'done');
+  expect(writes).toEqual([]);
+  back.dispose();
+  writes.length = 0;
+  back.notify('Build', 'done');
+  expect(writes).toEqual([]);
+});
+
+test('a bell and a notification between two frames leave the next frame diff byte-identical', () => {
+  const frame = (text: string) => {
+    const buf = new Buffer(3, 1);
+    [...text].forEach((ch, x) => buf.set(x, 0, ch));
+    return buf;
+  };
+
+  const plain = makeStub(3, 1);
+  const quiet = new TtyBackend(plain.stub, process.stdin, { notifications: 'osc9' });
+  quiet.draw(frame('abc'));
+  plain.writes.length = 0;
+  quiet.draw(frame('abd'));
+  const quietDiff = plain.writes.join('');
+  quiet.dispose();
+
+  const noisyStub = makeStub(3, 1);
+  const noisy = new TtyBackend(noisyStub.stub, process.stdin, { notifications: 'osc9' });
+  noisy.draw(frame('abc'));
+  noisyStub.writes.length = 0;
+  noisy.bell();
+  noisy.notify('Build', 'done');
+  const attention = noisyStub.writes.splice(0, 2);
+  noisy.draw(frame('abd'));
+  const noisyDiff = noisyStub.writes.join('');
+  noisy.dispose();
+
+  // One write each, and neither moved the cursor or changed a cell — so the
+  // frame that follows is diffed against the same baseline, byte for byte.
+  expect(attention).toEqual(['\x07', '\x1b]9;Build: done\x1b\\']);
+  expect(noisyDiff).toBe(quietDiff);
+});
