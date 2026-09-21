@@ -36,6 +36,7 @@ await render(
 ### Input
 - `useInput((key) => …)` — subscribe to keys from the active `InputContext`.
 - `<Box inert>` — drop a subtree out of input dispatch (no rerender, no layout impact).
+- Drag-to-select over the drawn frame, copied to the clipboard: `render(…, { onCopy, copyOnSelect })` and `useApp().copy(text)`, with `<Box selectionScope>` / `<Box selectable={false}>` to bound it.
 - F-keys parsed (F5–F12 via xterm tilde sequences) — see `@flowtty/tty-backend`.
 
 ### Focus

@@ -262,17 +262,82 @@ test('wheel modifier bits map to shift / meta / ctrl', () => {
   expect([ctrl!.name, ctrl!.shift, ctrl!.meta, ctrl!.ctrl]).toEqual(['wheelup', false, false, true]);
 });
 
-test('non-wheel mouse reports (press, release, motion) are swallowed, not surfaced as junk keys', () => {
-  const { keys, rest } = decodeKeys('a\x1b[<0;3;4M\x1b[<0;3;4m\x1b[<35;5;6Mb');
-  expect(keys.map((k) => k.name)).toEqual(['a', 'b']);
-  expect(rest).toBe('');
-});
-
 test('a wheel report split across reads is buffered until complete', () => {
   const first = decodeKeys('\x1b[<64;1');
   expect(first.keys).toEqual([]);
   const second = decodeKeys(first.rest + '0;5M');
   expect(second.keys.map((k) => [k.name, k.x, k.y])).toEqual([['wheelup', 9, 4]]);
+});
+
+// ─── SGR mouse: buttons ──────────────────────────────────────────────────────
+
+test('a button press becomes mousedown with the button and 0-based cell coordinates', () => {
+  const { keys } = decodeKeys('\x1b[<0;3;4M\x1b[<1;3;4M\x1b[<2;3;4M');
+  expect(keys).toEqual([
+    { name: 'mousedown', button: 'left', x: 2, y: 3, sequence: '\x1b[<0;3;4M', ctrl: false, meta: false, shift: false },
+    { name: 'mousedown', button: 'middle', x: 2, y: 3, sequence: '\x1b[<1;3;4M', ctrl: false, meta: false, shift: false },
+    { name: 'mousedown', button: 'right', x: 2, y: 3, sequence: '\x1b[<2;3;4M', ctrl: false, meta: false, shift: false },
+  ]);
+});
+
+test('motion with a button held becomes mousedrag (the 32 bit), not a second mousedown', () => {
+  const { keys } = decodeKeys('\x1b[<32;3;4M\x1b[<34;10;2M');
+  expect(keys.map((k) => [k.name, k.button, k.x, k.y])).toEqual([
+    ['mousedrag', 'left', 2, 3],
+    ['mousedrag', 'right', 9, 1],
+  ]);
+});
+
+test('a release (final m) becomes mouseup and names the button SGR 1006 reports', () => {
+  const { keys } = decodeKeys('\x1b[<0;3;4m\x1b[<2;3;4m');
+  expect(keys.map((k) => [k.name, k.button])).toEqual([
+    ['mouseup', 'left'],
+    ['mouseup', 'right'],
+  ]);
+});
+
+test('a release that names no button is still a mouseup — with button left undefined', () => {
+  const [up] = decodeKeys('\x1b[<3;3;4m').keys;
+  expect(up!.name).toBe('mouseup');
+  expect(up!.button).toBeUndefined();
+  expect([up!.x, up!.y]).toEqual([2, 3]);
+});
+
+test('motion with NO button held is dropped — it is noise unless 1003 is on', () => {
+  const { keys, rest } = decodeKeys('a\x1b[<35;5;6Mb');
+  expect(keys.map((k) => k.name)).toEqual(['a', 'b']);
+  expect(rest).toBe('');
+});
+
+test('button codes flowtty does not decode are dropped silently, never mis-named', () => {
+  // 66/67 = horizontal wheel; 128+ = the extra buttons (8..11).
+  const { keys, rest } = decodeKeys('a\x1b[<66;1;1M\x1b[<67;1;1M\x1b[<128;1;1M\x1b[<131;1;1m b');
+  expect(keys.map((k) => k.name)).toEqual(['a', ' ', 'b']);
+  expect(rest).toBe('');
+});
+
+test('a malformed mouse report is dropped, never turned into a key at a negative cell', () => {
+  const { keys, rest } = decodeKeys('a\x1b[<-1;1;1M\x1b[<;;M\x1b[<0;0;0M\x1b[<0;1.5;1Mb');
+  expect(keys.map((k) => k.name)).toEqual(['a', 'b']);
+  expect(rest).toBe('');
+});
+
+test('button modifier bits map to shift / meta / ctrl on down, drag and up alike', () => {
+  const { keys } = decodeKeys('\x1b[<4;1;1M\x1b[<8;1;1M\x1b[<16;1;1M\x1b[<36;1;1M\x1b[<16;1;1m');
+  expect(keys.map((k) => [k.name, k.button, k.shift, k.meta, k.ctrl])).toEqual([
+    ['mousedown', 'left', true, false, false],
+    ['mousedown', 'left', false, true, false],
+    ['mousedown', 'left', false, false, true],
+    ['mousedrag', 'left', true, false, false],
+    ['mouseup', 'left', false, false, true],
+  ]);
+});
+
+test('a button report split across reads is buffered until complete', () => {
+  const first = decodeKeys('\x1b[<32;1');
+  expect(first.keys).toEqual([]);
+  const second = decodeKeys(first.rest + '0;5M');
+  expect(second.keys.map((k) => [k.name, k.button, k.x, k.y])).toEqual([['mousedrag', 'left', 9, 4]]);
 });
 
 // ─── modified Enter / Tab / Escape / Backspace in CSI-u and modifyOtherKeys form ──

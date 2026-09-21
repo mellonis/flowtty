@@ -23,31 +23,61 @@ import type { Key } from '@flowtty/core';
  *    body is never decoded, so a pasted newline is text, not Return. A paste
  *    split across reads is handed back whole as `rest` until its end arrives.
  *
- *  - SGR mouse reports: ESC[<b;x;yM — wheel steps become {name: 'wheelup' |
- *    'wheeldown', x, y} (0-based cell). Other mouse reports (press, release,
- *    motion) are consumed and dropped until click support lands.
+ *  - SGR mouse reports: ESC[<b;x;yM (press / motion) and ESC[<b;x;ym (release)
+ *    — wheel steps become {name: 'wheelup' | 'wheeldown', x, y} (0-based cell),
+ *    button events become {name: 'mousedown' | 'mousedrag' | 'mouseup', button,
+ *    x, y}. Motion with no button held and buttons flowtty does not name are
+ *    consumed and dropped. See docs/input.md (the mouse).
  *
  *  - Keys reported by code point: CSI-u (ESC[13;2u) and xterm modifyOtherKeys
  *    (ESC[27;2;13~) → the usual name plus modifiers, e.g. Shift+Enter =
  *    {name: 'return', shift: true}. Decoded whenever a terminal sends them;
  *    flowtty does not yet ask terminals to (that is the Kitty protocol).
  *
- * NOT handled (later): mouse clicks, enabling the Kitty protocol, F13+.
+ * NOT handled (later): hit-testing a click against the laid-out tree, enabling
+ * the Kitty protocol, F13+.
  */
-// SGR mouse report params: "<button;col;row" (1-based). Button 64/65 = wheel
-// up/down; bits 4/8/16 add Shift/Meta/Ctrl. Anything else is not a wheel step.
-function decodeSgrWheel(params: string, final: string): Omit<Key, 'sequence'> | null {
+// SGR mouse report params: "<b;col;row", coordinates 1-based, final 'M' for a
+// press or motion and 'm' for a release. In `b`, bits 4/8/16 are Shift/Meta/Ctrl
+// and bit 32 marks motion; what is left is the button code — 0/1/2 left/middle/
+// right, 3 "no button", 64/65 wheel up/down, 66/67 the horizontal wheel, 128+
+// the extra buttons. Codes flowtty has no name for return null so the report is
+// dropped whole rather than mis-decoded as a neighbouring button.
+const MOUSE_BUTTONS = ['left', 'middle', 'right'] as const;
+
+function decodeSgrMouse(params: string, final: string): Omit<Key, 'sequence'> | null {
   const [b, col, row] = params.slice(1).split(';').map(Number);
-  if (final !== 'M' || b === undefined || col === undefined || row === undefined) return null;
-  if ([b, col, row].some((n) => !Number.isFinite(n))) return null;
-  const button = b & ~(4 | 8 | 16);
-  if (button !== 64 && button !== 65) return null;
-  return {
-    name: button === 64 ? 'wheelup' : 'wheeldown',
+  if (b === undefined || col === undefined || row === undefined) return null;
+  // Every field of a real report is a non-negative integer and the coordinates
+  // are 1-based. A malformed one ("<-1;1;1M", "<;;M") is dropped rather than
+  // turned into a key with a negative cell or a button nothing named.
+  if (![b, col, row].every(Number.isInteger) || b < 0 || col < 1 || row < 1) return null;
+  const at = {
     x: col - 1,
     y: row - 1,
     ctrl: (b & 16) !== 0, meta: (b & 8) !== 0, shift: (b & 4) !== 0,
   };
+  const motion = (b & 32) !== 0;
+  const code = b & ~(4 | 8 | 16 | 32);
+
+  // The wheel only ever presses — a 'm' report for it would be a terminal bug.
+  if (code === 64 || code === 65) {
+    if (final !== 'M') return null;
+    return { name: code === 64 ? 'wheelup' : 'wheeldown', ...at };
+  }
+  if (code > 2) return final === 'm' && code === 3
+    // A release names its button under SGR 1006 — except in the X10-shaped form
+    // "no button", which a few terminals still send. Surfacing it as a
+    // buttonless 'mouseup' is deliberate: dropping it would leave a drag open
+    // forever, which is worse than an absent field.
+    ? { name: 'mouseup', ...at }
+    // Code 3 with 'M' is motion with nothing held (only 1003 asks for it), and
+    // 66/67/128+ are buttons flowtty does not name.
+    : null;
+
+  const button = MOUSE_BUTTONS[code]!;
+  if (final === 'm') return { name: 'mouseup', button, ...at };
+  return { name: motion ? 'mousedrag' : 'mousedown', button, ...at };
 }
 
 function decodeKeyByCodePoint(final: string, params: string): Omit<Key, 'sequence'> | null {
@@ -111,8 +141,8 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
           const final = chars[j]!;
           const params = chars.slice(i + 2, j).join('');
           if ((final === 'M' || final === 'm') && params.startsWith('<')) {
-            const wheel = decodeSgrWheel(params, final);
-            if (wheel) out.push({ ...wheel, sequence: chars.slice(i, j + 1).join('') });
+            const mouse = decodeSgrMouse(params, final);
+            if (mouse) out.push({ ...mouse, sequence: chars.slice(i, j + 1).join('') });
             i = j + 1;
             continue;
           }

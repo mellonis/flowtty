@@ -9,6 +9,7 @@ It implements [`@flowtty/core`](https://github.com/mellonis/flowtty/tree/master/
 - Reads **raw input** and parses key sequences (arrows, function keys via xterm tilde sequences, Ctrl/Alt modifiers).
 - Restores cooked mode and shows the cursor on `dispose()`.
 - **Asks for attention** — `bell()` (rate-limited to one per second) and `notify(title, body?)`, a desktop notification posted through the terminal, with the text sanitized.
+- **Copies** — `copy(text)` puts text on the system clipboard with OSC 52, write-only and size-capped, and says whether a sequence went out.
 
 This is the backend you pass to `render()` for CLI tools and full-screen terminal apps.
 
@@ -39,8 +40,9 @@ Also exported:
 - `NotInteractiveError` — what `TtyBackend` throws when its stream is not a terminal, alongside `isInteractive(stream)` for asking before rendering.
 
 - `detectNotificationProtocol(env)`, `notificationSequence(title, body, protocol)`, `sanitizeNotificationText(text)` and `createAttention(write, options)` — the bell and desktop notifications as plain text-to-bytes, for custom backends.
+- `detectClipboardSupport(env)`, `clipboardSequence(text, limit)` and `createClipboard(write, options)` — the clipboard write, likewise.
 
-Pasted text arrives as one `{ name: 'paste', text }` key (bracketed paste is enabled automatically). The third constructor argument takes the options: `{ mouse: true }` to receive `wheelup` / `wheeldown` keys — off by default because mouse reporting takes over the terminal's native text selection — and `{ notifications }` (`'auto'` by default, or `'osc9'` / `'osc777'` / `'none'`) to choose which escape sequence `notify()` uses.
+Pasted text arrives as one `{ name: 'paste', text }` key (bracketed paste is enabled automatically). The third constructor argument takes the options: `{ mouse: true }` to receive `wheelup` / `wheeldown` and `mousedown` / `mousedrag` / `mouseup` keys — off by default because mouse reporting takes over the terminal's native text selection — `{ notifications }` (`'auto'` by default, or `'osc9'` / `'osc777'` / `'none'`) to choose which escape sequence `notify()` uses, and `{ clipboard }` (`'auto'` / `'osc52'` / `'none'`) plus `{ clipboardLimit }` for `copy()`.
 
 For an **inline** (non-alt-screen) live region with append-only log lines above it, use [`@flowtty/inline-tty-backend`](https://github.com/mellonis/flowtty/tree/master/packages/inline-tty-backend) instead.
 

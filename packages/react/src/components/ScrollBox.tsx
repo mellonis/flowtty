@@ -120,6 +120,11 @@ export function ScrollBox({
   return (
     <Box
       flexDirection="column"
+      // The viewport is its own selection scope: a drag inside it is confined
+      // to the content rect, which is the rows in view and — because the bar
+      // lives in the column `paddingRight` reserves — excludes the scrollbar.
+      // See docs/input.md (selection).
+      selectionScope
       {...boxProps}
       {...scrollProps}
       paddingRight={showBar ? basePadRight + 1 : boxProps.paddingRight}

@@ -1,5 +1,7 @@
 import { describe, test, expect } from 'vitest';
-import { layoutMarkdown, layoutMarkdownDetailed, type StyledLine } from './layout.js';
+import {
+  layoutMarkdown, layoutMarkdownDetailed, type MarkdownOptions, type StyledLine,
+} from './layout.js';
 
 // Flatten a line's spans back to plain text for content assertions.
 const text = (l: StyledLine) => l.spans.map((s) => s.text).join('');
@@ -449,5 +451,127 @@ describe('fenced code: languages, diffs and numbering', () => {
     expect(lines[2]!.spans.find((s) => s.text.startsWith('-a'))?.color).toBe('red');
     // Literal fences print what the author wrote, so nothing is added there.
     expect(text(layoutMarkdown(fence('', '@@ -1 +1 @@'), 20, { codeFence: 'literal' })[0]!)).toBe('```');
+  });
+});
+
+// ─── soft wrap ───────────────────────────────────────────────────────────────
+// <Markdown> wraps text itself and emits one row per line, so the painter never
+// sees a wrap. Each row says whether it carries on below, and a row is only
+// marked when nothing but its own text is painted on it — a gutter glyph in the
+// way would be spliced into the middle of the copied line.
+
+describe('continuation marks', () => {
+  test('a wrapped paragraph marks every row but the last, joining with a space', () => {
+    const lines = layoutMarkdown('one two three four five', 9);
+    expect(lines.map((l) => l.continues?.dropped)).toEqual([' ', ' ', undefined]);
+  });
+
+  test('a wrapped heading continues the same way', () => {
+    const lines = layoutMarkdown('# one two three four', 8);
+    expect(lines.at(-1)!.continues).toBeUndefined();
+    expect(lines[0]!.continues?.dropped).toBe(' ');
+  });
+
+  test('a cut through a long word joins with nothing', () => {
+    const lines = layoutMarkdown('antidisestablishmentarianism', 8);
+    expect(lines.map((l) => l.continues?.dropped)).toEqual(['', '', '', undefined]);
+  });
+
+  test('a wrapped list item continues — its hanging indent is blank', () => {
+    const lines = layoutMarkdown('- one two three four five', 10);
+    expect(lines.length).toBeGreaterThan(1);
+    expect(lines[0]!.continues?.dropped).toBe(' ');
+    expect(lines.at(-1)!.continues).toBeUndefined();
+  });
+
+  test('a blockquote rejoins past its bar — the bar is chrome, not content', () => {
+    const lines = layoutMarkdown('> one two three four five', 12);
+    expect(lines.length).toBeGreaterThan(1);
+    // Every row wears the bar, and every row but the last carries on past it.
+    expect(lines.every((l) => l.chrome === 1)).toBe(true);
+    expect(lines[0]!.continues).toEqual({ dropped: ' ', textStart: 2, textWidth: expect.any(Number) });
+    expect(lines.at(-1)!.continues).toBeUndefined();
+  });
+
+  test('a wrapped code row is marked past the gutter it wears', () => {
+    const lines = layoutMarkdown('```\nconst aLongIdentifier = 1\n```', 12);
+    const wrapped = lines.filter((l) => l.continues !== undefined);
+    expect(wrapped.length).toBeGreaterThan(0);
+    // `│ ` is two cells of chrome; the code — and the span a copy reads —
+    // starts after it.
+    expect(wrapped.every((l) => l.chrome === 1)).toBe(true);
+    expect(wrapped.every((l) => l.continues!.dropped === '' && l.continues!.textStart === 2)).toBe(true);
+  });
+
+  test('a wrapped code row with no gutter at all joins with nothing', () => {
+    const lines = layoutMarkdown('```\nconst aLongIdentifier = 1\n```', 12, { codeFence: 'literal' });
+    const wrapped = lines.filter((l) => l.continues !== undefined);
+    expect(wrapped.length).toBeGreaterThan(0);
+    expect(wrapped.every((l) => l.continues!.dropped === '')).toBe(true);
+  });
+
+  test('line numbers are chrome on every row of the block, first row or not', () => {
+    // The gutter is a property of the BLOCK: row 0 wears a number and the rows
+    // under it wear blanks. Both are frame, so every row is marked the same way
+    // and the rows rejoin past the gutter — the per-row question that used to
+    // leave row 0 unmarked and its continuations marked does not arise.
+    const src = '```\nconst aVeryLongIdentifierName = someOtherValue + 1\n```';
+    const lines = layoutMarkdown(src, 16, { codeFence: 'literal', lineNumbers: true });
+    const code = lines.filter((l) => l.chrome !== undefined);
+    expect(code.length).toBe(4); // the line wrapped into four rows
+    expect(code.every((l) => l.chrome === 1)).toBe(true);
+    // The fence rows are the author's own text: no gutter, no chrome.
+    expect(lines[0]!.chrome).toBeUndefined();
+    expect(lines.at(-1)!.chrome).toBeUndefined();
+    const wrapped = code.filter((l) => l.continues !== undefined);
+    expect(wrapped.length).toBe(code.length - 1);
+    expect(wrapped.every((l) => l.continues!.textStart === 2)).toBe(true);
+  });
+
+  test('every marked row starts its span exactly where its chrome ends', () => {
+    // `chrome` (a span count) and `continues.textStart` (a cell offset) are two
+    // expressions of the same fact, set side by side in `wrapBlock` and in
+    // `layoutCode`. If they ever drift, a rejoined row splices a gutter glyph
+    // into the middle of the copied line — the defect this pair exists to stop.
+    const doc = [
+      'one two three four five six seven',
+      '',
+      '> a quoted paragraph long enough to wrap somewhere',
+      '',
+      '- a list item long enough to wrap onto a second row',
+      '',
+      '```js',
+      'const aVeryLongIdentifierName = someOtherValue + 1;',
+      '',
+      'return aVeryLongIdentifierName;',
+      '```',
+    ].join('\n');
+    const cases: MarkdownOptions[] = [
+      {},
+      { lineNumbers: true },
+      { codeFence: 'literal' },
+      { codeFence: 'literal', lineNumbers: true },
+      { diffBackground: false, lineNumbers: true },
+    ];
+    let marked = 0;
+    for (const options of cases) {
+      for (const width of [12, 16, 24, 40]) {
+        for (const line of layoutMarkdown(doc, width, options)) {
+          const chrome = line.chrome ?? 0;
+          const chromeWidth = line.spans
+            .slice(0, chrome)
+            .reduce((n, span) => n + [...span.text].length, 0);
+          if (line.continues === undefined) continue;
+          marked++;
+          expect(line.continues.textStart ?? 0).toBe(chromeWidth);
+        }
+      }
+    }
+    expect(marked).toBeGreaterThan(20); // the corpus really does wrap
+  });
+
+  test('a separate paragraph never continues into the next one', () => {
+    const lines = layoutMarkdown('one\n\ntwo', 20);
+    expect(lines.every((l) => l.continues === undefined)).toBe(true);
   });
 });

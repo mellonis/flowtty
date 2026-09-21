@@ -59,6 +59,24 @@ export interface Backend {
    */
   notify?(title: string, body?: string): void;
   /**
+   * Put `text` on the person's system clipboard, and say whether a clipboard
+   * sequence was actually written — `false` when this terminal has none, when
+   * the text was empty, and when it was too large for the sequence to carry
+   * (over the cap a backend writes NOTHING rather than a partial copy).
+   *
+   * `true` means the bytes went out, not that the clipboard changed: no
+   * terminal answers that, and asking would mean reading the clipboard, which
+   * flowtty never does. An app that must be sure falls back on `false` — see
+   * docs/app.md (the clipboard).
+   *
+   * Which sequence carries it is the backend's business (see
+   * docs/terminal.md), as is the size cap. Never called from inside `draw()`,
+   * and the bytes go out as one write, so a copy between two frames leaves a
+   * frame-diffing backend's baseline valid. Backends with no terminal to write
+   * to omit it.
+   */
+  copy?(text: string): boolean;
+  /**
    * Whether this backend owns the entire render area — i.e. components can
    * use the full `size()` for layout and overlay larger panels (Menu cascade,
    * full-screen DialogHost) on top.

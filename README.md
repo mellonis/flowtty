@@ -54,9 +54,10 @@ terminal is back to normal — so the last line prints on the ordinary screen.
 |---|---|
 | **Layout** | flexbox via Yoga, borders with titles, padding / margin / gap, wrap, absolute positioning, `zIndex`, `overflow`, scroll viewports, a dimming backdrop — [docs/layout.md](docs/layout.md) |
 | **Components** | `ScrollBox`, `TextInput`, `TextArea`, `Select`, `MultiSelect`, `Table`, `Markdown` (GFM tables, nested lists, highlighted code), `Spinner`, `ProgressBar`, `TaskList`, `Link`, `Static` — [docs/components.md](docs/components.md) |
-| **Input, focus, forms** | keys with modifiers, bracketed paste as one event, the mouse wheel, `FocusGroup` + `Button`, `Form` with validation (Zod-friendly) — [docs/input.md](docs/input.md) |
+| **Input, focus, forms** | keys with modifiers, bracketed paste as one event, the mouse wheel and buttons, drag-to-select with per-pane scopes, `FocusGroup` + `Button`, `Form` with validation (Zod-friendly) — [docs/input.md](docs/input.md) |
+| **Copying out** | copy-on-select over the drawn frame, soft-wrapped paragraphs pasted as one line, `useApp().copy()`, OSC 52 with an `onCopy` fallback signal — [docs/input.md](docs/input.md#selection) |
 | **The app around them** | `render` / `waitUntilExit` / `useApp().exit`, `renderToString` for one-shot output, error handling, a root abort signal, a ticker for animation, `DialogHost` with stacked dialogs, `useApp().bell()` / `.notify()` for attention from another window — [docs/app.md](docs/app.md) |
-| **Testing** | `TestBackend`: frames as strings, cells with styles, `press` / `paste` / `wheel`; scripts that drive a whole app — [docs/testing.md](docs/testing.md) |
+| **Testing** | `TestBackend`: frames as strings, cells with styles, `press` / `paste` / `wheel` / `mouse`, recorded bells, notifications and clipboard writes; scripts that drive a whole app — [docs/testing.md](docs/testing.md) |
 | **Extending** | [writing a component](docs/writing-a-component.md), [writing a backend](docs/writing-a-backend.md), and [CONTRIBUTING](CONTRIBUTING.md) |
 | **Terminal specifics** | named and 24-bit color, glyph width, OSC 8 hyperlinks, desktop notifications, what is not there yet — [docs/terminal.md](docs/terminal.md) |
 
@@ -92,7 +93,8 @@ Alpha — `1.0.0-alpha.x` on npm. APIs can still change between alphas; each
 release's notes list what breaks. Runs on Node and Bun.
 
 Not there yet: cell-accurate wide glyphs (a CJK or emoji glyph takes one grid
-cell, so text after it overlaps its right half), mouse clicks, the Kitty keyboard
+cell, so text after it overlaps its right half), hit-testing a mouse key against
+the laid-out tree (the keys themselves carry the cell), the Kitty keyboard
 protocol — see [what is deferred](docs/terminal.md#still-deferred-later-milestones).
 
 ## License

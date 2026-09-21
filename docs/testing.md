@@ -96,6 +96,9 @@ backend.press({ name: 'c', ctrl: true });
 backend.type('hello');                 // one key per character
 backend.paste('two\nlines');           // ONE 'paste' key, as a terminal delivers it
 backend.wheel('down', 10, 4);          // a wheel step at cell (10, 4)
+backend.mouse('down', 4, 2);           // press the left button at cell (4, 2)
+backend.mouse('drag', 9, 2);           // …drag across to (9, 2)…
+backend.mouse('up', 9, 2);             // …and release
 ```
 
 `press()` throws on a name no terminal produces — `'space'`, `'enter'`, `'esc'` —
@@ -103,8 +106,35 @@ and says what to use instead (`' '`, `'return'`, `'escape'`). A printable key is
 named by its character; the rest come from `NAMED_KEYS`. A test that presses an
 impossible name exercises a branch real input never reaches, and would pass.
 
-`wheel()` defaults to cell (0, 0). A `<ScrollBox>` only reacts while the pointer
-is over it, so pass coordinates inside the box unless it sits at the origin.
+`wheel()` and `mouse()` default to cell (0, 0). A `<ScrollBox>` only reacts while
+the pointer is over it, so pass coordinates inside the box unless it sits at the
+origin. `mouse()` takes a fourth argument, `{ button, shift, meta, ctrl }` —
+`button` defaults to `'left'`. A drag is a `'down'`, one `'drag'` per cell
+crossed and an `'up'`, which is how a terminal reports one; see
+[Paste and the mouse](input.md#paste-and-the-mouse).
+
+A drag also selects and copies. The cells it covered come back with `inverse`
+toggled in `lastBuffer`; the text lands in `backend.clipboard` and goes to the
+`onCopy` render option, which a test can pass a spy to:
+
+```tsx
+const onCopy = vi.fn();
+const backend = new TestBackend(20, 3);
+await render(<App />, backend, { onCopy });
+backend.mouse('down', 0, 0);
+backend.mouse('drag', 4, 0);
+backend.mouse('up', 4, 0);
+await flush();
+expect(backend.clipboard).toEqual(['hello']);
+expect(onCopy).toHaveBeenCalledWith({ text: 'hello', delivered: true, source: 'selection' });
+```
+
+`backend.clipboard` records the text exactly as the app passed it — encoding and
+the size cap are a TTY backend's job. Set `backend.clipboardAvailable = false` to
+stand in for a terminal with no clipboard sequence: `copy()` then refuses,
+nothing is recorded, and `onCopy` still fires with `delivered: false` — which is
+how an app's `pbcopy` fallback gets tested. See [Selection](input.md#selection)
+and [The clipboard](app.md#the-clipboard).
 
 ## Driving a whole app with a script
 
@@ -116,7 +146,7 @@ copy:
   delivers the real keyboard *and* keys injected with `inject()`. It also keeps
   the last frame's text.
 - `play(backend, steps, { speed })` runs a list of steps — `type`, `press`,
-  `paste`, `wheel`, `wait`, and `waitFor(text)`, which blocks until the frame
+  `paste`, `wheel`, `mouse`, `wait`, and `waitFor(text)`, which blocks until the frame
   shows that text and throws, with the frame, if it never does.
 
 ```tsx

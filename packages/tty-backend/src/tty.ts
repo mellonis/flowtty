@@ -6,6 +6,7 @@ import { decodeKeys } from './key-parser.js';
 import { isInteractive, NotInteractiveError } from './interactive.js';
 import { detectColorDepth, type ColorDepth } from './colorDepth.js';
 import { createAttention, type Attention, type NotificationProtocol } from './notification.js';
+import { createClipboard, type Clipboard, type ClipboardProtocol } from './clipboard.js';
 
 export interface TtyBackendOptions {
   /**
@@ -29,6 +30,17 @@ export interface TtyBackendOptions {
    *  auto-detected `'none'`, does not fall back to the bell. `bell()` is
    *  unaffected. See docs/terminal.md (notifications). */
   notifications?: NotificationProtocol | 'auto';
+  /** Which sequence `copy()` puts text on the clipboard with. `'auto'` (the
+   *  default) picks one from the environment (`detectClipboardSupport`);
+   *  `'osc52'` writes it whatever the environment says — and, inside tmux,
+   *  wraps it in the DCS passthrough; `'none'` never writes one, and `copy()`
+   *  reports `false`. See docs/terminal.md (the clipboard). */
+  clipboard?: ClipboardProtocol | 'auto';
+  /** Cap on the base64 payload of one clipboard write, in bytes. Default
+   *  74,994 — the common xterm-derived ceiling. A text whose payload exceeds it
+   *  is not written AT ALL and `copy()` reports `false`: half a paste presented
+   *  as a whole one is worse than none. */
+  clipboardLimit?: number;
 }
 
 export class TtyBackend implements Backend {
@@ -76,6 +88,9 @@ export class TtyBackend implements Backend {
   // The bell + desktop notifications. Assigned in the constructor rather than
   // here, because it reads `options` — a constructor parameter property.
   private readonly attention: Attention;
+  // The clipboard write, bound to the same stream and assigned in the
+  // constructor for the same reason as `attention`.
+  private readonly clipboard: Clipboard;
   private disposed = false;
 
   constructor(
@@ -95,6 +110,10 @@ export class TtyBackend implements Backend {
     this.out.write(ALT_SCREEN_ON + HIDE_CURSOR);
     this.terminalEntered = true;
     this.attention = createAttention((bytes) => this.out.write(bytes), { notifications: options.notifications });
+    this.clipboard = createClipboard((bytes) => this.out.write(bytes), {
+      ...(options.clipboard === undefined ? {} : { clipboard: options.clipboard }),
+      ...(options.clipboardLimit === undefined ? {} : { limit: options.clipboardLimit }),
+    });
   }
 
   size(): { width: number; height: number } {
@@ -225,6 +244,23 @@ export class TtyBackend implements Backend {
   notify(title: string, body?: string): void {
     if (this.disposed) return;
     this.attention.notify(title, body);
+  }
+
+  /**
+   * Put `text` on the person's clipboard with OSC 52, as one write, and say
+   * whether a sequence went out. Nothing is written where the terminal has no
+   * OSC 52 (`detectClipboardSupport`), where the text is empty, where its
+   * base64 would exceed `clipboardLimit` — the whole text is refused, never
+   * truncated — or once the backend is disposed.
+   *
+   * Write-only: flowtty never emits the `?` form that would ask the terminal to
+   * hand the clipboard back. The sequence moves no cursor and changes no cell,
+   * and goes out on its own write, so copying between two frames leaves the
+   * frame-diff baseline valid. See docs/app.md (the clipboard).
+   */
+  copy(text: string): boolean {
+    if (this.disposed) return false;
+    return this.clipboard.copy(text);
   }
 
   onResize(handler: () => void): () => void {

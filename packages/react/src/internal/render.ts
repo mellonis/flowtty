@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from 'react';
-import { type Backend, type Key } from '@flowtty/core';
-import { getYoga, computeLayout, contentHeight, paint } from '@flowtty/core/host';
+import { type Backend, type Buffer, type Key } from '@flowtty/core';
+import { getYoga, computeLayout, contentHeight, paint, SelectionController } from '@flowtty/core/host';
 import { createRoot, type Root } from './reconciler.js';
 import { InputContext, type InputSource } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
@@ -20,16 +20,29 @@ import { ErrorBoundary, type ErrorSource } from '../components/ErrorBoundary.js'
 // should have been muted.
 // The backend listener attaches on the first subscriber and detaches on the
 // last, preserving TtyBackend's lazy raw-mode claim and unmount cleanup.
-function makeKeySource(backend: Backend & { onKey: NonNullable<Backend['onKey']> }, root: Root): InputSource {
+// `beforeDispatch` is the render root's own look at each key — the selection
+// controller — and runs first, outside flushSync: it is not React state, and
+// the key still goes on to every subscriber afterwards. `afterDispatch` runs
+// once the commit is done, which is where anything the key asked to be redrawn
+// belongs: by then React has queued its own paint (resetAfterCommit →
+// queueMicrotask), so work queued there lands after it and can stand down.
+function makeKeySource(
+  backend: Backend & { onKey: NonNullable<Backend['onKey']> },
+  root: Root,
+  beforeDispatch?: (key: Key) => void,
+  afterDispatch?: () => void,
+): InputSource {
   const subscribers = new Set<(key: Key) => void>();
   let detachBackend: (() => void) | undefined;
   return {
     subscribe(handler) {
       if (subscribers.size === 0) {
         detachBackend = backend.onKey((key) => {
+          beforeDispatch?.(key);
           root.flushSync(() => {
             for (const s of [...subscribers]) s(key);
           });
+          afterDispatch?.();
         });
       }
       subscribers.add(handler);
@@ -49,6 +62,40 @@ export interface RenderOptions {
    *  After this fires, flowtty has already called backend.dispose(); the terminal is restored.
    *  Default behavior (when onError not provided): print error to stderr + process.exit(1). */
   onError?: (info: { error: unknown; source: ErrorSource }) => void;
+  /** Let a drag over the committed frame select text — inverse cells, no
+   *  re-layout and no re-render. Default true, and inert until the backend
+   *  delivers mouse keys, so an app without `{ mouse: true }` pays nothing.
+   *  Set false to leave the frame entirely to the app.
+   *  See docs/input.md (selection). */
+  selection?: boolean;
+  /** Put what a drag selected on the system clipboard when the button comes
+   *  back up. Default true, and free where the backend has no clipboard — it
+   *  simply reports that nothing was delivered. Set false to leave the
+   *  clipboard entirely to the app; `onCopy` still fires either way.
+   *  See docs/input.md (selection). */
+  copyOnSelect?: boolean;
+  /** Something was copied: by a finished drag (`source: 'selection'`) or by the
+   *  app itself through `useApp().copy()` (`source: 'api'`).
+   *
+   *  Fires even when `delivered` is false — the terminal has no clipboard
+   *  sequence, the text was too large, or `copyOnSelect: false` — which is what
+   *  lets an app fall back on `pbcopy` / `wl-copy` / `clip.exe` of its own. An
+   *  empty selection fires nothing at all. See docs/app.md (the clipboard). */
+  onCopy?: (event: CopyEvent) => void;
+}
+
+/** What `onCopy` is called with. See docs/app.md (the clipboard). */
+export interface CopyEvent {
+  /** The text that was copied, exactly as it went to the backend. */
+  text: string;
+  /** Whether a clipboard sequence was actually written. `false` where the
+   *  terminal has none, where the backend refused the text (too large), and
+   *  where `copyOnSelect: false` turned the write off. It says the bytes went
+   *  out, not that the clipboard changed — no terminal answers that. */
+  delivered: boolean;
+  /** `'selection'` for a finished drag, `'api'` for `useApp().copy()` or
+   *  `RenderHandle.copy()`. */
+  source: 'selection' | 'api';
 }
 
 // SIGINT only arrives as a signal when stdin is not in raw mode (no key
@@ -73,6 +120,12 @@ export interface RenderHandle {
    *  `useApp().notify()` does. Silent when the backend cannot post one, and
    *  after unmount. See docs/app.md (getting attention). */
   notify(title: string, body?: string): void;
+  /** Put `text` on the system clipboard, from outside the tree — the same thing
+   *  `useApp().copy()` does. Returns whether a clipboard sequence was written:
+   *  false when the backend has no clipboard, when it refused the text, and
+   *  after unmount. Fires `onCopy` with `source: 'api'`.
+   *  See docs/app.md (the clipboard). */
+  copy(text: string): boolean;
 }
 
 export async function render(
@@ -96,6 +149,14 @@ export async function render(
   // Assigned once backend.onResize is wired below; referenced earlier by the
   // teardown closures, so it's declared up here (undefined until then).
   let unsubResize: (() => void) | undefined;
+  // The last frame paint produced, WITHOUT the selection overlay. Kept so a
+  // drag can re-show the same frame with a different highlight — no layout, no
+  // React work — and so the selection reads its text out of what is on screen.
+  let lastPaint: Buffer | null = null;
+  let selection: SelectionController | null = null;
+  // The highlight changed but the frame on screen does not show it yet. A paint
+  // clears it, because a painted frame always carries the current highlight.
+  let overlayStale = false;
   const draw = () => {
     if (unmounted) return;
     const { width, height } = backend.size();
@@ -105,10 +166,72 @@ export async function render(
     // allocates width × height cells.
     const bounded = Number.isFinite(height) ? height : undefined;
     computeLayout(container, width, bounded);
-    backend.draw(paint(container, width, bounded ?? contentHeight(container)));
+    const frame = paint(container, width, bounded ?? contentHeight(container));
+    lastPaint = frame;
+    // A selection over text that changed is a lie — the controller checks this
+    // frame's cells against the ones it highlighted and drops it if they moved.
+    selection?.observe(frame);
+    // decorate() hands the frame straight back when nothing is selected, so a
+    // buffer is only ever copied for an actual highlight.
+    backend.draw(selection === null ? frame : selection.decorate(frame));
+    overlayStale = false;
+  };
+
+  // Show a highlight that changed without one. Deferred to a microtask by
+  // `flushOverlay` so a repaint the same key caused gets there first — a drag
+  // that changes nothing else is then the only thing that draws, and a key that
+  // both drops a selection and changes the content draws once, not twice.
+  const drawOverlay = () => {
+    if (!overlayStale) return;
+    overlayStale = false;
+    if (unmounted || lastPaint === null || selection === null) return;
+    backend.draw(selection.decorate(lastPaint));
+  };
+  const flushOverlay = () => {
+    if (overlayStale) queueMicrotask(drawOverlay);
+  };
+
+  // A callback the app gave us, run where its throwing cannot break flowtty.
+  // Without this an `onCopy` that shells out to `pbcopy` and gets ENOENT would
+  // escape the backend's stdin handler as an uncaughtException — from inside
+  // the key path, so the key it came with never reached the app either.
+  const runCallback = (fn: () => void): void => {
+    try {
+      fn();
+    } catch (error) {
+      handleError(error, 'callback');
+    }
+  };
+
+  // What a finished drag selected, held until the key it came with has been
+  // dispatched. The order is deliberate: selection bookkeeping, then every
+  // `useInput` subscriber, then the app's `onCopy` — so no app callback can
+  // stand between a `mouseup` and the code waiting for it.
+  let pendingCopy: string | null = null;
+  const deliverCopy = () => {
+    const text = pendingCopy;
+    pendingCopy = null;
+    if (text === null || unmounted) return;
+    const delivered = options.copyOnSelect === false ? false : backend.copy?.(text) ?? false;
+    runCallback(() => options.onCopy?.({ text, delivered, source: 'selection' }));
   };
 
   const { container, root } = createRoot(Yoga, draw);
+
+  if (options.selection !== false) {
+    selection = new SelectionController({
+      container,
+      frame: () => lastPaint,
+      present: () => { overlayStale = true; },
+      // A finished drag is a copy: put the text on the clipboard (unless the
+      // app turned that off) and tell the app either way. An empty selection —
+      // a drag over blank cells — is not a copy and says nothing. The copy
+      // itself waits for `deliverCopy`, once the key has been dispatched.
+      onSelect: (text: string) => {
+        if (text !== '') pendingCopy = text;
+      },
+    });
+  }
 
   // If the backend provides a key source, wrap the tree in an InputContext
   // provider so useInput subscribers receive its keys (see makeKeySource for
@@ -182,7 +305,14 @@ export async function render(
   const innerTree = backend.onKey
     ? createElement(
         InputContext.Provider,
-        { value: makeKeySource(backend as Backend & { onKey: NonNullable<Backend['onKey']> }, root) },
+        {
+          value: makeKeySource(
+            backend as Backend & { onKey: NonNullable<Backend['onKey']> },
+            root,
+            selection === null ? undefined : (key) => selection?.handleKey(key),
+            selection === null ? undefined : () => { flushOverlay(); deliverCopy(); },
+          ),
+        },
         element,
       )
     : element;
@@ -201,6 +331,18 @@ export async function render(
   // After unmount there is no terminal of ours left to interrupt.
   const bell = () => { if (!unmounted) backend.bell?.(); };
   const notify = (title: string, body?: string) => { if (!unmounted) backend.notify?.(title, body); };
+  // One place decides what a copy means: hand the text to the backend if it has
+  // a clipboard, then tell the app what happened — whether it landed or not, so
+  // an app can run `pbcopy` of its own on the way down. After unmount there is
+  // no terminal of ours to write to and nothing is reported.
+  const copy = (text: string): boolean => {
+    if (unmounted) return false;
+    const delivered = backend.copy?.(text) ?? false;
+    // Told after the fact, and through the guarded path: the caller gets its
+    // answer whatever the app's own callback does with it.
+    runCallback(() => options.onCopy?.({ text, delivered, source: 'api' }));
+    return delivered;
+  };
   const appApi: AppApi = {
     exit: (result) => {
       exitResult = result;
@@ -208,6 +350,7 @@ export async function render(
     },
     bell,
     notify,
+    copy,
   };
   const withApp = createElement(AppContext.Provider, { value: appApi }, withAbort);
   const tree = createElement(TerminalSizeProvider, { backend }, withApp);
@@ -218,13 +361,19 @@ export async function render(
   await Promise.resolve();
 
   // Repaint on terminal resize. Backends with fixed dimensions (e.g. the test
-  // backend) omit onResize and this is a no-op.
-  unsubResize = backend.onResize?.(draw);
+  // backend) omit onResize and this is a no-op. A resize re-flows everything,
+  // so whatever was selected no longer covers the text it was taken from: drop
+  // it before the frame that replaces it.
+  unsubResize = backend.onResize?.(() => {
+    selection?.clear();
+    draw();
+  });
 
   const handle: RenderHandle = {
     waitUntilExit: () => exited,
     bell,
     notify,
+    copy,
     unmount() {
       if (unmounted) return;
       unmounted = true;

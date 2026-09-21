@@ -63,6 +63,20 @@ test('TestBackend.wheel delivers a wheelup / wheeldown key at the given cell', (
   expect(got).toEqual([['wheeldown', 3, 2], ['wheelup', 0, 0]]);
 });
 
+test('TestBackend.mouse delivers a press / drag / release at the given cell, left button by default', () => {
+  const b = new TestBackend(10, 4);
+  const got: Key[] = [];
+  b.onKey((k) => got.push(k));
+  b.mouse('down', 3, 2);
+  b.mouse('drag', 5, 2, { shift: true });
+  b.mouse('up', 5, 2, { button: 'right' });
+  expect(got.map((k) => [k.name, k.button, k.x, k.y, k.shift])).toEqual([
+    ['mousedown', 'left', 3, 2, false],
+    ['mousedrag', 'left', 5, 2, true],
+    ['mouseup', 'right', 5, 2, false],
+  ]);
+});
+
 test('TestBackend.press rejects a name no terminal can produce, and says what to use instead', () => {
   const b = new TestBackend(4, 1);
   expect(() => b.press({ name: 'space' })).toThrow(/'space'.*' '/s);
@@ -89,4 +103,25 @@ test('TestBackend records bells and notifications instead of writing them anywhe
   b.notify('Reminder');
   expect(b.bells).toBe(2);
   expect(b.notifications).toEqual([{ title: 'Build', body: 'done' }, { title: 'Reminder' }]);
+});
+
+test('TestBackend records clipboard writes instead of making one', () => {
+  const backend = new TestBackend();
+  expect(backend.clipboard).toEqual([]);
+  expect(backend.copy('hello')).toBe(true);
+  expect(backend.copy('again')).toBe(true);
+  expect(backend.clipboard).toEqual(['hello', 'again']);
+});
+
+test('an empty copy is refused, as a TTY backend refuses it', () => {
+  const backend = new TestBackend();
+  expect(backend.copy('')).toBe(false);
+  expect(backend.clipboard).toEqual([]);
+});
+
+test('clipboardAvailable = false refuses the copy, so an app can test its fallback', () => {
+  const backend = new TestBackend();
+  backend.clipboardAvailable = false;
+  expect(backend.copy('hello')).toBe(false);
+  expect(backend.clipboard).toEqual([]);
 });

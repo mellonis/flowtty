@@ -9,7 +9,7 @@ import {
   detectLanguage, highlightBlock, hunkNumbers, resolveLanguage,
   type CodeLine, type CodeLineKind,
 } from './highlight/index.js';
-import type { Color } from '@flowtty/core';
+import type { Color, WrapContinuation } from '@flowtty/core';
 
 /** How a fenced block is framed. `'bar'` (the default) draws a dim label row
  *  and a dim `│ ` gutter; `'literal'` prints the ``` fences as written. */
@@ -67,6 +67,38 @@ export interface StyledSpan {
 /** One rendered row. Empty `spans` is a blank spacer line (height 1). */
 export interface StyledLine {
   spans: StyledSpan[];
+  /**
+   * This row's text carries on at the start of the row below, with no line
+   * break between them in the source: `dropped` is what the wrap ate at the
+   * break (`' '` at a word boundary, `''` through a run of characters) and
+   * `textWidth` how many cells the row's own text covers — padding a diff band
+   * added excluded. The renderer puts it on the row's box as `wrapContinues`,
+   * so a drag-selection copies the paragraph back as the one line it was
+   * written as.
+   *
+   * See docs/input.md (selection).
+   */
+  continues?: WrapContinuation;
+  /**
+   * How many of the leading spans are FRAME rather than content: a code
+   * block's `│ ` bar and line-number gutter, a blockquote's bar, a fence
+   * label. The renderer paints them exactly as it paints the rest and marks
+   * them `selectable={false}`, so a drag over the document copies the text and
+   * leaves the chrome behind — and a wrapped row can be rejoined without
+   * splicing a gutter glyph into the middle of the line.
+   *
+   * A list marker, a task checkbox and a diff's `+`/`-` column are content:
+   * they are what the author wrote, and a copied diff has to still apply.
+   */
+  chrome?: number;
+  /**
+   * The row is frame from edge to edge — a fence label, a `… N more lines`
+   * notice. It is not a line of the document at all, so the renderer takes the
+   * whole row out of a selection and a copy skips it rather than returning it
+   * as an empty line. An empty line the author wrote, and an empty line inside
+   * a code block, are NOT this: their content area is selectable and blank.
+   */
+  frame?: true;
 }
 
 export type SpanStyle = Omit<StyledSpan, 'text'>;
@@ -131,7 +163,17 @@ const textWidth = (text: string): number => [...text].length;
 // instead of breaking on it.
 interface Word { chars: StyledChar[]; sep: SpanStyle }
 
+/** One wrapped row, with what the break that ended it dropped (see
+ *  `StyledLine`). A row that ends the block carries nothing. */
+interface WrappedChars { chars: StyledChar[]; continues?: string }
+
+/** {@link wrapChars} without the break kinds, for callers that lay rows out
+ *  side by side (a table cell) rather than one under the next. */
 function wrapChars(chars: StyledChar[], width: number): StyledChar[][] {
+  return wrapCharsDetailed(chars, width).map((l) => l.chars);
+}
+
+function wrapCharsDetailed(chars: StyledChar[], width: number): WrappedChars[] {
   const words: Word[] = [];
   let cur: StyledChar[] = [];
   let curSep: SpanStyle = {};
@@ -148,17 +190,23 @@ function wrapChars(chars: StyledChar[], width: number): StyledChar[][] {
   if (cur.length) words.push({ chars: cur, sep: curSep });
 
   if (width <= 0) {
-    return [words.flatMap((w, i) => (i ? [{ ch: ' ', style: w.sep }, ...w.chars] : w.chars))];
+    return [{ chars: words.flatMap((w, i) => (i ? [{ ch: ' ', style: w.sep }, ...w.chars] : w.chars)) }];
   }
 
-  const lines: StyledChar[][] = [];
+  const lines: WrappedChars[] = [];
+  // Every row but the last of the block carries what the break that ended it
+  // dropped: the space eaten at a word boundary, or nothing where it cut
+  // through a long word. Runs of spaces were already collapsed into one by the
+  // pass above (paragraphs come space-joined out of parseMarkdown), so a word
+  // boundary drops exactly one.
+  const push = (chars: StyledChar[], continues: string): void => { lines.push({ chars, continues }); };
   let line: StyledChar[] = [];
   let lineW = 0;
   for (const w of words) {
     let word = w.chars;
     let wordW = charsWidth(word);
     while (wordW > width) {
-      if (line.length) { lines.push(line); line = []; lineW = 0; }
+      if (line.length) { push(line, ' '); line = []; lineW = 0; }
       // Take as many chars as fit — always at least one, so a glyph wider than
       // the whole line still makes progress.
       let take = 0;
@@ -167,13 +215,13 @@ function wrapChars(chars: StyledChar[], width: number): StyledChar[][] {
         takeW += cellWidth(word[take]!);
         take++;
       }
-      lines.push(word.slice(0, take));
+      push(word.slice(0, take), '');
       word = word.slice(take);
       wordW -= takeW;
     }
     const sep = line.length ? 1 : 0;
     if (lineW + sep + wordW > width) {
-      if (line.length) lines.push(line);
+      if (line.length) push(line, ' ');
       line = [...word];
       lineW = wordW;
     } else {
@@ -182,8 +230,16 @@ function wrapChars(chars: StyledChar[], width: number): StyledChar[][] {
       lineW += sep + wordW;
     }
   }
-  if (line.length || lines.length === 0) lines.push(line);
+  if (line.length || lines.length === 0) lines.push({ chars: line });
   return lines;
+}
+
+/** Whether a row's painted prefix is blank — a list item's hanging indent, or
+ *  nothing at all. A blank prefix is part of the line's own text as painted,
+ *  so it needs no `chrome` marking; a prefix that draws a glyph is either
+ *  content the author wrote (a list marker) or frame that has to be marked. */
+function prefixIsBlank(prefix?: StyledSpan[]): boolean {
+  return (prefix ?? []).every((s) => s.text.trim() === '');
 }
 
 export function charsToSpans(chars: StyledChar[]): StyledSpan[] {
@@ -205,14 +261,36 @@ function prefixWidth(p?: StyledSpan[]): number {
 function wrapBlock(
   segs: InlineSeg[],
   width: number,
-  opts: { first?: StyledSpan[]; cont?: StyledSpan[]; base?: SpanStyle } = {},
+  opts: {
+    first?: StyledSpan[];
+    cont?: StyledSpan[];
+    base?: SpanStyle;
+    /** The prefix is frame, not content — a blockquote's bar. It is marked
+     *  `chrome` and left out of the span a copy reads. */
+    chromePrefix?: boolean;
+  } = {},
 ): StyledLine[] {
   const indent = Math.max(prefixWidth(opts.first), prefixWidth(opts.cont));
   const contentWidth = Math.max(1, width - indent);
-  const charLines = wrapChars(segsToChars(segs, opts.base), contentWidth);
+  const charLines = wrapCharsDetailed(segsToChars(segs, opts.base), contentWidth);
+  const chrome = opts.chromePrefix === true;
+  // A blank prefix is painted as part of the line (a hanging indent goes with
+  // the space the wrap dropped); a chrome one is taken out of the copy, so the
+  // span starts past it. Anything else is content that would land mid-line.
+  const marks = chrome || prefixIsBlank(opts.cont);
   return charLines.map((cl, i) => {
     const pre = i === 0 ? opts.first : opts.cont;
-    return { spans: [...(pre ?? []), ...charsToSpans(cl)] };
+    const line: StyledLine = { spans: [...(pre ?? []), ...charsToSpans(cl.chars)] };
+    if (chrome && pre !== undefined && pre.length > 0) line.chrome = pre.length;
+    if (marks && cl.continues !== undefined) {
+      const textStart = chrome ? prefixWidth(pre) : 0;
+      line.continues = {
+        dropped: cl.continues,
+        ...(textStart > 0 ? { textStart } : {}),
+        textWidth: (chrome ? 0 : prefixWidth(pre)) + charsWidth(cl.chars),
+      };
+    }
+    return line;
   });
 }
 
@@ -416,9 +494,12 @@ function layoutCode(b: CodeBlockSrc, width: number, opts: MarkdownOptions, out: 
     // a diff and nothing else on screen would explain why.
     const lang = b.lang || detected || '';
     const label = b.title ? (lang ? `${lang} · ${b.title}` : b.title) : lang;
-    if (label) out.push({ spans: [{ text: label, dim: true }] });
+    // The label is the frame's caption, not a line of the block: chrome from
+    // edge to edge, so a copy skips the row instead of pasting a blank line.
+    if (label) out.push({ spans: [{ text: label, dim: true }], chrome: 1, frame: true });
   } else {
-    // Literal mode prints the fence as written — nothing inferred.
+    // Literal mode prints the fence as written — the author chose to show the
+    // backticks, so they are content and a copy keeps them.
     out.push({ spans: [{ text: '```' + b.lang, dim: true }] });
   }
 
@@ -434,7 +515,13 @@ function layoutCode(b: CodeBlockSrc, width: number, opts: MarkdownOptions, out: 
   // "N more lines" it prints counts SOURCE lines, so each row remembers where
   // it came from.
   const bands = opts.diffBackground ?? true;
-  const rows: { spans: StyledSpan[]; src: number }[] = [];
+  // The gutter — the bar, the line numbers, or both — is the block's frame, so
+  // every row of it carries the same `chrome` count. A diff's `+`/`-` column is
+  // NOT in it: that one is content, or a copied diff would no longer apply.
+  const rows: {
+    spans: StyledSpan[]; src: number; chrome: number;
+    continues?: string; textStart?: number; textWidth?: number;
+  }[] = [];
   b.lines.forEach((_cl, si) => {
     const hl = code[si]!;
     const background = bands ? rowBackground(hl.kind) : undefined;
@@ -447,18 +534,55 @@ function layoutCode(b: CodeBlockSrc, width: number, opts: MarkdownOptions, out: 
       // A band has to be a solid bar: pad the row out to the code width so a
       // short line — and every wrapped continuation row — ends flush.
       const body = background === undefined ? pc : padChars(pc, avail, { background });
-      rows.push({ spans: [...prefix(pi === 0 ? numbers?.[si] ?? null : null), ...charsToSpans(body)], src: si });
+      const pre = prefix(pi === 0 ? numbers?.[si] ?? null : null);
+      // A wrapped code row is one source line cut in two, so it joins with
+      // nothing. The gutter in front of it is chrome and out of the selection,
+      // so the join splices nothing into the line.
+      const carries = pi < pieces.length - 1;
+      rows.push({
+        spans: [...pre, ...charsToSpans(body)],
+        src: si,
+        chrome: pre.length,
+        // The code starts past the gutter, and the band pads `body` out to the
+        // code width: the span is the text between the two.
+        ...(carries
+          ? { continues: '', textStart: prefixWidth(pre), textWidth: charsWidth(pc) }
+          : {}),
+      });
     });
   });
 
   const max = opts.maxCodeRows;
   const capped = max !== undefined && max >= 0 && rows.length > max;
   const shown = capped ? rows.slice(0, max) : rows;
-  for (const r of shown) out.push({ spans: r.spans });
+  for (const [i, r] of shown.entries()) {
+    // The last shown row of a capped block runs into the "… N more lines"
+    // notice, which is not its continuation.
+    const carries = r.continues !== undefined && i < shown.length - 1;
+    out.push({
+      spans: r.spans,
+      ...(r.chrome > 0 ? { chrome: r.chrome } : {}),
+      ...(carries
+        ? {
+            continues: {
+              dropped: r.continues!,
+              ...(r.textStart ? { textStart: r.textStart } : {}),
+              textWidth: r.textWidth ?? 0,
+            },
+          }
+        : {}),
+    });
+  }
   if (capped) {
-    // A source line with at least one row on screen counts as shown.
+    // A source line with at least one row on screen counts as shown. The notice
+    // is the frame speaking, not the block: chrome, whole row.
     const hidden = b.lines.length - ((shown[shown.length - 1]?.src ?? -1) + 1);
-    out.push({ spans: [...prefix(null), { text: `… ${hidden} more line${hidden === 1 ? '' : 's'}`, dim: true }] });
+    const pre = prefix(null);
+    out.push({
+      spans: [...pre, { text: `… ${hidden} more line${hidden === 1 ? '' : 's'}`, dim: true }],
+      chrome: pre.length + 1,
+      frame: true,
+    });
   }
   if (!bar) out.push({ spans: [{ text: '```', dim: true }] });
 }
@@ -519,7 +643,11 @@ export function layoutMarkdownDetailed(
         break;
       case 'blockquote': {
         const bar: StyledSpan[] = [{ text: '│ ', dim: true, color: 'cyan' }];
-        out.push(...wrapBlock(b.segs, width, { first: bar, cont: bar, base: { dim: true } }));
+        // The bar says "quoted"; the author wrote `> `. It is frame, so a copy
+        // of a quoted paragraph comes back as the paragraph.
+        out.push(...wrapBlock(b.segs, width, {
+          first: bar, cont: bar, base: { dim: true }, chromePrefix: true,
+        }));
         break;
       }
       case 'list':

@@ -10,23 +10,23 @@
 
 // ─── Data model + Backend interface ──────────────────────────────────────────
 export { Buffer } from './cells.js';
-export type { Cell, Style } from './cells.js';
+export type { Cell, ContinuationMark, Style } from './cells.js';
 export { NAMED_KEYS } from './keys.js';
-export type { Key, KeyName, NamedKey } from './keys.js';
+export type { Key, KeyName, NamedKey, MouseButton } from './keys.js';
 export type { Backend } from './backend.js';
 
 // ─── Component-author types ──────────────────────────────────────────────────
 // Component authors building Box-shaped widgets reach for BoxProps;
 // chrome helpers reach for the wrap / border / visual-line types.
-export type { BoxProps, ScrollMetrics, TextRun } from './host/host.js';
+export type { BoxProps, ScrollMetrics, TextRun, WrapContinuation } from './host/host.js';
 export { takeWarnings } from './warnings.js';
 export type { BorderStyle, BorderChars, GridChars } from './host/borders.js';
 export { DEFAULT_BORDER_STYLE, GRID_CHARS } from './host/borders.js';
-export type { WrapMode } from './wrap.js';
+export type { WrapMode, WrappedLine } from './wrap.js';
 export type { VisualLine } from './visualLines.js';
 
 // ─── Pure utilities for app code ─────────────────────────────────────────────
-export { wrapText } from './wrap.js';
+export { wrapText, wrapTextLines } from './wrap.js';
 export { splitVisualLines } from './visualLines.js';
 export { windowAround } from './windowAround.js';
 export { charWidth, stringWidth } from './displayWidth.js';

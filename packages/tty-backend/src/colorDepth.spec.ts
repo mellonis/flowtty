@@ -1,6 +1,7 @@
 import { describe, expect, test } from 'vitest';
 import { detectColorDepth, rgbToAnsi256, rgbToAnsi16 } from './colorDepth.js';
 import { sgr } from './ansi.js';
+import { selectedStyle } from '@flowtty/core/host';
 
 describe('detectColorDepth', () => {
   test('COLORTERM announces truecolor', () => {
@@ -62,5 +63,28 @@ describe('downgrading a 24-bit color', () => {
 
   test('named colors are 16-color codes at every depth', () => {
     for (const depth of [4, 8, 24] as const) expect(sgr({ fg: 'red', bg: 'gray' }, { depth })).toBe('\x1b[31;100m');
+  });
+});
+
+describe('a selected cell', () => {
+  // The band comes from `inverse` alone — the terminal's own default foreground
+  // — so the glyph's color rides in the BACKGROUND slot and is swapped onto it.
+  test('emits inverse plus a background code, never a foreground one', () => {
+    const style = selectedStyle({ fg: 'cyan', bg: '#3b0000', dim: true });
+    expect(style).toEqual({ inverse: true, bg: 'cyan' });
+    for (const depth of [4, 8, 24] as const) expect(sgr(style, { depth })).toBe('\x1b[7;46m');
+    // A hex color downgrades through the same background mapping as any other.
+    const hex = selectedStyle({ fg: '#ff0000' });
+    expect(sgr(hex)).toBe('\x1b[7;48;2;255;0;0m');
+    expect(sgr(hex, { depth: 8 })).toBe('\x1b[7;48;5;196m');
+    expect(sgr(hex, { depth: 4 })).toBe('\x1b[7;101m');
+    // `gray` and the bright names are backgrounds like any other.
+    expect(sgr(selectedStyle({ fg: 'gray' }))).toBe('\x1b[7;100m');
+    expect(sgr(selectedStyle({ fg: 'redBright' }))).toBe('\x1b[7;101m');
+  });
+
+  test('degrades to the plain band where color is off', () => {
+    expect(sgr(selectedStyle({ fg: 'cyan' }), { color: false })).toBe('\x1b[7m');
+    expect(sgr(selectedStyle({ fg: 'cyan', bold: true }), { color: false })).toBe('\x1b[1;7m');
   });
 });

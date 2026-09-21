@@ -1,7 +1,10 @@
 import React from "react";
 import { Component, type ReactNode } from 'react';
 
-export type ErrorSource = 'react' | 'uncaughtException' | 'unhandledRejection';
+/** Where an error flowtty handled came from. `'callback'` is a function the app
+ *  gave flowtty to call — `onCopy` — that threw: it is not a React error, and
+ *  it must not be left to escape the key handler it was called from. */
+export type ErrorSource = 'react' | 'uncaughtException' | 'unhandledRejection' | 'callback';
 
 interface ErrorBoundaryProps {
   /** Fires when an error is caught from the subtree. Receives the error and which path caught it ('react' here). */

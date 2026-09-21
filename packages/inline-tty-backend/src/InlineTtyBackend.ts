@@ -12,6 +12,7 @@ import {
   OSC8_CLOSE, osc8Open,
   sgr,
   createAttention, type Attention, type NotificationProtocol,
+  createClipboard, type Clipboard, type ClipboardProtocol,
 } from '@flowtty/tty-backend';
 
 export interface InlineTtyBackendOptions {
@@ -37,6 +38,16 @@ export interface InlineTtyBackendOptions {
    *  auto-detected `'none'`, does not fall back to the bell. Both are silent in
    *  log-only mode. See docs/terminal.md (notifications). */
   notifications?: NotificationProtocol | 'auto';
+  /** Which sequence `copy()` puts text on the clipboard with. `'auto'` (the
+   *  default) picks one from the environment (`detectClipboardSupport`);
+   *  `'osc52'` writes it whatever the environment says — and, inside tmux,
+   *  wraps it in the DCS passthrough; `'none'` never writes one. Silent in
+   *  log-only mode either way. See docs/terminal.md (the clipboard). */
+  clipboard?: ClipboardProtocol | 'auto';
+  /** Cap on the base64 payload of one clipboard write, in bytes. Default
+   *  74,994. A text over it is not written AT ALL and `copy()` reports
+   *  `false` — never a truncated copy presented as a complete one. */
+  clipboardLimit?: number;
 }
 
 /**
@@ -98,6 +109,7 @@ export class InlineTtyBackend implements Backend {
   private cursorHidden = false;
   private disposed = false;
   private readonly attention: Attention;
+  private readonly clipboard: Clipboard;
   private readonly sgrOptions: { color: boolean; depth: ColorDepth };
   /**
    * True when stdout is not an interactive terminal (piped, redirected, CI,
@@ -115,6 +127,10 @@ export class InlineTtyBackend implements Backend {
     this.input = options.in ?? process.stdin;
     this.liveHeight = Math.max(1, options.liveHeight ?? 10);
     this.attention = createAttention((bytes) => this.out.write(bytes), { notifications: options.notifications });
+    this.clipboard = createClipboard((bytes) => this.out.write(bytes), {
+      ...(options.clipboard === undefined ? {} : { clipboard: options.clipboard }),
+      ...(options.clipboardLimit === undefined ? {} : { limit: options.clipboardLimit }),
+    });
   }
 
   size(): { width: number; height: number } {
@@ -175,6 +191,20 @@ export class InlineTtyBackend implements Backend {
   notify(title: string, body?: string): void {
     if (this.logOnly || this.disposed) return;
     this.attention.notify(title, body);
+  }
+
+  /**
+   * Put `text` on the person's clipboard with OSC 52, as one write, and say
+   * whether a sequence went out. Nothing is written where the terminal has no
+   * OSC 52, where the text is empty or over the size cap (the whole text is
+   * refused, never truncated), in log-only mode — a pipe has no clipboard — or
+   * after dispose. Write-only: the `?` query form is never emitted. The
+   * sequence changes no cell, so it never disturbs the live region it lands
+   * between. See docs/app.md (the clipboard).
+   */
+  copy(text: string): boolean {
+    if (this.logOnly || this.disposed) return false;
+    return this.clipboard.copy(text);
   }
 
   onResize(handler: () => void): () => void {

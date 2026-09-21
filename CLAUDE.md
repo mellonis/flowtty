@@ -84,6 +84,11 @@ Required: `size()`, `draw(buffer)`. Optional (feature-detected, not assumed):
   wire one of these — call ALL hooks first, then `return null` after, to keep hook
   order stable.
 - `<Static>` calls `backend.printStatic?.(...)`; it no-ops if the backend lacks it.
+- `copy?(text): boolean` is the clipboard (OSC 52 in the TTY backends). It returns
+  whether a sequence was WRITTEN, not whether the clipboard changed — `onCopy`
+  fires either way so an app can fall back to `pbcopy`. Same rules as `bell` /
+  `notify`: one write, never inside `draw()`, silent after dispose. Over the size
+  cap it writes nothing — never a truncated copy reported as complete.
 - `size().height === Infinity` → an unbounded surface (`FinalFrameBackend`,
   `renderToString`): layout runs with auto height and the buffer is as tall as the
   content (`contentHeight`). `Infinity` must never reach `paint` / `new Buffer`.
@@ -126,6 +131,12 @@ errors (e.g. `Cannot find name 'setInterval'`).
 children overflow instead of shrinking unless you set `flexShrink={1}`.
 `alignContent` defaults to `flex-start` (CSS flex uses `stretch`). README documents
 the full prop set + every deliberate deviation.
+
+**`hitTest` mirrors `paint`'s traversal order.** `packages/core/src/host/hitTest.ts`
+reproduces paint's two passes, zIndex sort, clip intersections and scroll offsets
+so "the box under the pointer" is the box on screen. Change the ordering in
+`paint.ts` and that walk has to change with it, or a drag selects against the
+wrong box.
 
 **`onLayout` fires every paint — diff before `setState`** or you infinite-loop.
 

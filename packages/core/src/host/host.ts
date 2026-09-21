@@ -8,6 +8,21 @@ import { noteWarning } from '../warnings.js';
 // The host has a single element type by design: Text is sugar for Box.
 export type HostType = 'flowtty-box';
 
+/** A row of text a component wrapped itself, and how it rejoins the row below —
+ *  see `BoxProps.wrapContinues`. */
+export interface WrapContinuation {
+  /** What the wrap dropped at the break: `' '` at a word boundary, `''` where
+   *  it cut through a word. */
+  dropped: string;
+  /** First cell of the row's own text, as an offset into the box's content
+   *  rect — past any chrome the component painted in front of it (a code
+   *  block's gutter, a blockquote's bar). Default 0. */
+  textStart?: number;
+  /** Cells of the box's content rect this row's own text covers, counted from
+   *  `textStart`, padding the component added excluded. */
+  textWidth: number;
+}
+
 export interface BoxProps {
   /** Fixed size in cells. Strings like '100%' use Yoga's percentage sizing. */
   width?: number | string;
@@ -142,6 +157,36 @@ export interface BoxProps {
    *  scrolling component needs: content and viewport heights, the effective
    *  (clamped) `scrollTop`, and its maximum. */
   onScrollMetrics?: (metrics: ScrollMetrics) => void;
+  /** Confine a drag-selection that starts inside this box to its content rect —
+   *  inside its border and padding, and inside whatever clips it. A pane, a
+   *  dialog or a scroll viewport marked this way can be swept end to end
+   *  without the drag running into the neighbour or picking up border glyphs.
+   *  The nearest scoped ancestor-or-self wins; with none, a drag selects across
+   *  the whole frame, as the terminal's own selection does.
+   *  See docs/input.md (selection). */
+  selectionScope?: boolean;
+  /** Say that this box's text carries on at the start of the row below it, with
+   *  no line break between them in the source — so a drag-selection copies the
+   *  two rows as one line.
+   *
+   *  `dropped` is exactly what the wrap ate at the break: `' '` at a word
+   *  boundary, `''` where it cut through a run of characters. `textStart` and
+   *  `textWidth` say which cells of this box's content rect the row's own text
+   *  actually covers, so neither the chrome in front of it nor the padding
+   *  after it (a code block's gutter, its diff band) is copied as content — and
+   *  a trailing space that belongs to the text is.
+   *
+   *  Only for a component that wraps text ITSELF and paints each resulting row
+   *  as its own box (`<Markdown>` does): text this box wraps is marked by the
+   *  painter without any help. Neither layout nor paint is affected — it is
+   *  read when a drag ends. See docs/writing-a-component.md (soft wrap) and
+   *  docs/input.md (selection). */
+  wrapContinues?: WrapContinuation;
+  /** Whether a drag-selection may cover this box. Default true, and inherited:
+   *  `false` takes the box's whole rect out of every selection, children
+   *  included — nothing there is highlighted or copied. For a password field,
+   *  chrome that is not text, or a region whose content is not the point. */
+  selectable?: boolean;
 }
 
 export interface ScrollMetrics {

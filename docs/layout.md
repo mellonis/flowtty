@@ -16,6 +16,7 @@ Every `<Box>` is a Yoga flexbox node. These are the props that size, place, clip
 - [zIndex](#zindex)
 - [Overflow](#overflow)
 - [Scrolling](#scrolling)
+- [Selection scopes](#selection-scopes)
 
 ## Borders
 
@@ -224,3 +225,18 @@ layout leaves, so the app never adds up sibling heights to know how many rows fi
 Every child is laid out by Yoga (cleanly cached between frames), but only rows
 in view are drawn, so a few thousand rows scroll comfortably. Keep rows cheap to
 re-render — one memoized component per message, not one per line.
+
+A `<ScrollBox>` is a selection scope of its own: a drag inside it is confined to
+the rows in view, and the scrollbar column is not part of it. See
+[Selection scopes](#selection-scopes).
+
+## Selection scopes
+
+Two props say what a drag-selection over the frame may cover. Neither affects
+layout or paint — they are read when a press lands. The whole feature is
+described in [Input](input.md#selection).
+
+| Prop | |
+|---|---|
+| `selectionScope` | Confine a drag that starts inside this box to its **content rect** — inside border and padding, and inside whatever clips it. The drag point is clamped there, so sweeping out of a pane selects to its edge instead of into the neighbour or onto the border. The nearest scoped ancestor-or-self wins; with none, a drag covers the whole frame. `<ScrollBox>`, `<Table>` and each `<DialogHost>` dialog set it already. |
+| `selectable` | Default `true`, inherited. `false` takes this box's whole rect out of every selection, children included: nothing in it is highlighted, nothing in it is copied, and a press inside it starts nothing. `<Menu>`'s bar and dropdowns set it. |

@@ -1,9 +1,9 @@
 import { Buffer, type Style } from '../cells.js';
-import { wrapText, type WrapMode } from '../wrap.js';
+import { wrapTextLines, type WrapMode, type WrappedLine } from '../wrap.js';
 import { BORDER_CHARS } from './borders.js';
 import { layoutOf, type Rect } from './layout.js';
+import { contentRectOf, intersectRects, isScrollViewport, paddingRectOf, scrollStateOf } from './geometry.js';
 import { ownText, type Instance, type Container, type TextRun } from './host.js';
-import { Edge } from './yoga.js';
 
 export function paint(container: Container, width: number, height: number): Buffer {
   const buffer = new Buffer(width, height);
@@ -54,17 +54,36 @@ function setClipped(buffer: Buffer, x: number, y: number, char: string, style: S
   buffer.set(x, y, char, style);
 }
 
-// Intersection of two rects. Null treated as "no clip" (returns the other rect).
-// Returns an empty (width:0 / height:0) rect when there's no overlap — setClipped
-// will skip all writes against it.
-function intersectRects(a: Rect | null, b: Rect): Rect {
-  if (a === null) return b;
-  const left = Math.max(a.left, b.left);
-  const top = Math.max(a.top, b.top);
-  const right = Math.min(a.left + a.width, b.left + b.width);
-  const bottom = Math.min(a.top + a.height, b.top + b.height);
-  if (right <= left || bottom <= top) return { left, top, width: 0, height: 0 };
-  return { left, top, width: right - left, height: bottom - top };
+/**
+ * Record "the text painted in this span carries on at the start of the row
+ * below" — what a drag-selection needs to paste a soft-wrapped paragraph back
+ * as one line (see docs/input.md, selection).
+ *
+ * Both rows have to be on screen and inside the clip, and the span is narrowed
+ * to the clip and to the buffer: a mark over cells nobody can see would join
+ * rows a selection cannot reach anyway. Nothing about layout or paint changes.
+ */
+function markContinuation(
+  buffer: Buffer,
+  y: number,
+  x0: number,
+  x1: number,
+  join: string,
+  clip: Rect | null,
+): void {
+  if (clip !== null) {
+    if (y < clip.top || y + 1 >= clip.top + clip.height) return;
+    x0 = Math.max(x0, clip.left);
+    x1 = Math.min(x1, clip.left + clip.width);
+  }
+  // The row below has to be on the frame as well — a mark on the last row joins
+  // to nothing. `Buffer.markContinuation` drops a mark off the top or bottom;
+  // the columns are clamped here, where the buffer's width is known.
+  if (y + 1 >= buffer.height) return;
+  x0 = Math.max(x0, 0);
+  x1 = Math.min(x1, buffer.width);
+  if (x1 <= x0) return;
+  buffer.markContinuation({ y, x0, x1, join });
 }
 
 // Draw the box's 8-slot border (4 corners + 4 edge runs) directly into the
@@ -126,35 +145,6 @@ function paintBorder(inst: Instance, buffer: Buffer, box: Rect, clip: Rect | nul
       }
     }
   }
-}
-
-// Inner content rect (padding + border subtracted). Yoga's computed values are
-// only valid AFTER computeLayout, so this must be called inside paintInstance,
-// not at applyProps time. Border cells and padding cells are reserved by Yoga
-// in the LAYOUT phase (so children land inside the content rect automatically),
-// but own-text painting still needs the inset coordinates explicitly.
-function contentRectOf(inst: Instance, box: Rect): Rect {
-  const n = inst.yogaNode;
-  const padT = n.getComputedPadding(Edge.Top)    + n.getComputedBorder(Edge.Top);
-  const padR = n.getComputedPadding(Edge.Right)  + n.getComputedBorder(Edge.Right);
-  const padB = n.getComputedPadding(Edge.Bottom) + n.getComputedBorder(Edge.Bottom);
-  const padL = n.getComputedPadding(Edge.Left)   + n.getComputedBorder(Edge.Left);
-  return {
-    left:   box.left + padL,
-    top:    box.top  + padT,
-    width:  Math.max(0, box.width  - padL - padR),
-    height: Math.max(0, box.height - padT - padB),
-  };
-}
-
-// The box minus its border ring (padding included).
-function paddingRectOf(inst: Instance, box: Rect): Rect {
-  const n = inst.yogaNode;
-  const t = n.getComputedBorder(Edge.Top);
-  const r = n.getComputedBorder(Edge.Right);
-  const b = n.getComputedBorder(Edge.Bottom);
-  const l = n.getComputedBorder(Edge.Left);
-  return { left: box.left + l, top: box.top + t, width: Math.max(0, box.width - l - r), height: Math.max(0, box.height - t - b) };
 }
 
 function paintInstance(
@@ -223,7 +213,9 @@ function paintInstance(
   if (text) {
     const content = contentRectOf(inst, box);
     const mode = (inst.props.wrap ?? 'none') as WrapMode;
-    const lines = mode === 'none' ? text.split('\n') : wrapText(text, content.width, mode);
+    const lines: WrappedLine[] = mode === 'none'
+      ? text.split('\n').map((line) => ({ text: line }))
+      : wrapTextLines(text, content.width, mode);
     const textStyle = textStyleOf(inst);
     if (textStyle.bg === undefined && effectiveBg !== undefined) {
       textStyle.bg = effectiveBg;
@@ -233,7 +225,17 @@ function paintInstance(
     const source = styles ? [...text] : null;
     let at = 0; // position in `source` of the next character to be painted
     for (let row = 0; row < lines.length; row++) {
-      const chars = [...(lines[row] ?? '')];
+      const chars = [...(lines[row]?.text ?? '')];
+      // A line the WRAP ended (not a newline in the source) carries on at the
+      // start of the next row: mark the span it painted, so a selection over
+      // the two rows copies them as the one line they were written as. Only
+      // when that next row is actually painted — a line cut off by the content
+      // height has nothing below it.
+      const continues = lines[row]?.continues;
+      if (continues !== undefined && row + 1 < Math.min(lines.length, content.height)) {
+        const span = Math.min(chars.length, content.width);
+        markContinuation(buffer, content.top + row, content.left, content.left + span, continues, clip);
+      }
       for (let col = 0; col < chars.length; col++) {
         const ch = chars[col]!;
         let style = textStyle;
@@ -259,28 +261,39 @@ function paintInstance(
     }
   }
 
+  // 2b. A component that wraps text itself paints each resulting row as its own
+  // box, so the painter never sees the wrap. `wrapContinues` is how that
+  // component says "this row carries on below": the mark covers the cells the
+  // row's own text occupies — which the component has to say, since a box that
+  // frames its row (a code block's gutter) or pads it (a diff band) paints
+  // cells around the text that are not part of it.
+  const continuation = inst.props.wrapContinues;
+  if (!offscreen && continuation !== undefined) {
+    const content = contentRectOf(inst, box);
+    // A collapsed box has no last row: `content.top + content.height - 1` would
+    // land on the row ABOVE it and join two lines that are not its own.
+    if (content.width > 0 && content.height > 0) {
+      const from = Math.min(continuation.textStart ?? 0, content.width);
+      markContinuation(
+        buffer,
+        content.top + content.height - 1,
+        content.left + from,
+        content.left + Math.min(from + continuation.textWidth, content.width),
+        continuation.dropped,
+        clip,
+      );
+    }
+  }
+
   // A scroll prop turns the box into a scroll viewport: resolve the effective
   // offset now, against this frame's layout, so a pinned view (scrollBottom: 0)
   // follows growing content without a catch-up frame.
-  const scrolls = inst.props.scrollTop !== undefined || inst.props.scrollBottom !== undefined;
+  const scrolls = isScrollViewport(inst);
   let scrollTop = 0;
   if (scrolls || inst.props.onScrollMetrics) {
-    const viewport = contentRectOf(inst, box);
-    // Content height = the lowest bottom edge among flow children, measured from
-    // the content rect's top. Absolute children are overlays and don't count.
-    let contentBottom = 0;
-    for (const child of inst.children) {
-      if (child.type !== 'box' || child.props.position === 'absolute' || child.props.display === 'none') continue;
-      const n = child.yogaNode;
-      contentBottom = Math.max(contentBottom, n.getComputedTop() + n.getComputedHeight() + n.getComputedMargin(Edge.Bottom));
-    }
-    const contentHeight = Math.max(0, contentBottom - (viewport.top - box.top));
-    const maxScrollTop = Math.max(0, contentHeight - viewport.height);
-    const wanted = inst.props.scrollBottom !== undefined
-      ? maxScrollTop - inst.props.scrollBottom
-      : inst.props.scrollTop ?? 0;
-    scrollTop = Math.max(0, Math.min(maxScrollTop, Math.round(wanted)));
-    inst.props.onScrollMetrics?.({ contentHeight, viewportHeight: viewport.height, scrollTop, maxScrollTop });
+    const state = scrollStateOf(inst, box);
+    scrollTop = state.scrollTop;
+    inst.props.onScrollMetrics?.(state.metrics);
   }
 
   // Compute descendant clip: if this box clips (overflow:hidden, or it scrolls),
@@ -290,6 +303,10 @@ function paintInstance(
     : clip;
 
   // 3. Two-pass: stack-flow children first, then absolute children on top.
+  // `hitTest.ts` walks the tree in exactly this order to work out which box is
+  // under a cell — change the passes, the zIndex sort, the clip intersections
+  // or the scroll offset here and that walk has to change with it, or a drag
+  // will select against a box other than the one on screen.
   // Within each pass, sort by zIndex (default 0). JS sort is stable per ES2019,
   // so tree order is preserved as the natural tiebreaker. zIndex does NOT cross
   // pass boundaries — absolutes always paint on top of stack-flow.

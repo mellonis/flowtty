@@ -193,4 +193,14 @@ describe('TextArea', () => {
     expect(seen.value).toBe('😀😀😀😀');
     unmount();
   });
+
+  test('a mouse button key is never typed into the buffer', async () => {
+    const { backend, seen, frame, unmount } = await mount('ab');
+    backend.mouse('down', 1, 0);
+    backend.mouse('drag', 2, 0);
+    backend.mouse('up', 2, 0);
+    expect(await frame()).toEqual(['ab']);
+    expect(seen.value).toBe('ab');
+    unmount();
+  });
 });

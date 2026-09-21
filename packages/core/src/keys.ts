@@ -12,9 +12,14 @@ export const NAMED_KEYS = [
   'up', 'down', 'left', 'right', 'home', 'end', 'pageup', 'pagedown',
   'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12',
   'paste', 'wheelup', 'wheeldown',
+  'mousedown', 'mousedrag', 'mouseup',
 ] as const;
 
 export type NamedKey = typeof NAMED_KEYS[number];
+
+/** Which physical button a mouse key belongs to. The wheel is not a button —
+ *  it has its own key names. */
+export type MouseButton = 'left' | 'middle' | 'right';
 
 /** A key name: a named key, or the character itself for a printable key. The
  *  `string & {}` arm keeps any character valid while editors still complete the
@@ -28,7 +33,8 @@ export interface Key {
    * 'tab', 'backspace', 'delete', 'up', 'down', 'left', 'right', 'home',
    * 'end', 'pageup', 'pagedown'. A bracketed paste is one key named 'paste'
    * whose content is in `text`. Mouse wheel steps are 'wheelup' / 'wheeldown',
-   * positioned by `x` / `y`.
+   * and a button press, a drag and a release are 'mousedown', 'mousedrag' and
+   * 'mouseup' — all five positioned by `x` / `y`.
    */
   name: KeyName;
   /**
@@ -39,12 +45,19 @@ export interface Key {
    */
   text?: string;
   /**
-   * Cell under the pointer for a mouse key ('wheelup' / 'wheeldown'): 0-based
-   * column and row, the same coordinates `onLayout` rects use. Undefined for
-   * every other key.
+   * Cell under the pointer for a mouse key ('wheelup', 'wheeldown',
+   * 'mousedown', 'mousedrag', 'mouseup'): 0-based column and row, the same
+   * coordinates `onLayout` rects use. Undefined for every other key.
    */
   x?: number;
   y?: number;
+  /**
+   * Which button a 'mousedown' / 'mousedrag' / 'mouseup' belongs to. Undefined
+   * for every other key — and, rarely, for a 'mouseup' whose report named no
+   * button. Match a release on `name === 'mouseup'`, never on `button`: a drag
+   * that never sees its release stays stuck open.
+   */
+  button?: MouseButton;
   /** Raw byte sequence as received from the source (empty for synthetic keys). */
   sequence: string;
   ctrl: boolean;

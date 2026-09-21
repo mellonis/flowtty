@@ -6,6 +6,7 @@ Starting and stopping, errors, cancellation, animation, dialogs.
 - [Rendering to a string](#rendering-to-a-string)
 - [Error handling](#error-handling)
 - [Getting attention](#getting-attention)
+- [The clipboard](#the-clipboard)
 - [Root abort signal](#root-abort-signal)
 - [Ticker (animation clock)](#ticker-animation-clock)
 - [DialogHost (stack)](#dialoghost-stack)
@@ -112,12 +113,18 @@ flowtty calls `backend.dispose()` first (restores the terminal) and then either:
 ```tsx
 await render(<App />, backend, {
   onError: ({ error, source }) => {
-    // source: 'react' | 'uncaughtException' | 'unhandledRejection'
+    // source: 'react' | 'uncaughtException' | 'unhandledRejection' | 'callback'
     console.error(`[${source}]`, error);
     process.exit(1);
   },
 });
 ```
+
+`'callback'` is a function you gave flowtty to call — `onCopy` — that threw.
+It is handled here rather than left to escape: it runs on the key path, and an
+exception there would leave the terminal in the alt screen with mouse reporting
+still on. The key is dispatched to your `useInput` subscribers BEFORE `onCopy`
+runs, so a callback of yours can never keep one from arriving.
 
 The cleanup runs at most ONCE per render handle — subsequent errors after the
 first are ignored to avoid double-disposal. Process error listeners are removed
@@ -217,6 +224,74 @@ expect(backend.notifications).toEqual([{ title: 'Build finished', body: '12 pack
 
 The recorded text is what the app passed, not what a terminal would receive —
 sanitizing is a TTY backend's job (see [Testing](testing.md)).
+
+## The clipboard
+
+`useApp().copy(text)` puts text on the person's system clipboard, and the render
+handle has the same `copy(text)` for outside the tree. A drag over the frame
+copies by itself — see [Selection](input.md#selection) — and both paths report
+through the same `onCopy`.
+
+```tsx
+function Doc({ source }: { source: string }) {
+  const { copy } = useApp();
+  const [blocks, setBlocks] = useState<MarkdownCodeBlock[]>([]);
+  useInput((key) => { if (key.name === 'y') copy(blocks.at(-1)?.source ?? ''); });
+  return <Markdown onCodeBlocks={setBlocks}>{source}</Markdown>;
+}
+```
+
+`copy()` returns whether a clipboard sequence was actually written — false where
+the terminal has none, where the text was too large for one (the backend writes
+nothing rather than half of it), and after unmount. The TTY backends carry it as
+OSC 52, in one write, never from inside `draw()`; see
+[Terminal specifics](terminal.md#the-clipboard) for the `clipboard` option and
+the size cap. flowtty only ever *writes* the clipboard — the read form of the
+sequence is never emitted.
+
+**`onCopy` fires either way**, which is the point: `delivered: false` is the
+signal to reach for the platform's own tool.
+
+```tsx
+import { spawn } from 'node:child_process';
+
+const PASTE_COMMAND = process.platform === 'darwin' ? 'pbcopy'
+  : process.platform === 'win32' ? 'clip.exe'
+    : 'wl-copy';
+
+await render(<App />, backend, {
+  onCopy: ({ text, delivered, source }) => {
+    setToast(`copied ${text.length} chars${source === 'selection' ? '' : ' (menu)'}`);
+    if (delivered) return;                       // the terminal took it
+    const child = spawn(PASTE_COMMAND, { stdio: ['pipe', 'ignore', 'ignore'] });
+    child.on('error', () => {});                 // no such tool here — nothing more to try
+    child.stdin.end(text);
+  },
+});
+```
+
+If `onCopy` throws — a synchronous `spawn` of a tool that is not there — flowtty
+handles it like any other error (`source: 'callback'`, see
+[Error handling](#error-handling)): the terminal is restored and `onError` is
+called. The key it came with has already reached the app by then.
+
+`delivered: true` means the bytes went out, not that the clipboard changed: no
+terminal answers that question, and asking would mean reading the clipboard.
+Where that distinction matters — Apple Terminal has no OSC 52 at all — the table
+in [Selection](input.md#selection) says what is verified.
+
+**In a test**, `TestBackend` records the copies instead of writing any, and
+`clipboardAvailable = false` stands in for a terminal without OSC 52 so the
+fallback above can be exercised:
+
+```tsx
+const backend = new TestBackend(40, 3);
+backend.clipboardAvailable = false;
+const app = await render(<App />, backend, { onCopy });
+// … drag …
+expect(backend.clipboard).toEqual([]);
+expect(onCopy).toHaveBeenCalledWith({ text: 'hello', delivered: false, source: 'selection' });
+```
 
 ## Root abort signal
 
@@ -333,6 +408,10 @@ one, and only receive input when they become the top of the stack again.
 - Only the topmost dialog receives keys.
 
 **Caveat:** all dialogs share a single `dialogApi` instance — calling `done()` or `cancel()` always pops the TOP, regardless of which dialog component triggered it. Since input is gated to the top dialog, normal user-driven flows are safe; the edge case is async side-effects from a lower dialog (e.g. a useEffect / setTimeout) that calls `done` after a new dialog opened on top — it would pop the wrong entry. Wrap async work in `isMounted` guards if you need to be paranoid.
+
+**Selection.** Each dialog is its own selection scope: a drag inside one is
+confined to what the dialog says and picks up neither its border nor the content
+it covers. See [Selection](input.md#selection).
 
 **Backdrop.** `<DialogHost backdrop>` dims everything behind an open floating
 dialog — the host content and any dialog below it — while the dialog itself stays

@@ -13,12 +13,20 @@ export interface AppApi {
    *  with no terminal to write to ignores the call. See docs/app.md (getting
    *  attention). */
   notify(title: string, body?: string): void;
+  /** Put `text` on the person's system clipboard. Returns whether a clipboard
+   *  sequence was actually written — false where the terminal has none (Apple
+   *  Terminal, a pipe) and where the backend refused the text. Fires the
+   *  `onCopy` render option with `source: 'api'` either way, so an app can fall
+   *  back to `pbcopy` / `wl-copy` / `clip.exe` in one place. See docs/app.md
+   *  (the clipboard). */
+  copy(text: string): boolean;
 }
 
 // Outside render() (a component rendered by a bare reconciler in a test) exit,
-// bell and notify are all no-ops.
+// bell, notify and copy are all no-ops — and copy reports that nothing landed.
 export const AppContext: Context<AppApi> = createContext<AppApi>({
   exit: () => {},
   bell: () => {},
   notify: () => {},
+  copy: () => false,
 });

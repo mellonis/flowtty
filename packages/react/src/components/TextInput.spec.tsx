@@ -232,3 +232,21 @@ test('mask draws one bullet per character, not per UTF-16 unit', async () => {
   await render(createElement(TextInput, { value: 'a😀', onChange: () => {}, mask: true }), backend);
   expect(backend.lastFrame).toBe('••');
 });
+
+test('a mouse button key is never typed into the value', async () => {
+  let captured = 'ab';
+  function App() {
+    const [v, setV] = useState('ab');
+    captured = v;
+    return createElement(TextInput, { value: v, onChange: setV });
+  }
+  const backend = new TestBackend(10, 1);
+  await render(createElement(App), backend);
+  backend.mouse('down', 1, 0);
+  backend.mouse('drag', 2, 0);
+  backend.mouse('up', 2, 0);
+  backend.wheel('down', 1, 0);
+  await flush();
+  expect(captured).toBe('ab');
+  expect(backend.lastFrame).toBe('ab');
+});

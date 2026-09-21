@@ -28,12 +28,26 @@ export interface MarkdownProps extends MarkdownOptions {
 
 function MdLine({ line }: { line: StyledLine }) {
   if (line.spans.length === 0) return <Box>{' '}</Box>;
+  const chrome = line.chrome ?? 0;
   return (
-    <Box flexDirection="row">
+    // `wrapContinues` says this row's text carries on below — and which cells
+    // of it are that text — so a drag over the two rows copies the paragraph as
+    // one line (docs/input.md — selection).
+    <Box
+      flexDirection="row" wrapContinues={line.continues}
+      // A row that is frame from edge to edge goes out of the selection whole,
+      // its blank cells included: it is not a line of the document, so a copy
+      // skips it rather than returning an empty line. Paint is unaffected.
+      selectable={line.frame === true ? false : undefined}
+    >
       {line.spans.map((s, i) => (
         <Text
           key={i} color={s.color} backgroundColor={s.background}
           bold={s.bold} dim={s.dim} underline={s.underline} link={s.link}
+          // The leading spans of a framed row are the frame — a code block's
+          // gutter, a blockquote's bar, a fence label. Painted the same, never
+          // copied. Nothing else about the row changes.
+          selectable={i < chrome ? false : undefined}
         >
           {s.text}
         </Text>

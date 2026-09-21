@@ -18,6 +18,11 @@ export interface TextProps {
   link?: string;
   /** Default 'none' (no wrap). 'wrap' = word-wrap with char-wrap fallback. 'truncate' = single-cell ellipsis. */
   wrap?: 'wrap' | 'truncate' | 'none';
+  /** `false` takes this text out of every drag-selection: it is painted, but
+   *  never highlighted and never copied. For frame a component draws around
+   *  content — a gutter, a bar — and for text that is not the point.
+   *  See docs/input.md (selection). */
+  selectable?: boolean;
 }
 
 // Fold children into runs — the strings as they are, each <Span> as a run with

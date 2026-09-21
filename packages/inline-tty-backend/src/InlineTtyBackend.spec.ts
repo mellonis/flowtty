@@ -247,6 +247,27 @@ describe('InlineTtyBackend', () => {
     expect(out.captured()).toBe('');
   });
 
+  test('copy writes OSC 52 once, and nothing after dispose', () => {
+    const out = mockStdout();
+    const b = new InlineTtyBackend({ out, in: mockStdin(), clipboard: 'osc52' });
+    out.writes.length = 0;
+    expect(b.copy('hello')).toBe(true);
+    expect(out.writes).toEqual(['\x1b]52;c;aGVsbG8=\x1b\\']);
+    b.dispose();
+    out.writes.length = 0;
+    expect(b.copy('hello')).toBe(false);
+    expect(out.writes).toEqual([]);
+  });
+
+  test('log-only: copy writes nothing and says it did not deliver', () => {
+    const out = mockStdout();
+    (out as unknown as { isTTY: boolean }).isTTY = false;
+    const b = new InlineTtyBackend({ out, in: mockStdin(), clipboard: 'osc52' });
+    expect(b.copy('hello')).toBe(false);
+    b.dispose();
+    expect(out.captured()).toBe('');
+  });
+
   test('a notification between two frames leaves the next live-region write unchanged', () => {
     const quietOut = mockStdout();
     const quiet = new InlineTtyBackend({ out: quietOut, in: mockStdin(), liveHeight: 1 });

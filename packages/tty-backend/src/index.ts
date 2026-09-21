@@ -12,6 +12,13 @@ export {
   createAttention, detectNotificationProtocol, notificationSequence, sanitizeNotificationText,
   type Attention, type AttentionOptions, type NotificationProtocol,
 } from './notification.js';
+// The clipboard write — pure text-to-bytes, plus the small factory both TTY
+// backends drive their `copy()` from. Exposed for the same reason: a sibling
+// backend should not have to assemble OSC 52 itself.
+export {
+  createClipboard, clipboardSequence, detectClipboardSupport, DEFAULT_CLIPBOARD_LIMIT,
+  type Clipboard, type ClipboardOptions, type ClipboardProtocol,
+} from './clipboard.js';
 // ANSI helpers — exposed so sibling TTY backends (e.g. @flowtty/inline-tty-backend)
 // can reuse the SGR / cursor / screen-control sequences instead of duplicating.
 // App code typically should not assemble escape sequences itself.

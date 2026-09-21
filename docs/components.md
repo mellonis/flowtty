@@ -185,6 +185,12 @@ exceeds the available space. Pass `width` to fix the total budget. Columns are
 only shrunk, never stretched. Horizontal scroll for over-wide tables is a
 planned follow-up (it needs a focus + keyboard surface).
 
+**Selection.** A `<Table>` is its own selection scope: a drag that starts in the
+grid is confined to it, so sweeping a column never runs into whatever sits
+beside the table. What comes out is the rows exactly as they are painted — rules
+and padding included, as in the terminal's own selection. See
+[Selection](input.md#selection).
+
 > Column widths are measured in **code points**, matching flowtty's one-cell-
 > per-code-point grid, so rules stay aligned. Double-width CJK/emoji cells carry
 > the same visual overlap as the rest of flowtty until paint reserves the second
@@ -249,6 +255,47 @@ through rendered markdown exactly the way it pages raw text. `layoutMarkdown` is
 exported for that use; `<Markdown>` itself just measures its width (via
 `onLayout`) and renders every line. Pass an explicit `width` to skip the
 measure-and-relayout paint.
+
+A rendered document is a likely thing to copy out of, and a drag gives back the
+document — not the frame around it. The **frame is never copied**: a fenced
+block's `│ ` gutter and its line-number column, its label row (`ts ·
+src/app.ts`) and its `… N more lines` notice, and a blockquote's `│ ` bar. They
+are painted exactly as before and simply left out of every selection, so a drag
+over a fenced block returns the block's source, character for character — the
+same string `onCodeBlocks` reports.
+
+A row that is frame from edge to edge — the label, the notice — is skipped
+whole, not returned as a blank line, so a quote followed by a labelled block
+copies with the one blank line the document has. An empty line inside a block
+is content and survives.
+
+What IS content: a list marker (`• `), a task checkbox (`☐`/`☑`), a heading's
+`##`, a diff's `+` / `-` / space column (a copied diff has to still apply), and,
+with `codeFence="literal"`, the ` ``` ` fence rows — there the author chose to
+show them.
+
+A wrapped row comes back as the one line it was written as: a paragraph,
+heading or list item, a quoted paragraph (without its bar), and a code line the
+wrap cut (rejoined at the exact column, gutter and all left behind). With
+`codeWrap="truncate"` a copy returns **what is on screen**, ellipsis included —
+the cut text is the row, and the characters past it were never painted.
+
+Put the `<Markdown>` in a `<Box selectionScope>` (or a `<ScrollBox>`, which is
+one already) so a drag stops at the pane instead of running into whatever is
+beside it. See [Selection](input.md#selection).
+
+`onCodeBlocks` reports each fenced block's raw `source`, which is what a
+"copy this block" key hands to the clipboard — no gutter, no wrapping, no
+`maxCodeRows` cap:
+
+```tsx
+function Doc({ source }: { source: string }) {
+  const { copy } = useApp();
+  const [blocks, setBlocks] = useState<MarkdownCodeBlock[]>([]);
+  useInput((key) => { if (key.name === 'y') copy(blocks.at(-1)?.source ?? ''); });
+  return <Markdown onCodeBlocks={setBlocks}>{source}</Markdown>;
+}
+```
 
 > The `articles-tui` example opens article `.md` files rendered this way by
 > default; press `R` to flip to the **raw source view** — the markdown source

@@ -171,3 +171,22 @@ test('focused: the cursor marker is colored + bold and its row is bold; unfocuse
   expect(b.get(2, 0).style.bold).toBeFalsy();
   expect(focused.lastFrame).toBe(blurred.lastFrame);
 });
+
+test('a mouse button key neither filters nor moves the Select cursor', async () => {
+  function App() {
+    return createElement(Select<string>, {
+      items: [{ label: 'apple', value: 'a' }, { label: 'banana', value: 'b' }],
+      value: 'a', onChange: () => {}, onSubmit: () => {}, onCancel: () => { throw new Error('cancelled'); },
+    });
+  }
+  const backend = new TestBackend(20, 3);
+  await render(createElement(App), backend);
+  backend.type('ba');                      // a real filter, to prove the frame can change
+  await flush();
+  expect(backend.lastFrame).toBe('filter: ba\n▸ banana');
+  backend.mouse('down', 3, 1);
+  backend.mouse('drag', 5, 1);
+  backend.mouse('up', 5, 1);
+  await flush();
+  expect(backend.lastFrame).toBe('filter: ba\n▸ banana');
+});

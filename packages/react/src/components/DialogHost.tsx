@@ -136,6 +136,10 @@ export function DialogHost(props: DialogHostProps): ReactNode {
           border: DEFAULT_BORDER_STYLE,
           flexDirection: 'column',
           padding: o.padding,
+          // A drag inside the dialog is confined to what the dialog says, not
+          // its border and not the content it covers.
+          // See docs/input.md (selection).
+          selectionScope: true,
         };
         if (o.title != null) wrapperProps.borderTitle = o.title;
         if (o.floating) {
@@ -169,6 +173,10 @@ export function DialogHost(props: DialogHostProps): ReactNode {
           // dialogs so the wrapper is the only opaque region and lower stack
           // entries show around it. See `overlayBg` computed above.
           backgroundColor={overlayBg}
+          // An unwrapped dialog has no chrome of its own to scope to, so the
+          // overlay is the scope; a wrapped one scopes to the wrapper inside it,
+          // which is nearer. See docs/input.md (selection).
+          selectionScope
           // The scrim is this full-screen overlay itself: it restyles what is
           // under it (host content, lower dialogs), then the dialog paints on
           // top, bright. Floating only — a full-screen dialog covers everything.

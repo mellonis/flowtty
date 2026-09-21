@@ -282,6 +282,11 @@ export function Table<T>({
     <Box
       flexDirection="column"
       overflow="hidden"
+      // A grid reads as one thing: a drag that starts in it is confined to it,
+      // so sweeping a column never runs into whatever sits beside the table.
+      // The rules and the padding are painted text and come along, as they do
+      // in the terminal's own selection (docs/input.md — selection).
+      selectionScope
       flexGrow={scrollable ? 1 : undefined}
       flexShrink={scrollable ? 1 : undefined}
       onLayout={measure ? (r) => {

@@ -23,6 +23,7 @@ interface Backend {
   printStatic?(lines: string[]): void;               // permanent lines above a live region
   bell?(): void;                                     // BEL — the portable "over here"
   notify?(title: string, body?: string): void;       // a desktop notification
+  copy?(text: string): boolean;                      // put text on the clipboard
   fullScreen?: boolean;                              // false = a bounded region, not the whole screen
   hyperlinks?: boolean;                              // the terminal honors OSC 8
 }
@@ -35,7 +36,8 @@ Only `size` and `draw` are required; everything else is feature-detected.
   the previous one is the backend's business (`TtyBackend` does, and writes only
   what changed).
 - **`onKey`** delivers `Key` objects: `{ name, sequence, ctrl, meta, shift }`, plus
-  `text` for a paste and `x` / `y` for the mouse. Without it the app is a passive
+  `text` for a paste, `x` / `y` for the mouse and `button` for a mouse key that
+  names one (see docs/input.md, the mouse). Without it the app is a passive
   view and `useInput` handlers never fire. `decodeKeys` from
   `@flowtty/tty-backend` turns raw stdin bytes into keys, if your source is a
   byte stream.
@@ -52,6 +54,15 @@ Only `size` and `draw` are required; everything else is feature-detected.
   frame-diffing baseline valid. `createAttention(write, options)` from
   `@flowtty/tty-backend` does all of that; see
   [Terminal specifics](terminal.md#notifications).
+- **`copy`** is what `useApp().copy(text)` and copy-on-select call. Return
+  whether a clipboard sequence was actually written — `false` is not a failure
+  to hide, it is the signal an app falls back on (`pbcopy`, `wl-copy`,
+  `clip.exe`), so report it honestly and never report `true` for a text you
+  truncated. Same rules as the two above: ONE write, never from inside `draw()`.
+  And write-only — never emit the form of the sequence that asks the terminal to
+  hand the clipboard back. `createClipboard(write, options)` from
+  `@flowtty/tty-backend` does all of that; see
+  [Terminal specifics](terminal.md#the-clipboard).
 
 ## A complete backend
 

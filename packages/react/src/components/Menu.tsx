@@ -268,7 +268,13 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
       return ' '.repeat(TOP_PAD) + it.label + ' '.repeat(TOP_PAD);
     }
     return (
-      <Box key="__topbar" flexDirection="row" width="100%">
+      <Box
+        key="__topbar" flexDirection="row" width="100%"
+        // Chrome, not text: a drag over the bar selects nothing, and the
+        // highlighted item keeps its inverse instead of having it toggled off
+        // under the pointer. See docs/input.md (selection).
+        selectable={false}
+      >
         {title != null && <Box key="__title" bold>{titleText}</Box>}
         {items.map((it, i) => {
           const isFocused = depth === 0 && i === cursorClamped;
@@ -300,6 +306,8 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
         border={DEFAULT_BORDER_STYLE}
         backgroundColor="default"
         flexDirection="column"
+        // As with the bar: a dropdown is chrome. See docs/input.md (selection).
+        selectable={false}
       >
         {p.items.map((it, i) => {
           const focused = i === focusedIdx;

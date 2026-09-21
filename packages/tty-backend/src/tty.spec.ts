@@ -426,13 +426,32 @@ test('TtyBackend: mouse reporting is opt-in — off by default, on with { mouse:
 
   const received: Array<[string, number | undefined, number | undefined]> = [];
   b.onKey((k) => received.push([k.name, k.x, k.y]));
-  expect(writes.join('')).toContain('\x1b[?1000h\x1b[?1006h');
+  // Button events (1002) come on with the rest, so a drag reports every cell.
+  expect(writes.join('')).toContain('\x1b[?1000h\x1b[?1002h\x1b[?1006h');
 
   stdin.emit('data', '\x1b[<65;7;3M');
   expect(received).toEqual([['wheeldown', 6, 2]]);
 
   b.dispose();
-  expect(writes.join('')).toContain('\x1b[?1006l\x1b[?1000l');
+  expect(writes.join('')).toContain('\x1b[?1006l\x1b[?1002l\x1b[?1000l');
+});
+
+test('TtyBackend: a press, a drag and a release reach subscribers as mouse keys', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin, { mouse: true });
+  const received: Array<[string, string | undefined, number | undefined, number | undefined]> = [];
+  back.onKey((k) => received.push([k.name, k.button, k.x, k.y]));
+
+  // Split mid-params: a report that straddles two stdin chunks still decodes.
+  stdin.emit('data', '\x1b[<0;3;4M\x1b[<32;4');
+  stdin.emit('data', ';4M\x1b[<0;4;4m');
+  expect(received).toEqual([
+    ['mousedown', 'left', 2, 3],
+    ['mousedrag', 'left', 3, 3],
+    ['mouseup', 'left', 3, 3],
+  ]);
+  back.dispose();
 });
 
 test('TtyBackend.dispose reports unknown color names once the screen is restored', () => {
@@ -664,4 +683,66 @@ test('a bell and a notification between two frames leave the next frame diff byt
   // frame that follows is diffed against the same baseline, byte for byte.
   expect(attention).toEqual(['\x07', '\x1b]9;Build: done\x1b\\']);
   expect(noisyDiff).toBe(quietDiff);
+});
+
+test('TtyBackend.copy writes OSC 52 as one write, and nothing after dispose', () => {
+  const { stub, writes } = makeStub();
+  const back = new TtyBackend(stub, process.stdin, { clipboard: 'osc52' });
+  writes.length = 0;
+  expect(back.copy('hello')).toBe(true);
+  expect(writes).toEqual(['\x1b]52;c;aGVsbG8=\x1b\\']);
+  back.dispose();
+  writes.length = 0;
+  expect(back.copy('hello')).toBe(false);
+  expect(writes).toEqual([]);
+});
+
+test('TtyBackend.copy: clipboard none stays silent and says it did not deliver', () => {
+  const { stub, writes } = makeStub();
+  const back = new TtyBackend(stub, process.stdin, { clipboard: 'none' });
+  writes.length = 0;
+  expect(back.copy('hello')).toBe(false);
+  expect(writes).toEqual([]);
+  back.dispose();
+});
+
+test('TtyBackend.copy refuses a text over the cap outright — never a partial one', () => {
+  const { stub, writes } = makeStub();
+  const back = new TtyBackend(stub, process.stdin, { clipboard: 'osc52', clipboardLimit: 8 });
+  writes.length = 0;
+  expect(back.copy('a text that will not fit')).toBe(false);
+  expect(writes).toEqual([]);
+  back.dispose();
+});
+
+test('a copy between two frames leaves the next frame diff byte-identical', () => {
+  const frame = (text: string) => {
+    const buf = new Buffer(3, 1);
+    [...text].forEach((ch, x) => buf.set(x, 0, ch));
+    return buf;
+  };
+
+  const plain = makeStub(3, 1);
+  const quiet = new TtyBackend(plain.stub, process.stdin, { clipboard: 'osc52' });
+  quiet.draw(frame('abc'));
+  plain.writes.length = 0;
+  quiet.draw(frame('abd'));
+  const quietDiff = plain.writes.join('');
+  quiet.dispose();
+
+  const copierStub = makeStub(3, 1);
+  const copier = new TtyBackend(copierStub.stub, process.stdin, { clipboard: 'osc52' });
+  copier.draw(frame('abc'));
+  copierStub.writes.length = 0;
+  copier.copy('the selection');
+  const clip = copierStub.writes.splice(0, 1);
+  copier.draw(frame('abd'));
+  const copierDiff = copierStub.writes.join('');
+  copier.dispose();
+
+  // One write, and it moved no cursor and changed no cell — so the frame that
+  // follows is diffed against the same baseline, byte for byte.
+  expect(clip).toHaveLength(1);
+  expect(clip[0]!.startsWith('\x1b]52;c;')).toBe(true);
+  expect(copierDiff).toBe(quietDiff);
 });

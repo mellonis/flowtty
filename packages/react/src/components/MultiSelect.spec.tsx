@@ -219,3 +219,25 @@ test('focused: the cursor marker is colored + bold and the cursor row is bold; u
   expect(b.get(6, 0).style.bold).toBeFalsy();
   expect(focused.lastFrame).toBe(blurred.lastFrame); // same text either way
 });
+
+test('a mouse button key neither toggles nor moves the MultiSelect cursor', async () => {
+  const captured: string[][] = [];
+  function App() {
+    const [v, setV] = useState<string[]>(['b']);
+    captured.push(v);
+    return createElement(MultiSelect<string>, {
+      items: [{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }],
+      value: v, onChange: setV, onSubmit: () => { throw new Error('submitted'); },
+      onCancel: () => { throw new Error('cancelled'); },
+    });
+  }
+  const backend = new TestBackend(20, 2);
+  await render(createElement(App), backend);
+  const before = backend.lastFrame;
+  backend.mouse('down', 4, 1);
+  backend.mouse('drag', 6, 1);
+  backend.mouse('up', 6, 1, { button: 'right' });
+  await flush();
+  expect(backend.lastFrame).toBe(before);
+  expect(captured[captured.length - 1]).toEqual(['b']);
+});

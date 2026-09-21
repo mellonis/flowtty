@@ -6,6 +6,7 @@ Color, glyph width, and what the renderer does not do yet.
 - [Display width](#display-width)
 - [Environment](#environment)
 - [Notifications](#notifications)
+- [The clipboard](#the-clipboard)
 - [Still deferred (later milestones)](#still-deferred-later-milestones)
 
 ## Truecolor
@@ -229,6 +230,59 @@ and `sanitizeNotificationText(text)` are exported from `@flowtty/tty-backend` fo
 custom backends, alongside `createAttention(write, options)`, which is what both
 backends drive their `bell()` and `notify()` from.
 
+## The clipboard
+
+`useApp().copy(text)` and copy-on-select (see
+[The app around the components](app.md#the-clipboard)) go out as **OSC 52** —
+`ESC ] 52 ; c ; <base64 of the UTF-8 text> ST` — the xterm sequence every
+terminal that has a clipboard escape copied. One write, never from inside
+`draw()`, and it moves no cursor and changes no cell, so a copy between two
+frames leaves the frame-diff baseline exactly as it was.
+
+**Write-only.** OSC 52 also has a `?` form that asks the terminal to send the
+clipboard *back*, over the same channel the app reads keys from. flowtty never
+emits it, and cannot: the payload of every sequence it builds is base64, and
+base64 has no `?`.
+
+**The size cap.** Terminals cap what they will accept in one OSC 52, and the
+common xterm-derived ceiling is 74,994 bytes of base64. Over it, flowtty writes
+**nothing** and `copy()` reports `false` — never a partial base64, and never a
+truncated copy presented as a complete one. `clipboardLimit` moves the cap.
+
+**Where a write is attempted.**
+
+| Where | What is sent | Why |
+| --- | --- | --- |
+| `TERM_PROGRAM=Apple_Terminal` | nothing | Apple Terminal implements no OSC 52; the app's own `pbcopy` is the path there |
+| GNU screen (`STY`, `TERM=screen*`) | nothing | no clipboard of its own, and its passthrough is a different, size-limited form |
+| `TERM=dumb`, `TERM=linux` | nothing | no escape handling, or no clipboard behind the console |
+| tmux (`TMUX`, `TERM=tmux*`) | `OSC 52`, unwrapped | tmux reads the sequence from the application itself; its `set-clipboard` option governs that and must not be `off` |
+| everything else | `OSC 52` | the one sequence there is; a terminal that does not know it swallows the OSC |
+
+As with notifications, the table is short on purpose: a terminal is listed only
+where its own behaviour is known. Everything else falls through to the attempt,
+which is inert where it is not understood — and there is no way to ask a terminal
+whether a write landed, so `copy()` returning `true` means the bytes went out.
+[Selection](input.md#selection) lists the three settings worth knowing about
+(Apple Terminal, iTerm2's clipboard-access setting, tmux's `set-clipboard`).
+
+**The option.** Both TTY backends take `clipboard: 'auto' | 'osc52' | 'none'`
+(default `'auto'`, the table above) and `clipboardLimit`:
+
+```ts
+new TtyBackend(process.stdout, process.stdin, { clipboard: 'osc52' });
+new InlineTtyBackend({ clipboard: 'none' });
+```
+
+`'osc52'` asked for explicitly writes the sequence whatever the environment says
+— and inside tmux wraps it in tmux's DCS passthrough, for a pane configured with
+`allow-passthrough on`. `'none'` never writes one and `copy()` always reports
+`false`. Both are silent in `InlineTtyBackend`'s log-only mode and after
+`dispose()`. `FinalFrameBackend` has no `copy()` at all: nothing is interactive
+there. `detectClipboardSupport(env)`, `clipboardSequence(text, limit)` and
+`createClipboard(write, options)` are exported from `@flowtty/tty-backend` for
+custom backends.
+
 ## Still deferred (later milestones)
 
 - Wide-character **rendering**: the grid is still one cell per code point. The
@@ -242,4 +296,8 @@ backends drive their `bell()` and `notify()` from.
 - Scrolling-region optimization for log-stream apps.
 - Column-only cursor moves (`CSI <col>G`) when row is unchanged — small extra perf nibble.
 - `position: 'relative'`.
-- Mouse clicks / hit-testing (the wheel is supported — see [Paste and mouse wheel](input.md#paste-and-mouse-wheel)), Kitty keyboard protocol.
+- Hit-testing a mouse key against the laid-out tree — the wheel and the buttons
+  are reported with the cell under the pointer, but working out which component
+  that cell belongs to is still the app's job (see
+  [Paste and the mouse](input.md#paste-and-the-mouse)).
+- Kitty keyboard protocol.

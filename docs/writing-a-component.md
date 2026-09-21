@@ -83,6 +83,39 @@ export function Stepper({ value, onChange, min = 0, max = 10, color = 'cyan', is
 - **Types.** An exported function needs an explicit return type only inside the
   `@flowtty/*` packages (their declarations are generated without a type
   checker); in your own code it is up to you.
+- **Selection.** A drag over the frame copies what it covers
+  ([selection](input.md#selection)), and three `<Box>` props say how your
+  component takes part. None of them affects layout or paint.
+
+| Prop | |
+|---|---|
+| `selectionScope` | Confine a drag that starts inside this box to its content rect. Put it on anything that reads as one region — a pane, a dialog, a grid — so a sweep stops at its edge instead of running into the neighbour or picking up the border between them. |
+| `selectable={false}` | Take this box and its children out of every selection: nothing there is highlighted, nothing there is copied, a press there starts nothing. For chrome that is not text (a menu bar, a scrollbar) and for content that is not the point. |
+| `wrapContinues` | `{ dropped, textWidth }` — "this row's text carries on at the start of the row below". |
+
+`wrapContinues` is only for a component that **wraps text itself and paints each
+resulting row as its own box** — `<Markdown>` does. Text you hand to a wrapping
+`<Text>` is marked by the painter without any help. Without the prop, a drag
+copies the two rows as two lines.
+
+```tsx
+<Box wrapContinues={{ dropped: ' ', textWidth: 18 }}>…</Box>
+```
+
+- `dropped` is **exactly what your wrap ate at the break**: `' '` where it
+  broke at a word boundary, `''` where it cut through a run of characters, and
+  a longer run of spaces where it swallowed several. It is pasted back between
+  the two rows verbatim, so a copy returns what the author wrote.
+- `textWidth` is how many cells of the box's content rect this row's own text
+  covers. Say where the text *ends*, not where the box does: padding you added
+  to square a row off (a code block's diff band) is not content, while a
+  trailing space that belongs to the source is.
+
+Mark a row only when nothing but its own text is painted on it. A blank hanging
+indent is fine — the join swallows it — but a gutter glyph (a `│ ` bar, a line
+number) is part of what the drag picks up, and joining would splice it into the
+middle of the copied line. That is why `<Markdown>` marks its paragraphs,
+headings and list items, and leaves blockquotes and fenced code alone.
 
 ## The test
 
