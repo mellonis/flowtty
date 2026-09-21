@@ -4,6 +4,7 @@ Color, glyph width, and what the renderer does not do yet.
 
 - [Truecolor](#truecolor)
 - [Display width](#display-width)
+- [Environment](#environment)
 - [Still deferred (later milestones)](#still-deferred-later-milestones)
 
 ## Truecolor
@@ -42,6 +43,17 @@ stringWidth('a😀b');  // 4
 Measurement is per-code-point, not grapheme-aware, so an emoji ZWJ sequence
 (👩‍👧) over-counts; pre-segment if you need cluster-exact widths. Expects plain
 text (styling lives in the cell, not the string).
+
+## Environment
+
+**Signals.** On `SIGTERM`, `SIGHUP` and `SIGINT`, `render()` unmounts and
+disposes the backend first — leaving the alt screen, showing the cursor, turning
+bracketed paste and mouse reporting off — and then re-raises the signal, so the
+process still dies *by* that signal and its exit status says so (143, 129, 130).
+If the app has installed its own handler for the signal, flowtty only restores
+the terminal and leaves the outcome to that handler. In raw mode Ctrl-C arrives
+as a key, not as `SIGINT`; `TtyBackend` treats it (and Ctrl-D) as "restore and
+exit 130".
 
 ## Still deferred (later milestones)
 

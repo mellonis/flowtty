@@ -51,6 +51,10 @@ export interface RenderOptions {
   onError?: (info: { error: unknown; source: ErrorSource }) => void;
 }
 
+// SIGINT only arrives as a signal when stdin is not in raw mode (no key
+// subscriber), or from `kill -INT`; in raw mode Ctrl-C is a key the backend handles.
+const TERMINATION_SIGNALS = ['SIGTERM', 'SIGHUP', 'SIGINT'] as const;
+
 export interface RenderHandle {
   /** Unmount the tree and restore the terminal. Idempotent. */
   unmount(): void;
@@ -110,6 +114,19 @@ export async function render(
     unsubResize?.();
     process.removeListener('uncaughtException', onUncaughtException);
     process.removeListener('unhandledRejection', onUnhandledRejection);
+    for (const sig of TERMINATION_SIGNALS) process.removeListener(sig, onSignal);
+  };
+
+  // A termination signal must not leave the terminal in the alt screen with the
+  // cursor hidden (and bracketed paste / mouse reporting still on): restore it,
+  // then let the signal do what it would have done. With our listener gone the
+  // default action applies again, so re-raising makes the process die BY the
+  // signal and its exit status says so. If the app has a handler of its own, it
+  // owns the outcome — we only restore the terminal.
+  const onSignal = (signal: NodeJS.Signals) => {
+    const appHandlesIt = process.listenerCount(signal) > 1;
+    handle.unmount();
+    if (!appHandlesIt) process.kill(process.pid, signal);
   };
   // abort() IS the teardown trigger: both unmount() and the error path call it,
   // and this releases the listeners synchronously. `once` so it can't double-fire.
@@ -147,6 +164,7 @@ export async function render(
 
   process.on('uncaughtException', onUncaughtException);
   process.on('unhandledRejection', onUnhandledRejection);
+  for (const sig of TERMINATION_SIGNALS) process.on(sig, onSignal);
 
   const innerTree = backend.onKey
     ? createElement(
