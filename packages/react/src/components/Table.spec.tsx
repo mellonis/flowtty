@@ -134,7 +134,7 @@ describe('Table', () => {
     r.unmount();
   });
 
-  test('selectedIndex inverse-highlights the cursor row edge-to-edge', async () => {
+  test('selectedIndex inverse-highlights the cursor row between the outer borders', async () => {
     const backend = new TestBackend(40, 10);
     const columns: TableColumn<Person>[] = [
       { accessor: 'name', header: 'Name', width: 6 },
@@ -155,7 +155,14 @@ describe('Table', () => {
     // Lines: 0 top rule · 1 header · 2 mid rule · 3 row0 · 4 row1 (selected) · 5 row2.
     const inv = (x: number, y: number) => buf.get(x, y).style.inverse === true;
     expect(inv(2, 4)).toBe(true);  // selected row's cell content is inverse
-    expect(inv(0, 4)).toBe(true);  // ...and so is its left border — a continuous bar
+    // Inner verticals are part of the bar, so it reads as one continuous strip…
+    const row = backend.lastFrame.split('\n')[4]!;
+    const inner = [...row].findIndex((ch, x) => x > 0 && ch === '│');
+    expect(inv(inner, 4)).toBe(true);
+    // …but the OUTER borders are not: an inverse `│` fills its whole cell, which
+    // makes the bar poke half a cell past the table's frame on both sides.
+    expect(inv(0, 4)).toBe(false);
+    expect(inv([...row].lastIndexOf('│'), 4)).toBe(false);
     expect(inv(2, 3)).toBe(false); // neighbouring rows are not
     expect(inv(2, 5)).toBe(false);
     r.unmount();

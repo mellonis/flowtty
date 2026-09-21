@@ -212,8 +212,10 @@ export function Table<T>({
   };
 
   const padStr = ' '.repeat(pad);
-  // `selected` inverts the whole row — cells and the verticals between/around
-  // them — so the highlight reads as one continuous bar edge-to-edge. Per-cell
+  // `selected` inverts the row's cells and the verticals BETWEEN them, so the
+  // highlight reads as one continuous bar. The two outer borders stay plain: an
+  // inverse `│` fills its whole cell, and the bar would poke half a cell past
+  // the table's frame on each side. Per-cell
   // styles layer underneath: their dim/color/underline/strikethrough still
   // apply, but the row's inverse + bold take precedence so the cursor stays
   // legible over any column accent.
@@ -222,7 +224,7 @@ export function Table<T>({
     styles?: (TableCellStyle | undefined)[],
   ) => {
     const spans: React.ReactNode[] = [];
-    if (bordered) spans.push(<Text key="l" color={borderColor} inverse={selected}>{chars!.v}</Text>);
+    if (bordered) spans.push(<Text key="l" color={borderColor}>{chars!.v}</Text>);
     for (let c = 0; c < ncols; c++) {
       const content = padStr + fitCell(cells[c] ?? '', colWidths[c]!, columns[c]!.align ?? 'left') + padStr;
       const st = styles?.[c];
@@ -239,7 +241,7 @@ export function Table<T>({
               strikethrough={st?.strikethrough}
             >{content}</Text>,
       );
-      if (bordered) spans.push(<Text key={`v${c}`} color={borderColor} inverse={selected}>{chars!.v}</Text>);
+      if (bordered) spans.push(<Text key={`v${c}`} color={borderColor} inverse={selected && c < ncols - 1}>{chars!.v}</Text>);
     }
     return <Box flexDirection="row">{spans}</Box>;
   };
