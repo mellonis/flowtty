@@ -5,10 +5,10 @@ Yoga flexbox that lays out `<Box>`/`<Text>`, paints them into a cell buffer, and
 writes that buffer to a backend — a full-screen TTY, an inline live region, or an
 in-memory surface for tests.
 
-> The renderer is a host config on top of React's reconciler + Yoga — not a
-> from-scratch renderer including layout, and not a performance competitor to
-> native-core renderers like OpenTUI. flowtty's value is the component and
-> workflow layer built on top.
+> Reconciliation is React's and layout is Yoga's — both proven. flowtty adds what
+> sits between them and the terminal: a cell renderer with frame diffing, the
+> input layer, and the components and patterns for building an actual app —
+> forms, dialogs, scrolling, a chat-style input, a test backend.
 
 ```bash
 npm install @flowtty/react @flowtty/tty-backend react

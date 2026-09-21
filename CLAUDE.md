@@ -8,9 +8,9 @@ flowtty is a React-for-the-terminal library (Ink-shaped): a `react-reconciler`
 host config that lays out `<Box>`/`<Text>` with Yoga flexbox, paints them into a
 cell `Buffer`, and writes that buffer to a backend (a real TTY, an inline live
 region, or an in-memory test surface). The renderer rides on React + Yoga — it is
-deliberately **not** a from-scratch layout engine or a native-core perf competitor
-(see README's note re: OpenTUI). The intended value is the component/workflow
-layer on top.
+deliberately **not** a from-scratch layout engine, and raw render speed is not the
+goal. The intended value is the component/workflow layer on top. (Internal
+framing: the README states what flowtty IS, not what it is not.)
 
 ## Commands
 
