@@ -69,6 +69,25 @@ and the two backends apply it differently, because the two kinds of app differ:
   log. (A spinner *cannot* exist in a pipe — it is drawn by overwriting a cell.)
   For a sign of life in CI, emit a `<Static>` line on a timer.
 
+  The `inline-build-log` example shows both faces of one program:
+
+  ```text
+  $ npm run inline-build-log              # in a terminal: the log grows, a spinner works under it
+  [0] compiled module
+  [1] compiled module
+  ⠹ compiling...
+
+  $ npm run inline-build-log | cat        # piped: the same log, nothing else, no escape codes
+  [0] compiled module
+  [1] compiled module
+  [2] compiled module
+  [3] compiled module
+  [4] compiled module
+  ```
+
+  A test runs it exactly that way — as a real process with its stdout piped — and
+  compares the log byte for byte.
+
 **Color.** `NO_COLOR` — present and non-empty — turns color off; `FORCE_COLOR`
 overrides it in either direction (`0` = off, anything else = on). Without color
 the backends still emit bold, dim, underline, inverse and strikethrough, so
