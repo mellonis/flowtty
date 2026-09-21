@@ -29,12 +29,20 @@ export function DataScene() {
     `| size | ${pkg.size} |`,
     `| deps | ${pkg.deps} |`,
     '',
-    '1. rendered by `<Markdown>`',
+    '1. drawn by `<Markdown>`',
     '2. tables, nested lists',
-    '   - and code:',
+    '   - code and a diff:',
     '',
     '```ts',
-    `import { render } from '@flowtty/react';`,
+    'render(<App />, tty);',
+    '```',
+    '',
+    // Three rows of patch: the added / removed bands, and one context row
+    // between them so the bands read as bands.
+    '```diff',
+    ' <Markdown',
+    '-  codeWrap="wrap"',
+    '+  lineNumbers',
     '```',
   ].join('\n');
   return (

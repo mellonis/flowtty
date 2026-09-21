@@ -77,11 +77,24 @@ describe('showcase', () => {
   }, 20000);
 
   test('data: the selection walks down the table and the markdown pane follows it', async () => {
-    const { frame, app } = await playScene('data');
+    const { frame, app, inner } = await playScene('data');
     expect(frame).toContain('## @flowtty/testing');
     expect(frame).toMatch(/ <Markdown> {2}─+╮ │/);      // the pane is whole; its code block wrapped inside it
     expect(frame).toContain('TestBackend');
     expect(frame).toContain('package'); // the table header is still there
+    // Both fenced blocks fit the pane: the ts one-liner and the three-row diff,
+    // the last of which sits on the pane's last row — nothing is clipped.
+    expect(frame).toContain('│ render(<App />, tty);');
+    expect(frame).toContain('│ -  codeWrap="wrap"');
+    expect(frame).toContain('│ +  lineNumbers');
+    // The removed row wears its band, and it runs to the end of the code area.
+    const rows = frame.split('\n');
+    const y = rows.findIndex((r) => r.includes('-  codeWrap="wrap"'));
+    const x = [...rows[y]!].indexOf('-', rows[y]!.indexOf('│ -'));
+    const buf = inner.lastBuffer!;
+    expect(buf.get(x, y).style.fg).toBe('red');
+    expect(buf.get(x, y).style.bg).toBe('#3b0000');
+    expect(buf.get(x - 2, y).style.bg).toBeUndefined();  // the gutter stays outside the band
     app.unmount();
   }, 20000);
 
