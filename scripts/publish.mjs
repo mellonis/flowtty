@@ -48,6 +48,17 @@ const restore = () => {
 };
 process.on('SIGINT', () => { restore(); process.exit(130); });
 
+if (!dryRun) {
+  let who;
+  try {
+    who = execFileSync('npm', ['whoami'], { cwd: root, encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] }).trim();
+  } catch {
+    console.error('publish: not logged in to npm — run "npm login" first');
+    process.exit(1);
+  }
+  console.log(`== publishing as ${who}`);
+}
+
 if (!dryRun && !otp) {
   console.error('An OTP is required: --otp <code> (or NPM_OTP). Use --dry-run to rehearse.');
   process.exit(1);
