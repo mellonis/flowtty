@@ -4,6 +4,7 @@ How keys reach a component, how focus moves, and how forms validate.
 
 - [Paste and mouse wheel](#paste-and-mouse-wheel)
 - [Focus + Button](#focus--button)
+- [Form](#form)
 - [Usage with Zod](#usage-with-zod)
 
 ## Paste and mouse wheel
@@ -65,6 +66,34 @@ the component selects it and moves the cursor onto it once it appears in `items`
 TextInput / Select / MultiSelect also plug into the focus system. Their `isFocused` prop becomes optional — if unset, they read from the FocusGroup. If set explicitly, the prop overrides.
 
 Outside a FocusGroup, `useFocus()` returns `{isFocused: true}` (safe default — single component receives input as before).
+
+## Form
+
+`<Form>` collects named fields, moves focus through them, and submits them
+together. A field is whatever calls `useField(name, { validate })`:
+
+```tsx
+function Field({ name, label, validate }: { name: string; label: string; validate?: (v: unknown) => string | null }) {
+  const f = useField(name, { validate });
+  return (
+    <Box flexDirection="column">
+      <Text dim>{label}</Text>
+      <TextInput value={(f.value as string) ?? ''} onChange={f.onChange}
+        onSubmit={f.onSubmit} onCancel={f.onCancel} isFocused={f.isFocused} />
+    </Box>
+  );
+}
+
+<Form onSubmit={(values) => save(values)} onCancel={close}>
+  <Field name="slug" label="slug" validate={(v) => (/^[a-z-]+$/.test(String(v)) ? null : 'kebab-case only')} />
+  <Field name="title" label="title" />
+</Form>
+```
+
+`useField` returns `{ value, onChange, onSubmit, onCancel, isFocused }`. Enter in
+a field (`onSubmit`) validates it and moves to the next one; from the last field
+it calls the form's `onSubmit` with every value, keyed by name. Escape cancels the
+form. Fields register in mount order, which is also the focus order.
 
 ## Usage with Zod
 

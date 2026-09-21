@@ -2,6 +2,9 @@
 
 The building blocks beyond `<Box>` and `<Text>`. Forms, focus and buttons are in [input.md](input.md); dialogs are in [app.md](app.md).
 
+- [TextInput](#textinput)
+- [Select](#select)
+- [MultiSelect](#multiselect)
 - [TextArea](#textarea)
 - [Table](#table)
 - [Markdown](#markdown)
@@ -9,6 +12,66 @@ The building blocks beyond `<Box>` and `<Text>`. Forms, focus and buttons are in
 - [Spinner](#spinner)
 - [ProgressBar](#progressbar)
 - [TaskList](#tasklist)
+
+## TextInput
+
+A single-line field. Controlled (`value` + `onChange`) or, for a one-shot prompt,
+uncontrolled (`defaultValue`).
+
+```tsx
+<TextInput value={slug} onChange={setSlug} onSubmit={save} onCancel={close}
+  validate={(v) => (/^[a-z-]+$/.test(v) ? null : 'kebab-case only')} />
+```
+
+| Prop | |
+|---|---|
+| `value` / `onChange` | Controlled value. Omit `value` for an uncontrolled field. |
+| `defaultValue` | Initial value of an uncontrolled field. |
+| `onSubmit(value)` | Enter — only if `validate` passes. |
+| `onCancel()` | Escape. |
+| `validate(value)` | Return a message to reject a submit, `null` to accept. The message is drawn in red under the field and cleared by the next edit; `showError={false}` leaves that to you. |
+| `mask` | Draw `•` per character (passwords). |
+| `isFocused` | Override focus; by default the enclosing `<FocusGroup>` decides. |
+
+Editing keys: ←/→, Home/End and Ctrl+A / Ctrl+E, Alt+←/→ (or Alt+B / Alt+F) by
+word, Backspace / Delete, Alt+Backspace and Ctrl+W delete a word back, Alt+D a
+word forward, Ctrl+K / Ctrl+U kill to the end / start. A paste is inserted at the
+caret with its line breaks turned into spaces. An emoji is one character. For
+several lines use [`<TextArea>`](#textarea).
+
+## Select
+
+Pick one of a list. The highlighted item *is* the value.
+
+```tsx
+<Select items={[{ label: 'Hobby', value: 'hobby' }, { label: 'Team', value: 'team' }]}
+  value={plan} onChange={setPlan} onSubmit={confirm} />
+```
+
+↑/↓ (or `k` / `j`) move and wrap around; typing narrows the list to labels
+containing what was typed (case-insensitive), Backspace widens it again; Enter
+calls `onSubmit`, Escape `onCancel`. Because `j` and `k` navigate, they cannot be
+typed into the filter. The generic parameter is the value type —
+`<Select<Plan> …>` in JSX keeps it, `createElement` loses it.
+
+## MultiSelect
+
+Pick any number. `value` is the array of selected values, always in the order of
+`items`.
+
+```tsx
+<MultiSelect items={tags} value={picked} onChange={setPicked} onSubmit={next}
+  onAddNew={async () => (await askForTag()) ?? null} />
+```
+
+↑/↓ move, Space toggles, Enter submits, Escape cancels. `onAddNew` adds a
+"+ add new" row; return the new item's value — directly or as a promise, e.g.
+after a sub-prompt in a dialog — and the component selects it and moves the cursor
+onto it once it appears in `items` (adding it to `items` is the caller's job).
+Return `null` for a cancelled prompt.
+
+Both lists show focus: a colored, bold `▸` and a bold cursor row when focused, a
+dim marker when not.
 
 ## TextArea
 
