@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Box, Text, Spinner, ProgressBar, TaskList, useInput, type TaskItem } from '@flowtty/react';
 import { useTempo } from '../tempo.js';
 
-const STEPS = ['install dependencies', 'typecheck', 'run 657 tests', 'build four packages', 'publish to the registry'];
+const STEPS = ['install dependencies', 'typecheck', 'run the tests', 'build four packages', 'publish to the registry'];
 
 export function ProgressScene() {
   const tempo = useTempo();
