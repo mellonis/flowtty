@@ -4,6 +4,7 @@ import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON,
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
 import { isInteractive, notInteractiveReason } from './interactive.js';
+import { detectColorDepth, type ColorDepth } from './colorDepth.js';
 
 export interface TtyBackendOptions {
   /**
@@ -17,6 +18,10 @@ export interface TtyBackendOptions {
    *  `FORCE_COLOR` overriding it (see `detectColorSupport`). Bold, dim, underline
    *  and inverse are emitted either way. */
   color?: boolean;
+  /** Color depth in bits: 4 (16 colors), 8 (256) or 24 (truecolor). Default: from
+   *  the environment (`detectColorDepth`) — truecolor only where the terminal
+   *  announces it. `#hex` / `rgb()` colors are brought down to fit. */
+  colorDepth?: ColorDepth;
 }
 
 export class TtyBackend implements Backend {
@@ -26,7 +31,7 @@ export class TtyBackend implements Backend {
    *  the bytes but never makes them clickable). The painter writes OSC 8
    *  unconditionally regardless of this flag — it only governs <Link> fallback. */
   readonly hyperlinks: boolean = detectHyperlinkSupport();
-  private readonly sgrOptions: { color: boolean };
+  private readonly sgrOptions: { color: boolean; depth: ColorDepth };
 
   private readonly subscribers = new Set<(key: Key) => void>();
   // Carries an incomplete escape sequence from one stdin chunk to the next, so
@@ -78,7 +83,7 @@ export class TtyBackend implements Backend {
         + 'or use InlineTtyBackend, which falls back to printing its <Static> lines.',
       );
     }
-    this.sgrOptions = { color: options.color ?? detectColorSupport() };
+    this.sgrOptions = { color: options.color ?? detectColorSupport(), depth: options.colorDepth ?? detectColorDepth() };
     // Enter the alternate screen buffer + hide cursor, atomic write.
     // Alt-screen ensures full-frame redraws happen in place and the user's
     // pre-launch terminal content is restored on dispose.

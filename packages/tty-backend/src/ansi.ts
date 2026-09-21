@@ -1,4 +1,5 @@
 import type { Cell, NamedColor, Style } from '@flowtty/core';
+import { rgbToAnsi16, rgbToAnsi256, type ColorDepth } from './colorDepth.js';
 
 export const RESET = '\x1b[0m';
 
@@ -94,6 +95,10 @@ export interface SgrOptions {
   /** Emit fg / bg color codes. Default true. Off, the other attributes (bold,
    *  dim, underline, inverse, strikethrough) are still emitted. */
   color?: boolean;
+  /** The terminal's color depth. Default 24. At 8 or 4 a `#hex` / `rgb()` color
+   *  is brought down to the nearest 256-color or 16-color entry; named colors
+   *  are 16-color codes at any depth. */
+  depth?: ColorDepth;
 }
 
 /**
@@ -109,6 +114,7 @@ export function detectColorSupport(env: NodeJS.ProcessEnv = process.env): boolea
 
 export function sgr(style: Style, opts: SgrOptions = {}): string {
   const color = opts.color !== false;
+  const depth = opts.depth ?? 24;
   const parts: string[] = [];
   if (style.bold) parts.push('1');
   if (style.dim) parts.push('2');
@@ -118,7 +124,9 @@ export function sgr(style: Style, opts: SgrOptions = {}): string {
   if (color && style.fg) {
     const rgb = parseColor(style.fg);
     if (rgb) {
-      parts.push(`38;2;${rgb.r};${rgb.g};${rgb.b}`);
+      parts.push(depth === 24 ? `38;2;${rgb.r};${rgb.g};${rgb.b}`
+        : depth === 8 ? `38;5;${rgbToAnsi256(rgb.r, rgb.g, rgb.b)}`
+          : String(rgbToAnsi16(rgb.r, rgb.g, rgb.b)));
     } else {
       const code = fgCode(style.fg);
       if (code !== undefined) parts.push(String(code));
@@ -128,7 +136,9 @@ export function sgr(style: Style, opts: SgrOptions = {}): string {
   if (color && style.bg) {
     const rgb = parseColor(style.bg);
     if (rgb) {
-      parts.push(`48;2;${rgb.r};${rgb.g};${rgb.b}`);
+      parts.push(depth === 24 ? `48;2;${rgb.r};${rgb.g};${rgb.b}`
+        : depth === 8 ? `48;5;${rgbToAnsi256(rgb.r, rgb.g, rgb.b)}`
+          : String(rgbToAnsi16(rgb.r, rgb.g, rgb.b) + 10));
     } else {
       const code = bgCode(style.bg);
       if (code !== undefined) parts.push(String(code));

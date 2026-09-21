@@ -18,8 +18,23 @@ Color, glyph width, and what the renderer does not do yet.
 - 6-digit hex `#rrggbb`.
 - CSS-style `rgb(R, G, B)` (each channel 0–255 integer).
 
-24-bit color (`#…` / `rgb(…)`) emits `\x1b[38;2;R;G;Bm` (fg) / `\x1b[48;2;R;G;Bm` (bg).
-Modern terminal required (iTerm2, Terminal.app, Windows Terminal, modern xterm).
+On a truecolor terminal a `#…` / `rgb(…)` color is emitted as 24-bit SGR
+(`\x1b[38;2;R;G;Bm` / `\x1b[48;2;R;G;Bm`). Elsewhere it is **brought down to what
+the terminal can show**: the nearest entry of the xterm 256-color palette (the
+6×6×6 cube or the gray ramp, whichever is closer — `38;5;N`), or the nearest of
+the 16 ANSI colors. Named colors are 16-color codes at any depth.
+
+The depth comes from the environment (`detectColorDepth`): truecolor when
+`COLORTERM` is `truecolor` / `24bit` or `TERM` is one of the truecolor-by-name
+terminals (kitty, alacritty, wezterm, ghostty, `*-direct`); 256 colors when `TERM`
+contains `256color`; otherwise 16. Truecolor is only assumed where it is
+*announced* — a 24-bit sequence sent to a 256-color terminal gives wrong colors,
+while 256 colors on a truecolor terminal are merely a little duller. If your
+terminal supports truecolor but says nothing, set `COLORTERM=truecolor`, or
+`FORCE_COLOR=3` (`1` = 16 colors, `2` = 256). Both TTY backends also take a
+`colorDepth` option (`4`, `8` or `24` bits); `rgbToAnsi256` / `rgbToAnsi16` are
+exported for custom backends.
+
 An unknown color name paints nothing; the TTY backends list such names in a
 warning when they exit (never mid-frame, where it would corrupt the display).
 

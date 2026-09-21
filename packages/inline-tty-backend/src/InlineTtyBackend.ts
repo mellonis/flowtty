@@ -4,6 +4,8 @@ import {
   decodeKeys,
   detectHyperlinkSupport,
   detectColorSupport,
+  detectColorDepth,
+  type ColorDepth,
   isInteractive,
   RESET, HIDE_CURSOR, SHOW_CURSOR,
   BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF,
@@ -25,6 +27,9 @@ export interface InlineTtyBackendOptions {
    *  `FORCE_COLOR` overriding it. Bold, dim, underline and inverse are emitted
    *  either way. */
   color?: boolean;
+  /** Color depth in bits: 4, 8 or 24. Default: from the environment —
+   *  truecolor only where the terminal announces it. */
+  colorDepth?: ColorDepth;
 }
 
 /**
@@ -85,7 +90,7 @@ export class InlineTtyBackend implements Backend {
   private liveLines: string[] = [];
   private cursorHidden = false;
   private disposed = false;
-  private readonly sgrOptions: { color: boolean };
+  private readonly sgrOptions: { color: boolean; depth: ColorDepth };
   /**
    * True when stdout is not an interactive terminal (piped, redirected, CI,
    * `TERM=dumb`). The app has already split its output into permanent lines
@@ -96,7 +101,7 @@ export class InlineTtyBackend implements Backend {
   readonly logOnly: boolean;
 
   constructor(options: InlineTtyBackendOptions = {}) {
-    this.sgrOptions = { color: options.color ?? detectColorSupport() };
+    this.sgrOptions = { color: options.color ?? detectColorSupport(), depth: options.colorDepth ?? detectColorDepth() };
     this.out = options.out ?? process.stdout;
     this.logOnly = !isInteractive(this.out);
     this.input = options.in ?? process.stdin;

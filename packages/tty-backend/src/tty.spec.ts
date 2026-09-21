@@ -514,3 +514,17 @@ test('TtyBackend refuses TERM=dumb the same way', () => {
     if (saved === undefined) delete process.env.TERM; else process.env.TERM = saved;
   }
 });
+
+test('TtyBackend downgrades 24-bit colors to the terminal\'s depth, in the full redraw and in the diff', () => {
+  const { stub: out, writes } = makeStub();
+  const back = new TtyBackend(out, makeStdinStub(), { colorDepth: 8 });
+  const a = new Buffer(6, 1); a.set(0, 0, 'x', { fg: 'rgb(255,0,0)' });
+  back.draw(a);
+  const b = new Buffer(6, 1); b.set(0, 0, 'y', { fg: '#5f87af' });
+  back.draw(b);
+  const all = writes.join('');
+  expect(all).toContain('38;5;196');
+  expect(all).toContain('38;5;67');
+  expect(all).not.toContain('38;2;');
+  back.dispose();
+});
