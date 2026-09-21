@@ -1,13 +1,14 @@
-import React, { useState, type ReactNode } from 'react';
+import React, { useEffect, useState, type ReactNode } from 'react';
 import { Box, DialogHost, Text, useApp, useInput, useTerminalSize } from '@flowtty/react';
 import { useAutopilot, type Autopilot } from './autopilot.js';
-import { TempoContext } from './tempo.js';
+import { CopyFeed, useLastCopy } from './copyFeed.js';
+import { TempoContext, useTempo } from './tempo.js';
 
 export interface Scene { name: string; render: () => ReactNode }
 
 export const FRAME = { width: 100, height: 30 } as const;
 
-export interface AppProps { scenes: Scene[]; autopilot: Autopilot; speed?: number }
+export interface AppProps { scenes: Scene[]; autopilot: Autopilot; speed?: number; copies?: CopyFeed }
 
 /** DialogHost + playback speed around the tour itself. */
 export function App({ speed = 1, ...rest }: AppProps) {
@@ -19,11 +20,12 @@ export function App({ speed = 1, ...rest }: AppProps) {
 }
 
 /** The showcase draws inside a fixed frame so it looks the same in every terminal — and in every recording. */
-function Tour({ scenes, autopilot }: { scenes: Scene[]; autopilot: Autopilot }) {
+function Tour({ scenes, autopilot, copies }: { scenes: Scene[]; autopilot: Autopilot; copies?: CopyFeed }) {
   const { exit } = useApp();
   const size = useTerminalSize();
   const mode = useAutopilot(autopilot);
   const [index, setIndex] = useState(0);
+  const toast = useCopyToast(copies);
 
   useInput((key) => {
     // F1…Fn jump to a scene (what the script uses); Ctrl+N / Ctrl+P step for people on a laptop keyboard.
@@ -64,10 +66,30 @@ function Tour({ scenes, autopilot }: { scenes: Scene[]; autopilot: Autopilot }) 
         {/* keyed by scene: switching remounts it, so every visit starts from a clean state */}
         <Box key={scene.name} flexDirection="column" flexGrow={1} flexShrink={1}>{scene.render()}</Box>
         <Box flexDirection="row" justifyContent="space-between">
-          <Text dim>{status}</Text>
+          {/* The copy notice takes the status line's place while it is up, so
+              nothing has to fit beside it. */}
+          <Text dim={toast === null} color={toast === null ? undefined : 'green'}>{toast ?? status}</Text>
           <Text dim>Ctrl+N / Ctrl+P scenes · Ctrl+Q quit</Text>
         </Box>
       </Box>
     </Box>
   );
+}
+
+/** "copied N chars" for a moment after every copy — a drag over the frame, or
+ *  `useApp().copy()`. Null the rest of the time. */
+function useCopyToast(copies: CopyFeed | undefined): string | null {
+  const last = useLastCopy(copies);
+  const tempo = useTempo();
+  const [shown, setShown] = useState<typeof last>(null);
+  useEffect(() => {
+    if (last === null) return;
+    setShown(last);
+    // Long enough that the script's `waitFor('copied')` is never racing it.
+    const timer = setTimeout(() => setShown(null), tempo(3000));
+    return () => { clearTimeout(timer); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [last]);
+  if (shown === null) return null;
+  return `${shown.delivered ? '✓' : '·'} copied ${shown.text.length} chars`;
 }

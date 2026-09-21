@@ -3,7 +3,7 @@
 // straight through, while `onKey` delivers BOTH the real keyboard and the keys
 // the director injects. Because it wraps the `Backend` interface, the same
 // script drives a live TTY (for a recording) and a `TestBackend` (as a test).
-import type { Backend, Buffer, Key } from '@flowtty/react';
+import type { Backend, Buffer, Key, MouseButton } from '@flowtty/react';
 
 export type Step =
   | { kind: 'wait'; ms: number }
@@ -11,6 +11,7 @@ export type Step =
   | { kind: 'press'; key: Partial<Key> & { name: string }; times: number }
   | { kind: 'paste'; text: string }
   | { kind: 'wheel'; direction: 'up' | 'down'; x: number; y: number; times: number }
+  | { kind: 'mouse'; points: readonly { kind: 'down' | 'drag' | 'up'; x: number; y: number }[]; button: MouseButton; perPointMs: number }
   | { kind: 'waitFor'; text: string; timeoutMs: number };
 
 export const wait = (ms: number): Step => ({ kind: 'wait', ms });
@@ -18,6 +19,13 @@ export const type = (text: string, perCharMs = 55): Step => ({ kind: 'type', tex
 export const press = (name: string, mods: Partial<Key> = {}, times = 1): Step => ({ kind: 'press', key: { ...mods, name }, times });
 export const paste = (text: string): Step => ({ kind: 'paste', text });
 export const wheel = (direction: 'up' | 'down', x: number, y: number, times = 1): Step => ({ kind: 'wheel', direction, x, y, times });
+/** A run of mouse button events — a drag is `down` at the start, `drag` for each
+ *  cell it crosses, `up` at the end, which is how a terminal reports one. */
+export const mouse = (
+  points: readonly { kind: 'down' | 'drag' | 'up'; x: number; y: number }[],
+  button: MouseButton = 'left',
+  perPointMs = 60,
+): Step => ({ kind: 'mouse', points, button, perPointMs });
 /** Block until the frame shows `text` — for anything the app does on its own clock. */
 export const waitFor = (text: string, timeoutMs = 8000): Step => ({ kind: 'waitFor', text, timeoutMs });
 
@@ -32,6 +40,7 @@ export class ScriptedBackend implements Backend {
   printStatic: Backend['printStatic'];
   bell: Backend['bell'];
   notify: Backend['notify'];
+  copy: Backend['copy'];
 
   private readonly subscribers = new Set<(key: Key) => void>();
   private unsubscribeInner: (() => void) | undefined;
@@ -43,6 +52,7 @@ export class ScriptedBackend implements Backend {
     if (inner.printStatic) this.printStatic = (lines) => inner.printStatic!(lines);
     if (inner.bell) this.bell = () => inner.bell!();
     if (inner.notify) this.notify = (title, body) => inner.notify!(title, body);
+    if (inner.copy) this.copy = (text) => inner.copy!(text);
   }
 
   size(): { width: number; height: number } { return this.inner.size(); }
@@ -84,6 +94,9 @@ export interface DirectorOptions {
   gate?: () => Promise<void>;
   /** A `waitFor` that times out: throw (tests) or carry on (a live demo should not die). */
   onTimeout?: 'throw' | 'continue';
+  /** Where the app's frame starts on the screen. Mouse points in a script are
+   *  relative to the frame; a frame centered in a larger window is not at 0,0. */
+  origin?: () => { x: number; y: number };
 }
 
 const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
@@ -127,6 +140,19 @@ export async function play(backend: ScriptedBackend, steps: readonly Step[], opt
           if (aborted()) return;
           backend.inject({ name: step.direction === 'up' ? 'wheelup' : 'wheeldown', x: step.x, y: step.y });
           await beat(90);
+        }
+        break;
+      case 'mouse':
+        for (const point of step.points) {
+          if (aborted()) return;
+          const origin = opts.origin?.() ?? { x: 0, y: 0 };
+          backend.inject({
+            name: point.kind === 'down' ? 'mousedown' : point.kind === 'drag' ? 'mousedrag' : 'mouseup',
+            button: step.button,
+            x: origin.x + point.x,
+            y: origin.y + point.y,
+          });
+          await beat(step.perPointMs);
         }
         break;
       case 'waitFor': {

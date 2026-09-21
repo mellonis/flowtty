@@ -1,4 +1,4 @@
-import { press, paste, type, wait, waitFor, type Step } from './director.js';
+import { mouse, press, paste, type, wait, waitFor, type Step } from './director.js';
 
 // One entry per scene, in F-key order. Each starts by jumping to its scene, so a
 // scene's script can be played (and tested) on its own. Anything the app does on
@@ -21,8 +21,20 @@ export const SCRIPT: Record<string, Step[]> = {
     waitFor('Saved ✓'), wait(1400),
   ],
   data: [
-    press('f3'), wait(1100),
-    press('down'), wait(800), press('down'), wait(800), press('down'), wait(800), press('down'),
+    press('f3'), wait(500),
+    // Sweep the pane's first paragraph. It is soft-wrapped over two rows, and
+    // the pane is a selectionScope, so it comes back as the one line it was
+    // written as — and the footer says how many characters went out.
+    mouse([
+      { kind: 'down', x: 71, y: 6 },
+      { kind: 'drag', x: 84, y: 6 },
+      { kind: 'drag', x: 94, y: 6 },
+      { kind: 'drag', x: 84, y: 7 },
+      { kind: 'drag', x: 94, y: 7 },
+      { kind: 'up', x: 94, y: 7 },
+    ]),
+    waitFor('copied'), wait(700),
+    press('down'), wait(650), press('down'), wait(650), press('down'), wait(650), press('down'),
     waitFor('@flowtty/testing'), wait(1300),
   ],
   progress: [

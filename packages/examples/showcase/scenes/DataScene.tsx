@@ -31,11 +31,7 @@ export function DataScene() {
     '',
     '1. drawn by `<Markdown>`',
     '2. tables, nested lists',
-    '   - code and a diff:',
-    '',
-    '```ts',
-    'render(<App />, tty);',
-    '```',
+    '   - and a diff:',
     '',
     // Three rows of patch: the added / removed bands, and one context row
     // between them so the bands read as bands.
@@ -59,7 +55,9 @@ export function DataScene() {
           ]}
         />
       </Box>
-      <Box flexDirection="column" flexGrow={1} flexShrink={1} border="round" borderTitle=" <Markdown> " paddingX={1}>
+      {/* selectionScope: a drag inside the rendered markdown stops at the pane's
+          content, so the border and the table beside it never come along. */}
+      <Box flexDirection="column" flexGrow={1} flexShrink={1} border="round" borderTitle=" <Markdown> " paddingX={1} selectionScope>
         <Markdown>{md}</Markdown>
       </Box>
     </Box>

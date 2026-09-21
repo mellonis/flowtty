@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { describe, test, expect } from 'vitest';
 import { render, Text, TextInput, useInput } from '@flowtty/react';
 import { TestBackend, flushAsync } from '@flowtty/core/testing';
-import { ScriptedBackend, play, type, press, paste, wait, waitFor } from './director.js';
+import { ScriptedBackend, play, type, press, paste, wait, waitFor, mouse } from './director.js';
 
 function Probe() {
   const [value, setValue] = useState('');
@@ -24,6 +24,17 @@ describe('showcase director', () => {
     await play(backend, [type('hi'), paste(' there'), press('return')], { speed: Infinity });
     await flushAsync(inner);
     expect(inner.lastFrame).toContain('sent:hi there');
+    app.unmount();
+  });
+
+  test('mouse points are relative to the origin the caller gives — a centered frame moves with its window', async () => {
+    const inner = new TestBackend(30, 3);
+    const backend = new ScriptedBackend(inner);
+    const seen: string[] = [];
+    function Spy() { useInput((key) => { if (key.name.startsWith('mouse')) seen.push(`${key.name}@${key.x},${key.y}`); }); return null; }
+    const app = await render(<Spy />, backend);
+    await play(backend, [mouse([{ kind: 'down', x: 1, y: 1 }, { kind: 'up', x: 4, y: 2 }])], { speed: Infinity, origin: () => ({ x: 2, y: 1 }) });
+    expect(seen).toEqual(['mousedown@3,2', 'mouseup@6,3']);
     app.unmount();
   });
 
