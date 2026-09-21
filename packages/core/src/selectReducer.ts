@@ -42,11 +42,14 @@ export function reduce<T>(items: SelectItem<T>[], state: SelectState, key: Key):
     return { kind: 'submit', index: visible[cursor]! };
   }
 
-  if (key.name === 'down' || (key.name === 'j' && !key.ctrl && !key.meta)) {
+  // Arrows only. This list filters as you type, so every printable character —
+  // `j` and `k` included — belongs to the filter; MultiSelect, which has no
+  // filter, keeps the vim-style pair.
+  if (key.name === 'down') {
     if (n === 0) return { kind: 'noop' };
     return { kind: 'state', state: { cursor: (state.cursor + 1) % n, filter: state.filter } };
   }
-  if (key.name === 'up' || (key.name === 'k' && !key.ctrl && !key.meta)) {
+  if (key.name === 'up') {
     if (n === 0) return { kind: 'noop' };
     return { kind: 'state', state: { cursor: (state.cursor - 1 + n) % n, filter: state.filter } };
   }

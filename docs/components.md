@@ -48,10 +48,9 @@ Pick one of a list. The highlighted item *is* the value.
   value={plan} onChange={setPlan} onSubmit={confirm} />
 ```
 
-↑/↓ (or `k` / `j`) move and wrap around; typing narrows the list to labels
-containing what was typed (case-insensitive), Backspace widens it again; Enter
-calls `onSubmit`, Escape `onCancel`. Because `j` and `k` navigate, they cannot be
-typed into the filter. The generic parameter is the value type —
+↑/↓ move and wrap around; typing narrows the list to labels containing what was
+typed (case-insensitive), Backspace widens it again; Enter calls `onSubmit`, Escape
+`onCancel`. Every printable key goes to the filter. The generic parameter is the value type —
 `<Select<Plan> …>` in JSX keeps it, `createElement` loses it.
 
 ## MultiSelect
@@ -64,7 +63,8 @@ Pick any number. `value` is the array of selected values, always in the order of
   onAddNew={async () => (await askForTag()) ?? null} />
 ```
 
-↑/↓ move, Space toggles, Enter submits, Escape cancels. `onAddNew` adds a
+↑/↓ (or `k` / `j` — there is no filter here to need the letters) move, Space
+toggles, Enter submits, Escape cancels. `onAddNew` adds a
 "+ add new" row; return the new item's value — directly or as a promise, e.g.
 after a sub-prompt in a dialog — and the component selects it and moves the cursor
 onto it once it appears in `items` (adding it to `items` is the caller's job).

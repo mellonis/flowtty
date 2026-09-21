@@ -80,3 +80,23 @@ test('cursor clamps to visible range when filter narrows the list', () => {
     kind: 'state', state: { cursor: 0, filter: 'b' },
   });
 });
+
+// A list that filters as you type needs every printable character for the
+// filter — so `j` / `k` are letters here, not vim-style navigation.
+test('j and k go into the filter, like any other letter', () => {
+  const tools = ['jest', 'mocha', 'karma', 'jasmine'].map((label) => ({ label, value: label }));
+  expect(reduce(tools, { cursor: 1, filter: '' }, key({ name: 'j', sequence: 'j' }))).toEqual({
+    kind: 'state', state: { cursor: 0, filter: 'j' },
+  });
+  expect(reduce(tools, { cursor: 1, filter: '' }, key({ name: 'k', sequence: 'k' }))).toEqual({
+    kind: 'state', state: { cursor: 0, filter: 'k' },
+  });
+  expect(visibleIndices(tools, 'j')).toEqual([0, 3]);
+  expect(visibleIndices(tools, 'k')).toEqual([2]);
+});
+
+test('arrows still navigate', () => {
+  const three = ['a', 'b', 'c'].map((label) => ({ label, value: label }));
+  expect(reduce(three, { cursor: 0, filter: '' }, key({ name: 'down' }))).toEqual({ kind: 'state', state: { cursor: 1, filter: '' } });
+  expect(reduce(three, { cursor: 0, filter: '' }, key({ name: 'up' }))).toEqual({ kind: 'state', state: { cursor: 2, filter: '' } });
+});
