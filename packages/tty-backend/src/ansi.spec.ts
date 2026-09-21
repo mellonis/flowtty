@@ -1,6 +1,6 @@
 import { expect, test, describe } from 'vitest';
 import { NAMED_COLORS } from '@flowtty/core';
-import { sgr, RESET, cursorTo, cellsEqual, parseColor, OSC8_CLOSE, osc8Open, takeUnknownColors } from './ansi.js';
+import { sgr, RESET, cursorTo, cellsEqual, parseColor, OSC8_CLOSE, osc8Open, takeUnknownColors, detectColorSupport } from './ansi.js';
 
 describe('OSC 8 hyperlinks', () => {
   test('osc8Open wraps the URL in the OSC 8 open sequence with an ST terminator', () => {
@@ -179,4 +179,22 @@ test('every named color from core has an SGR code, for fg and bg', () => {
     expect(sgr({ fg: name }), `fg ${name}`).toMatch(/^\x1b\[(3[0-7]|9[0-7])m$/);
     expect(sgr({ bg: name }), `bg ${name}`).toMatch(/^\x1b\[(4[0-7]|10[0-7])m$/);
   }
+});
+
+// ─── NO_COLOR / FORCE_COLOR ──────────────────────────────────────────────────
+
+test('sgr with color off drops fg and bg but keeps the other attributes', () => {
+  expect(sgr({ fg: 'red', bg: '#112233', bold: true, underline: true }, { color: false })).toBe('\x1b[1;4m');
+  expect(sgr({ fg: 'red' }, { color: false })).toBe('');
+  expect(sgr({ inverse: true, dim: true }, { color: false })).toBe('\x1b[2;7m');
+});
+
+test('detectColorSupport: NO_COLOR (any non-empty value) turns color off; FORCE_COLOR wins over it', () => {
+  expect(detectColorSupport({})).toBe(true);
+  expect(detectColorSupport({ NO_COLOR: '1' })).toBe(false);
+  expect(detectColorSupport({ NO_COLOR: 'true' })).toBe(false);
+  expect(detectColorSupport({ NO_COLOR: '' })).toBe(true);           // per no-color.org: present AND non-empty
+  expect(detectColorSupport({ NO_COLOR: '1', FORCE_COLOR: '1' })).toBe(true);
+  expect(detectColorSupport({ FORCE_COLOR: '0' })).toBe(false);
+  expect(detectColorSupport({ NO_COLOR: '1', FORCE_COLOR: '0' })).toBe(false);
 });

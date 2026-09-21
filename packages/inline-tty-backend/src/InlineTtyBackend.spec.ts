@@ -188,4 +188,15 @@ describe('InlineTtyBackend', () => {
     b.dispose();
     expect(out.captured()).toContain('\x1b[?2004l');
   });
+
+  test('color: false drops color codes and keeps bold', () => {
+    const out = mockStdout();
+    const b = new InlineTtyBackend({ out, in: mockStdin(), liveHeight: 1, color: false });
+    const buf = new Buffer(10, 1);
+    buf.set(0, 0, 'x', { fg: 'red', bold: true });
+    b.draw(buf);
+    expect(out.captured()).toContain('\x1b[1m');
+    expect(out.captured()).not.toContain('31m');
+    b.dispose();
+  });
 });

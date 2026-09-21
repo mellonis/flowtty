@@ -90,14 +90,32 @@ export function parseColor(input: string): { r: number; g: number; b: number } |
   return null;
 }
 
-export function sgr(style: Style): string {
+export interface SgrOptions {
+  /** Emit fg / bg color codes. Default true. Off, the other attributes (bold,
+   *  dim, underline, inverse, strikethrough) are still emitted. */
+  color?: boolean;
+}
+
+/**
+ * Should color be emitted? Follows the two conventions CLIs agree on:
+ * `NO_COLOR` — present and non-empty — turns it off (no-color.org), and
+ * `FORCE_COLOR` overrides that in either direction (`0` = off, anything else = on).
+ */
+export function detectColorSupport(env: NodeJS.ProcessEnv = process.env): boolean {
+  const force = env.FORCE_COLOR;
+  if (force !== undefined && force !== '') return force !== '0';
+  return !(env.NO_COLOR !== undefined && env.NO_COLOR !== '');
+}
+
+export function sgr(style: Style, opts: SgrOptions = {}): string {
+  const color = opts.color !== false;
   const parts: string[] = [];
   if (style.bold) parts.push('1');
   if (style.dim) parts.push('2');
   if (style.underline) parts.push('4');
   if (style.inverse) parts.push('7');
   if (style.strikethrough) parts.push('9');
-  if (style.fg) {
+  if (color && style.fg) {
     const rgb = parseColor(style.fg);
     if (rgb) {
       parts.push(`38;2;${rgb.r};${rgb.g};${rgb.b}`);
@@ -107,7 +125,7 @@ export function sgr(style: Style): string {
       else noteUnknownColor(style.fg);
     }
   }
-  if (style.bg) {
+  if (color && style.bg) {
     const rgb = parseColor(style.bg);
     if (rgb) {
       parts.push(`48;2;${rgb.r};${rgb.g};${rgb.b}`);

@@ -3,6 +3,7 @@ import { stringWidth, type Buffer, type Style, type Backend, type Key } from '@f
 import {
   decodeKeys,
   detectHyperlinkSupport,
+  detectColorSupport,
   RESET, HIDE_CURSOR, SHOW_CURSOR,
   BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF,
   OSC8_CLOSE, osc8Open,
@@ -19,6 +20,10 @@ export interface InlineTtyBackendOptions {
   out?: NodeJS.WriteStream;
   /** Input stream for keys; defaults to process.stdin. */
   in?: NodeJS.ReadStream;
+  /** Emit color. Default: from the environment — off when `NO_COLOR` is set,
+   *  `FORCE_COLOR` overriding it. Bold, dim, underline and inverse are emitted
+   *  either way. */
+  color?: boolean;
 }
 
 /**
@@ -79,8 +84,10 @@ export class InlineTtyBackend implements Backend {
   private liveLines: string[] = [];
   private cursorHidden = false;
   private disposed = false;
+  private readonly sgrOptions: { color: boolean };
 
   constructor(options: InlineTtyBackendOptions = {}) {
+    this.sgrOptions = { color: options.color ?? detectColorSupport() };
     this.out = options.out ?? process.stdout;
     this.input = options.in ?? process.stdin;
     this.liveHeight = Math.max(1, options.liveHeight ?? 10);
@@ -218,7 +225,7 @@ export class InlineTtyBackend implements Backend {
         const cell = buffer.get(x, y);
         if (JSON.stringify(cell.style) !== JSON.stringify(last)) {
           if (lineLink !== undefined && lineLink !== cell.style.link) line += OSC8_CLOSE;
-          line += RESET + sgr(cell.style);
+          line += RESET + sgr(cell.style, this.sgrOptions);
           if (cell.style.link !== undefined && cell.style.link !== lineLink) line += osc8Open(cell.style.link);
           last = cell.style;
           lineLink = cell.style.link;

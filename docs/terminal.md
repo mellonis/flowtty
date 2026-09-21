@@ -46,6 +46,14 @@ text (styling lives in the cell, not the string).
 
 ## Environment
 
+**Color.** `NO_COLOR` — present and non-empty — turns color off; `FORCE_COLOR`
+overrides it in either direction (`0` = off, anything else = on). Without color
+the backends still emit bold, dim, underline, inverse and strikethrough, so
+emphasis survives. Both TTY backends take a `color` option that overrides the
+environment: `new TtyBackend(stdout, stdin, { color: false })`.
+`detectColorSupport(env)` and `sgr(style, { color })` are exported for custom
+backends.
+
 **Signals.** On `SIGTERM`, `SIGHUP` and `SIGINT`, `render()` unmounts and
 disposes the backend first — leaving the alt screen, showing the cursor, turning
 bracketed paste and mouse reporting off — and then re-raises the signal, so the

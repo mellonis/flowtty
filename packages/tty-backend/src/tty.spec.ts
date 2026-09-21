@@ -446,3 +446,40 @@ test('TtyBackend.dispose reports unknown color names once the screen is restored
   expect(String(warn.mock.calls[0]![0])).toContain('notacolor');
   warn.mockRestore();
 });
+
+test('TtyBackend with color off writes no color codes, in the full redraw and in the diff', () => {
+  const { stub: out, writes } = makeStub();
+  const back = new TtyBackend(out, makeStdinStub(), { color: false });
+  const a = new Buffer(6, 1); a.set(0, 0, 'x', { fg: 'red', bold: true });
+  back.draw(a);
+  const b = new Buffer(6, 1); b.set(0, 0, 'y', { fg: 'green', bg: 'blue', bold: true });
+  back.draw(b);
+  const all = writes.join('');
+  expect(all).toContain('\x1b[1m');           // bold survives
+  expect(all).not.toMatch(/\x1b\[[0-9;]*3[0-7]m/);
+  expect(all).not.toMatch(/\x1b\[[0-9;]*4[0-7]m/);
+  back.dispose();
+});
+
+test('TtyBackend reads NO_COLOR from the environment unless told otherwise', () => {
+  const saved = { NO_COLOR: process.env.NO_COLOR, FORCE_COLOR: process.env.FORCE_COLOR };
+  delete process.env.FORCE_COLOR;
+  process.env.NO_COLOR = '1';
+  try {
+    const { stub: out, writes } = makeStub();
+    const back = new TtyBackend(out, makeStdinStub());
+    const buf = new Buffer(6, 1); buf.set(0, 0, 'x', { fg: 'red' });
+    back.draw(buf);
+    expect(writes.join('')).not.toContain('31m');
+    back.dispose();
+
+    const forced = makeStub();
+    const back2 = new TtyBackend(forced.stub, makeStdinStub(), { color: true });
+    back2.draw(buf);
+    expect(forced.writes.join('')).toContain('31m');
+    back2.dispose();
+  } finally {
+    if (saved.NO_COLOR === undefined) delete process.env.NO_COLOR; else process.env.NO_COLOR = saved.NO_COLOR;
+    if (saved.FORCE_COLOR !== undefined) process.env.FORCE_COLOR = saved.FORCE_COLOR;
+  }
+});

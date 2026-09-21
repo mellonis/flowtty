@@ -1,6 +1,6 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import { stringWidth, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, osc8Open, sgr, takeUnknownColors } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, takeUnknownColors } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
 
@@ -12,6 +12,10 @@ export interface TtyBackendOptions {
    * or Option held).
    */
   mouse?: boolean;
+  /** Emit color. Default: from the environment — off when `NO_COLOR` is set,
+   *  `FORCE_COLOR` overriding it (see `detectColorSupport`). Bold, dim, underline
+   *  and inverse are emitted either way. */
+  color?: boolean;
 }
 
 export class TtyBackend implements Backend {
@@ -21,6 +25,7 @@ export class TtyBackend implements Backend {
    *  the bytes but never makes them clickable). The painter writes OSC 8
    *  unconditionally regardless of this flag — it only governs <Link> fallback. */
   readonly hyperlinks: boolean = detectHyperlinkSupport();
+  private readonly sgrOptions: { color: boolean };
 
   private readonly subscribers = new Set<(key: Key) => void>();
   // Carries an incomplete escape sequence from one stdin chunk to the next, so
@@ -61,6 +66,7 @@ export class TtyBackend implements Backend {
     private readonly input: NodeJS.ReadStream = process.stdin,
     private readonly options: TtyBackendOptions = {},
   ) {
+    this.sgrOptions = { color: options.color ?? detectColorSupport() };
     // Enter the alternate screen buffer + hide cursor, atomic write.
     // Alt-screen ensures full-frame redraws happen in place and the user's
     // pre-launch terminal content is restored on dispose.
@@ -100,7 +106,7 @@ export class TtyBackend implements Backend {
         const cell = buffer.get(x, y);
         if (JSON.stringify(cell.style) !== JSON.stringify(last)) {
           if (lineLink !== undefined && lineLink !== cell.style.link) line += OSC8_CLOSE;
-          line += RESET + sgr(cell.style);
+          line += RESET + sgr(cell.style, this.sgrOptions);
           if (cell.style.link !== undefined && cell.style.link !== lineLink) line += osc8Open(cell.style.link);
           last = cell.style;
           lineLink = cell.style.link;
@@ -150,7 +156,7 @@ export class TtyBackend implements Backend {
         // Style change iff the pen's style doesn't already match.
         if (JSON.stringify(b.style) !== JSON.stringify(penStyle)) {
           if (penLink !== undefined && penLink !== b.style.link) out += OSC8_CLOSE;
-          out += RESET + sgr(b.style);
+          out += RESET + sgr(b.style, this.sgrOptions);
           if (b.style.link !== undefined && b.style.link !== penLink) out += osc8Open(b.style.link);
           penStyle = b.style;
           penLink = b.style.link;
