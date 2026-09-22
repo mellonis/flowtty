@@ -11,6 +11,7 @@ The building blocks beyond `<Box>` and `<Text>`. Forms, focus and buttons are in
 - [Markdown](#markdown)
 - [Link](#link)
 - [Spinner](#spinner)
+- [Shimmer](#shimmer)
 - [ProgressBar](#progressbar)
 - [TaskList](#tasklist)
 
@@ -584,6 +585,48 @@ Props:
 
 The frame sets are a curated subset of the cli-spinners catalogue, inlined so
 the package stays dependency-free.
+
+## Shimmer
+
+`<Shimmer>` is a running label that does not blink: a bright band travels along
+the text while something is in flight. It replaces the "blink the whole label
+between two colours" pattern — the text stays readable, and only a few cells
+change from one frame to the next.
+
+```tsx
+import { Shimmer } from '@flowtty/react';
+
+<Shimmer color="gray" highlight={['cyan', 'white', 'cyan']} running={busy}>Running tests</Shimmer>
+<Shimmer highlight="yellowBright" width={5} direction="rtl">Syncing</Shimmer>
+```
+
+Props:
+
+- `children` — the text, as a **raw string only**. The band colours the text
+  character by character, so it needs the characters; elements are not accepted
+  (the prop type is `string`).
+- `color` — the text's own colour. Unset, it is inherited like any `<Text>`.
+- `highlight` — the band: one colour, or several for a gradient across the band
+  (the first colour at its leading edge). Default `'white'` — a guess that reads
+  poorly on a light theme; pass the app's own accent colours.
+- `width` — the band in cells. Default 3; anything below 1 is 1.
+- `interval` — ms per one-cell step. Default 80.
+- `direction` — `'ltr'` (default) or `'rtl'`.
+- `running` — default true. While false there is no ticker and the text is a
+  still frame in its base colour: one `<Text>`, no spans, no repaints. Flipping
+  it back resumes.
+- `limit` — the character limit, default 64: at most this many characters
+  (code points, from the start) are ever under the band. Characters past it stay
+  in the base colour and the band never travels over them, so the number of runs
+  a frame produces is bounded whatever the length of the text.
+
+The band enters from before the first character, crosses the text and leaves
+past its end before it comes round again. Each frame is folded into a few
+`<Span>` runs — the text before the band, the band's cells, the text after —
+never one span per character. Characters are code points, one cell each, the
+grid's own rule: a wide glyph is one character and the band walks over it as
+one cell. The animation rides on `useTicker`, so it stops on unmount and on
+whole-app teardown.
 
 ## ProgressBar
 

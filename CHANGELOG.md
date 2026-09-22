@@ -7,6 +7,15 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- `<Shimmer>`: a running label that does not blink — a bright band travels
+  along the text while something is in flight, in one colour or a gradient
+  of the app's accent colours, and stops as a still frame when `running` is
+  false. See docs/components.md (Shimmer).
+
 ## 1.0.0-alpha.20 — 2026-09-22
 
 ### Fixed

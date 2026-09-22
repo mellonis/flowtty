@@ -53,7 +53,7 @@ terminal is back to normal — so the last line prints on the ordinary screen.
 | | |
 |---|---|
 | **Layout** | flexbox via Yoga, borders with titles, padding / margin / gap, wrap, absolute positioning, `zIndex`, `overflow`, scroll viewports, a dimming backdrop — [docs/layout.md](docs/layout.md) |
-| **Components** | `ScrollBox`, `ScrollList`, `TextInput`, `TextArea`, `Select`, `MultiSelect`, `Table`, `Markdown` (GFM tables, nested lists, highlighted code), `Spinner`, `ProgressBar`, `TaskList`, `Link`, `Static` — [docs/components.md](docs/components.md) |
+| **Components** | `ScrollBox`, `ScrollList`, `TextInput`, `TextArea`, `Select`, `MultiSelect`, `Table`, `Markdown` (GFM tables, nested lists, highlighted code), `Spinner`, `Shimmer`, `ProgressBar`, `TaskList`, `Link`, `Static` — [docs/components.md](docs/components.md) |
 | **Input, focus, forms** | keys with modifiers, bracketed paste as one event, the mouse wheel and buttons, drag-to-select with per-pane scopes, `FocusGroup` + `Button`, `Form` with validation (Zod-friendly) — [docs/input.md](docs/input.md) |
 | **Copying out** | copy-on-select over the drawn frame, soft-wrapped paragraphs pasted as one line, `useApp().copy()`, OSC 52 with an `onCopy` fallback signal — [docs/input.md](docs/input.md#selection) |
 | **The app around them** | `render` / `waitUntilExit` / `useApp().exit`, `renderToString` for one-shot output, error handling, a root abort signal, a ticker for animation, `DialogHost` with stacked dialogs, `useApp().bell()` / `.notify()` for attention from another window, `useColorScheme()` to follow the terminal's light or dark scheme — [docs/app.md](docs/app.md) |

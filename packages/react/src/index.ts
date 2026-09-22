@@ -65,6 +65,7 @@ export { HRule } from './components/HRule.js';
 export { HelpBar } from './components/HelpBar.js';
 export { Menu, type MenuItem, type MenuProps } from './components/Menu.js';
 export { Spinner, type SpinnerProps, type SpinnerType } from './components/Spinner.js';
+export { Shimmer, type ShimmerProps } from './components/Shimmer.js';
 export { ProgressBar, type ProgressBarProps } from './components/ProgressBar.js';
 export { TaskList, type TaskListProps, type TaskItem, type TaskState } from './components/TaskList.js';
 export { Table, type TableProps, type TableColumn, type TableAlign, type TableCellStyle } from './components/Table.js';
