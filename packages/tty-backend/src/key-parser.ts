@@ -1,6 +1,19 @@
 import type { Key } from '@flowtty/core';
 
 /**
+ * Something the terminal said that is not a key: the answer to a background
+ * query (OSC 11), a light/dark change it announces (DEC mode 2031, as
+ * `CSI ? 997 ; 1|2 n`), or the window gaining / losing focus (mode 1004, as
+ * `CSI I` / `CSI O`). The parser takes these out of the key stream so no input
+ * handler sees them, and the backend acts on them — see docs/terminal.md
+ * (light and dark).
+ */
+export type TerminalReport =
+  | { type: 'background'; color: { r: number; g: number; b: number } }
+  | { type: 'colorScheme'; scheme: 'light' | 'dark' }
+  | { type: 'focus'; focused: boolean };
+
+/**
  * Decode a chunk of input bytes (utf-8 string from stdin) into normalized Key
  * events, returning any trailing bytes that form an incomplete escape sequence.
  *
@@ -33,6 +46,10 @@ import type { Key } from '@flowtty/core';
  *    (ESC[27;2;13~) → the usual name plus modifiers, e.g. Shift+Enter =
  *    {name: 'return', shift: true}. Decoded whenever a terminal sends them;
  *    flowtty does not yet ask terminals to (that is the Kitty protocol).
+ *
+ *  - Terminal reports — an OSC 11 background reply, a DEC 2031 scheme change
+ *    (`CSI ? 997 ; 1|2 n`), focus in / out (`CSI I` / `CSI O`) — come back as
+ *    `reports`, never as keys. Any other OSC is swallowed.
  *
  * NOT handled (later): hit-testing a click against the laid-out tree, enabling
  * the Kitty protocol, F13+.
@@ -97,6 +114,43 @@ function decodeKeyByCodePoint(final: string, params: string): Omit<Key, 'sequenc
   return { name, ctrl: mod.ctrl, meta: mod.meta, shift: mod.shift };
 }
 
+// The color in an OSC 11 reply: `rgb:rrrr/gggg/bbbb` in the X11 form, each
+// channel 1 to 4 hex digits scaled to the full range (`f` is 255, `ff` is
+// 255, `ffff` is 65535 → 255), or `#rrggbb`. Anything else is not a color
+// this parser knows, and the reply is dropped rather than guessed at.
+function parseReportedColor(spec: string): { r: number; g: number; b: number } | null {
+  const x11 = /^rgb:([0-9a-f]{1,4})\/([0-9a-f]{1,4})\/([0-9a-f]{1,4})$/i.exec(spec);
+  if (x11) {
+    const scale = (h: string): number => Math.round((parseInt(h, 16) / (16 ** h.length - 1)) * 255);
+    return { r: scale(x11[1]!), g: scale(x11[2]!), b: scale(x11[3]!) };
+  }
+  const hex = /^#([0-9a-f]{2})([0-9a-f]{2})([0-9a-f]{2})$/i.exec(spec);
+  if (hex) return { r: parseInt(hex[1]!, 16), g: parseInt(hex[2]!, 16), b: parseInt(hex[3]!, 16) };
+  return null;
+}
+
+// A CSI the terminal sends on its own, not for a key: a DEC 2031 color-scheme
+// notification (`?997;1n` dark, `?997;2n` light) or a focus event (`I` / `O`).
+function decodeCsiReport(params: string, final: string): TerminalReport | null {
+  if (final === 'n' && params.startsWith('?997;')) {
+    const which = params.slice(5);
+    if (which === '1') return { type: 'colorScheme', scheme: 'dark' };
+    if (which === '2') return { type: 'colorScheme', scheme: 'light' };
+    return null;
+  }
+  if (params === '' && (final === 'I' || final === 'O')) return { type: 'focus', focused: final === 'I' };
+  return null;
+}
+
+// OSC terminators: BEL, or ST (ESC \). Index just past the terminator, or -1.
+function findOscEnd(chars: string[], from: number): { end: number; body: string } | null {
+  for (let k = from; k < chars.length; k++) {
+    if (chars[k] === '\x07') return { end: k + 1, body: chars.slice(from, k).join('') };
+    if (chars[k] === '\x1b' && chars[k + 1] === '\\') return { end: k + 2, body: chars.slice(from, k).join('') };
+  }
+  return null;
+}
+
 const PASTE_START_PARAM = '200';
 const PASTE_END = [...'\x1b[201~'];
 
@@ -110,8 +164,9 @@ function indexOfSeq(chars: string[], seq: string[], from: number): number {
   return -1;
 }
 
-export function decodeKeys(input: string): { keys: Key[]; rest: string } {
+export function decodeKeys(input: string): { keys: Key[]; rest: string; reports: TerminalReport[] } {
   const out: Key[] = [];
+  const reports: TerminalReport[] = [];
   // Iterate by Unicode code point so astral characters (emoji, etc.) stay
   // intact instead of splitting into UTF-16 surrogate halves. Every byte of an
   // escape sequence is ASCII, so this is also correct for the sequence paths.
@@ -129,6 +184,21 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
       }
       const next = chars[i + 1]!;
 
+      // OSC: ESC ] <body> BEL|ST — never a key. The one flowtty asks for is
+      // the OSC 11 background reply; any other is the terminal's business and
+      // is swallowed whole. Unterminated, it waits for the next read like a
+      // paste does.
+      if (next === ']') {
+        const osc = findOscEnd(chars, i + 2);
+        if (osc === null) return { keys: out, rest: chars.slice(i).join(''), reports };
+        if (osc.body.startsWith('11;')) {
+          const color = parseReportedColor(osc.body.slice(3));
+          if (color) reports.push({ type: 'background', color });
+        }
+        i = osc.end;
+        continue;
+      }
+
       // CSI: ESC [ <params> <final-byte 0x40-0x7E>
       if (next === '[') {
         let j = i + 2;
@@ -140,6 +210,12 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
         if (j < chars.length) {
           const final = chars[j]!;
           const params = chars.slice(i + 2, j).join('');
+          const report = decodeCsiReport(params, final);
+          if (report) {
+            reports.push(report);
+            i = j + 1;
+            continue;
+          }
           if ((final === 'M' || final === 'm') && params.startsWith('<')) {
             const mouse = decodeSgrMouse(params, final);
             if (mouse) out.push({ ...mouse, sequence: chars.slice(i, j + 1).join('') });
@@ -160,7 +236,7 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
             const bodyStart = j + 1;
             const end = indexOfSeq(chars, PASTE_END, bodyStart);
             // Terminator not here yet — buffer the whole paste for the next read.
-            if (end < 0) return { keys: out, rest: chars.slice(i).join('') };
+            if (end < 0) return { keys: out, rest: chars.slice(i).join(''), reports };
             out.push({
               name: 'paste',
               text: chars.slice(bodyStart, end).join('').replace(/\r\n?/g, '\n'),
@@ -197,7 +273,7 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
         }
         // No final byte yet — the CSI is split across reads. Hand it back as
         // `rest` so the next chunk can complete it.
-        return { keys: out, rest: chars.slice(i).join('') };
+        return { keys: out, rest: chars.slice(i).join(''), reports };
       }
 
       // SS3: ESC O <letter>
@@ -213,7 +289,7 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
           continue;
         }
         // Missing the SS3 final letter — split across reads; buffer it.
-        return { keys: out, rest: chars.slice(i).join('') };
+        return { keys: out, rest: chars.slice(i).join(''), reports };
       }
 
       // Meta-prefix: ESC + <char> → that char with meta=true.
@@ -235,7 +311,7 @@ export function decodeKeys(input: string): { keys: Key[]; rest: string } {
     out.push(parseChar(c));
     i++;
   }
-  return { keys: out, rest: '' };
+  return { keys: out, rest: '', reports };
 }
 
 /**

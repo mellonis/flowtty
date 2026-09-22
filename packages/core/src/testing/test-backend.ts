@@ -1,6 +1,7 @@
 import { Buffer } from '../cells.js';
 import { NAMED_KEYS, type Key, type MouseButton } from '../keys.js';
 import type { Backend } from '../backend.js';
+import { UNKNOWN_COLOR_SCHEME, type ColorScheme, type TerminalColorScheme } from '../colorScheme.js';
 
 // Common guesses, mapped to the name the decoder actually produces.
 const KEY_NAME_HINTS: Record<string, string> = {
@@ -35,6 +36,8 @@ export class TestBackend implements Backend {
   clipboardAvailable: boolean = true;
   private buffers: Buffer[] = [];
   private readonly subscribers = new Set<(key: Key) => void>();
+  private scheme: TerminalColorScheme = UNKNOWN_COLOR_SCHEME;
+  private readonly schemeSubscribers = new Set<(scheme: TerminalColorScheme) => void>();
 
   constructor(
     private readonly cols = 40,
@@ -142,6 +145,30 @@ export class TestBackend implements Backend {
       meta: options.meta ?? false,
       ctrl: options.ctrl ?? false,
     });
+  }
+
+  /** The scheme a test last set — `'unknown'` until it does, as in a terminal
+   *  that never answers. */
+  colorScheme(): TerminalColorScheme {
+    return this.scheme;
+  }
+
+  onColorScheme(handler: (scheme: TerminalColorScheme) => void): () => void {
+    this.schemeSubscribers.add(handler);
+    return () => { this.schemeSubscribers.delete(handler); };
+  }
+
+  /**
+   * Stand in for the terminal answering, or switching: set the scheme (and the
+   * background it reported, if the test cares) and tell every subscriber —
+   * `useColorScheme()` re-renders. Setting what is already set tells no one,
+   * as a TTY backend tells no one about an unchanged reply.
+   */
+  setColorScheme(scheme: ColorScheme, background?: string): void {
+    const next: TerminalColorScheme = background === undefined ? { scheme } : { scheme, background };
+    if (next.scheme === this.scheme.scheme && next.background === this.scheme.background) return;
+    this.scheme = next;
+    for (const h of [...this.schemeSubscribers]) h(next);
   }
 
   // eslint-disable-next-line @typescript-eslint/no-empty-function

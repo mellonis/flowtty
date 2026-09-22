@@ -7,6 +7,7 @@ Starting and stopping, errors, cancellation, animation, dialogs.
 - [Error handling](#error-handling)
 - [Getting attention](#getting-attention)
 - [The clipboard](#the-clipboard)
+- [The color scheme](#the-color-scheme)
 - [Root abort signal](#root-abort-signal)
 - [Ticker (animation clock)](#ticker-animation-clock)
 - [DialogHost (stack)](#dialoghost-stack)
@@ -291,6 +292,56 @@ const app = await render(<App />, backend, { onCopy });
 // … drag …
 expect(backend.clipboard).toEqual([]);
 expect(onCopy).toHaveBeenCalledWith({ text: 'hello', delivered: false, source: 'selection' });
+```
+
+## The color scheme
+
+A terminal is light or dark, and on macOS it can switch by itself — Auto
+appearance goes dark after sunset, and the terminal follows. An app that paints
+its own grounds picks them for one scheme; on the other, a dark modal is a black
+box on a white screen. `useColorScheme()` says which scheme the terminal is on,
+and re-renders when that changes:
+
+```tsx
+function Panel({ children }: { children: ReactNode }) {
+  const { scheme } = useColorScheme();
+  const ground = scheme === 'light' ? '#f4f0e6' : scheme === 'dark' ? '#1e1e2e' : 'default';
+  return <Box border="round" padding={1} backgroundColor={ground} color={scheme === 'light' ? 'black' : 'white'}>{children}</Box>;
+}
+```
+
+The value is `{ scheme, background? }`: `scheme` is `'light'`, `'dark'` or
+`'unknown'`, and `background` is the terminal's default background as
+`#rrggbb` when it reported one — the exact ground an app's colors sit on,
+for a panel that wants to be a shade off it. `useApp().colorScheme` and the
+render handle's `colorScheme` give the same answer as of now, without a
+re-render; a component reads the hook, a key handler reads the app.
+
+**`'unknown'` is a real state**, not a transient one. It is what the app sees
+until the terminal answers — the TTY backends ask with the first key
+subscription, and the reply comes back a moment later — and what it sees for
+good where the terminal never answers: a multiplexer that eats the query, an
+old terminal, `TestBackend` before a test sets it. Treat it as "leave the
+grounds to the terminal": `backgroundColor: 'default'` and no text color, which
+read correctly on either scheme (see [Inherited colors](layout.md#inherited-colors)).
+
+**When a change arrives** depends on the terminal — at once where it announces
+the switch, on the next focus-in where it does not, never inside some
+multiplexers. [Terminal specifics](terminal.md#light-and-dark) has the table,
+the sequences, and the `colorScheme` backend option that turns the whole thing
+off.
+
+**In a test**, `TestBackend` never answers by itself. `setColorScheme(scheme,
+background?)` stands in for the terminal answering or switching, and every
+`useColorScheme()` re-renders:
+
+```tsx
+const backend = new TestBackend(40, 5);
+const app = await render(<Panel>hi</Panel>, backend);
+await flushAsync(backend);                        // scheme is 'unknown': grounds left to the terminal
+backend.setColorScheme('light', '#fdf6e3');
+await flushAsync(backend);
+expect(backend.lastBuffer!.get(1, 1).style.bg).toBe('#f4f0e6');
 ```
 
 ## Root abort signal

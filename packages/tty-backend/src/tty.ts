@@ -1,5 +1,5 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
-import { stringWidth, takeWarnings, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
+import { stringWidth, takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme } from '@flowtty/core';
 import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, takeUnknownColors } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
@@ -7,6 +7,7 @@ import { isInteractive, NotInteractiveError } from './interactive.js';
 import { detectColorDepth, type ColorDepth } from './colorDepth.js';
 import { createAttention, type Attention, type NotificationProtocol } from './notification.js';
 import { createClipboard, type Clipboard, type ClipboardProtocol } from './clipboard.js';
+import { createColorSchemeTracker, type ColorSchemeTracker } from './colorScheme.js';
 
 export interface TtyBackendOptions {
   /**
@@ -16,6 +17,11 @@ export interface TtyBackendOptions {
    * or Option held).
    */
   mouse?: boolean;
+  /** Follow the terminal's light / dark scheme: ask for its background once
+   *  keys are read, and listen for a change (DEC mode 2031, or a focus-in where
+   *  the terminal has no 2031). On by default; `false` asks nothing and
+   *  `colorScheme()` stays `'unknown'`. See docs/terminal.md (light and dark). */
+  colorScheme?: boolean;
   /** Emit color. Default: from the environment — off when `NO_COLOR` is set,
    *  `FORCE_COLOR` overriding it (see `detectColorSupport`). Bold, dim, underline
    *  and inverse are emitted either way. */
@@ -60,8 +66,11 @@ export class TtyBackend implements Backend {
   // `NodeBuffer` avoids the name-clash with our cells `Buffer` import.
   private readonly inputDataHandler = (chunk: NodeBuffer | string): void => {
     const s = this.pendingInput + (typeof chunk === 'string' ? chunk : chunk.toString('utf-8'));
-    const { keys, rest } = decodeKeys(s);
+    const { keys, rest, reports } = decodeKeys(s);
     this.pendingInput = rest;
+    // What the terminal said back is not input: the tracker acts on it, and
+    // no subscriber ever sees it as a key.
+    if (reports.length > 0) this.scheme.handle(reports);
     for (const key of keys) {
       // Ctrl-C / Ctrl-D in raw mode are delivered as keypresses (NOT signals —
       // raw mode swallows SIGINT). Default-handle them as "exit with restore"
@@ -91,6 +100,9 @@ export class TtyBackend implements Backend {
   // The clipboard write, bound to the same stream and assigned in the
   // constructor for the same reason as `attention`.
   private readonly clipboard: Clipboard;
+  // The light / dark answer and the reactions that keep it current — asked
+  // for with the first key subscription, since the reply comes down stdin.
+  private readonly scheme: ColorSchemeTracker;
   private disposed = false;
 
   constructor(
@@ -114,6 +126,9 @@ export class TtyBackend implements Backend {
       ...(options.clipboard === undefined ? {} : { clipboard: options.clipboard }),
       ...(options.clipboardLimit === undefined ? {} : { limit: options.clipboardLimit }),
     });
+    // Its writes stop with stop(), which dispose() calls before the input goes;
+    // after that no report can arrive to prompt another.
+    this.scheme = createColorSchemeTracker((bytes) => this.out.write(bytes));
   }
 
   size(): { width: number; height: number } {
@@ -263,6 +278,22 @@ export class TtyBackend implements Backend {
     return this.clipboard.copy(text);
   }
 
+  /**
+   * Whether the terminal is light or dark, with its default background when
+   * known. `'unknown'` until the terminal has answered — which it can only do
+   * once keys are being read — and for good where it never does (a
+   * multiplexer that eats the query, `colorScheme: false`). See docs/app.md
+   * (the color scheme).
+   */
+  colorScheme(): TerminalColorScheme {
+    return this.scheme.current();
+  }
+
+  /** Hear a change of scheme, after `colorScheme()` reflects it. */
+  onColorScheme(handler: (scheme: TerminalColorScheme) => void): () => void {
+    return this.scheme.subscribe(handler);
+  }
+
   onResize(handler: () => void): () => void {
     // Lazy: only attach the underlying 'resize' listener when the first
     // subscriber arrives. `tty.WriteStream` emits 'resize' on SIGWINCH.
@@ -284,6 +315,9 @@ export class TtyBackend implements Backend {
       this.inputAttached = true;
       // Only a backend that reads keys asks for bracketed paste; dispose() undoes it.
       this.out.write(BRACKETED_PASTE_ON + (this.options.mouse ? MOUSE_ON : ''));
+      // Same for the scheme: its answer arrives as input, so it is only asked
+      // for once input is read.
+      if (this.options.colorScheme !== false) this.scheme.start();
     }
     this.subscribers.add(handler);
     return () => {
@@ -303,6 +337,8 @@ export class TtyBackend implements Backend {
       this.input.pause();
       this.inputAttached = false;
       this.pendingInput = '';
+      // Reports off first — they were turned on last.
+      this.scheme.stop();
       this.out.write((this.options.mouse ? MOUSE_OFF : '') + BRACKETED_PASTE_OFF);
     }
     if (this.resizeAttached) {

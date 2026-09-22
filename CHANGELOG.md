@@ -7,6 +7,19 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- The app can follow the terminal's light or dark scheme. `useColorScheme()`
+  returns `{ scheme: 'light' | 'dark' | 'unknown', background? }` and re-renders
+  when the terminal switches; `useApp().colorScheme` and the render handle give
+  the same answer as of now. The TTY backends ask for the background with OSC 11
+  once keys are read, listen for a change through DEC mode 2031 where the
+  terminal announces one, and ask again on every focus-in where it does not; the
+  replies never reach a key handler. `colorScheme: false` turns it off.
+  `TestBackend.setColorScheme()` stands in for the terminal in a test.
+
 ## 1.0.0-alpha.16 — 2026-09-22
 
 ### Added

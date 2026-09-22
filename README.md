@@ -56,10 +56,10 @@ terminal is back to normal — so the last line prints on the ordinary screen.
 | **Components** | `ScrollBox`, `TextInput`, `TextArea`, `Select`, `MultiSelect`, `Table`, `Markdown` (GFM tables, nested lists, highlighted code), `Spinner`, `ProgressBar`, `TaskList`, `Link`, `Static` — [docs/components.md](docs/components.md) |
 | **Input, focus, forms** | keys with modifiers, bracketed paste as one event, the mouse wheel and buttons, drag-to-select with per-pane scopes, `FocusGroup` + `Button`, `Form` with validation (Zod-friendly) — [docs/input.md](docs/input.md) |
 | **Copying out** | copy-on-select over the drawn frame, soft-wrapped paragraphs pasted as one line, `useApp().copy()`, OSC 52 with an `onCopy` fallback signal — [docs/input.md](docs/input.md#selection) |
-| **The app around them** | `render` / `waitUntilExit` / `useApp().exit`, `renderToString` for one-shot output, error handling, a root abort signal, a ticker for animation, `DialogHost` with stacked dialogs, `useApp().bell()` / `.notify()` for attention from another window — [docs/app.md](docs/app.md) |
-| **Testing** | `TestBackend`: frames as strings, cells with styles, `press` / `paste` / `wheel` / `mouse`, recorded bells, notifications and clipboard writes; scripts that drive a whole app — [docs/testing.md](docs/testing.md) |
+| **The app around them** | `render` / `waitUntilExit` / `useApp().exit`, `renderToString` for one-shot output, error handling, a root abort signal, a ticker for animation, `DialogHost` with stacked dialogs, `useApp().bell()` / `.notify()` for attention from another window, `useColorScheme()` to follow the terminal's light or dark scheme — [docs/app.md](docs/app.md) |
+| **Testing** | `TestBackend`: frames as strings, cells with styles, `press` / `paste` / `wheel` / `mouse`, a settable color scheme, recorded bells, notifications and clipboard writes; scripts that drive a whole app — [docs/testing.md](docs/testing.md) |
 | **Extending** | [writing a component](docs/writing-a-component.md), [writing a backend](docs/writing-a-backend.md), [CONTRIBUTING](CONTRIBUTING.md), and what each release changed in the [CHANGELOG](CHANGELOG.md) |
-| **Terminal specifics** | named and 24-bit color, glyph width, OSC 8 hyperlinks, desktop notifications, what is not there yet — [docs/terminal.md](docs/terminal.md) |
+| **Terminal specifics** | named and 24-bit color, glyph width, OSC 8 hyperlinks, desktop notifications, light and dark detection, what is not there yet — [docs/terminal.md](docs/terminal.md) |
 
 Packages: [`@flowtty/react`](packages/react) (components, hooks, `render`),
 [`@flowtty/core`](packages/core) (buffer, layout, paint, reducers, `TestBackend`),

@@ -7,6 +7,7 @@ Color, glyph width, and what the renderer does not do yet.
 - [Environment](#environment)
 - [Notifications](#notifications)
 - [The clipboard](#the-clipboard)
+- [Light and dark](#light-and-dark)
 - [Still deferred (later milestones)](#still-deferred-later-milestones)
 
 ## Truecolor
@@ -282,6 +283,52 @@ new InlineTtyBackend({ clipboard: 'none' });
 there. `detectClipboardSupport(env)`, `clipboardSequence(text, limit)` and
 `createClipboard(write, options)` are exported from `@flowtty/tty-backend` for
 custom backends.
+
+## Light and dark
+
+`useColorScheme()` (see [The app around the components](app.md#the-color-scheme))
+is fed by three sequences, all asked for with the first key subscription — the
+answers come down stdin, and a backend nobody reads keys from cannot hear them.
+
+1. **The background, once.** `OSC 11 ; ?` asks the terminal for its default
+   background; it answers `OSC 11 ; rgb:rrrr/gggg/bbbb ST`, and the backend
+   decides light or dark by the color's brightness (above half is light). No
+   answer — a terminal that does not know the query, a multiplexer that eats it
+   — means `'unknown'`, quietly; nothing waits for it.
+2. **A change, where the terminal announces one.** DEC mode 2031 (`CSI ? 2031 h`)
+   asks to be told when the scheme switches; the terminal sends
+   `CSI ? 997 ; 1 n` (dark) or `CSI ? 997 ; 2 n` (light). The backend takes the
+   scheme from that at once and asks for the background again, so the two agree
+   within one round trip.
+3. **Otherwise, the next time the window is looked at.** Focus reporting
+   (`CSI ? 1004 h`) makes the terminal send `CSI I` / `CSI O` as the window
+   gains and loses focus, and the backend asks for the background again on every
+   focus-in: the scheme usually flips while the window is in the background, and
+   the person sees it when they come back.
+
+Every reply is taken out of the key stream by the parser (`decodeKeys` returns
+them as `reports`), so no input handler ever sees one as a key. Both modes are
+turned off on `dispose()`, in reverse order, as the mouse modes are.
+
+| Terminal | The first answer | A change is heard |
+| --- | --- | --- |
+| Ghostty, kitty, Contour, foot | at once | at once (mode 2031) |
+| iTerm2, Apple Terminal, Alacritty, WezTerm, Windows Terminal, VS Code | at once | on the next focus-in |
+| tmux | when `allow-passthrough` lets OSC 11 through; newer tmux answers 2031 itself | as the outer terminal allows |
+| GNU screen, `TERM=linux` | never — `'unknown'` | never |
+
+The table is short on purpose, and the second row is the safe assumption for a
+terminal not listed: focus reporting is nearly universal, and where a terminal
+answers 2031 as well, the change simply arrives sooner.
+
+**The option.** Both TTY backends take `colorScheme: boolean` (default `true`).
+`false` asks nothing: no query, no modes, `colorScheme()` stays `'unknown'`.
+`InlineTtyBackend` asks nothing in log-only mode either way, and
+`FinalFrameBackend` has no scheme at all — nothing is interactive there.
+`createColorSchemeTracker(write)`, `decodeKeys`'s `TerminalReport` and the three
+sequences (`BACKGROUND_QUERY`, `COLOR_SCHEME_REPORTS_ON` / `_OFF`) are exported
+from `@flowtty/tty-backend` for custom backends; `colorSchemeOf(rgb)` — the
+brightness rule — from `@flowtty/core`.
 
 ## Still deferred (later milestones)
 

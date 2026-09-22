@@ -1,5 +1,5 @@
 import { createElement, type ReactNode } from 'react';
-import { type Backend, type Buffer, type Key } from '@flowtty/core';
+import { UNKNOWN_COLOR_SCHEME, type Backend, type Buffer, type Key, type TerminalColorScheme } from '@flowtty/core';
 import { getYoga, computeLayout, contentHeight, paint, SelectionController } from '@flowtty/core/host';
 import { createRoot, type Root } from './reconciler.js';
 import { InputContext, type InputSource } from '../context/inputContext.js';
@@ -7,6 +7,7 @@ import { BackendContext } from '../context/backendContext.js';
 import { AbortContext } from '../context/abortContext.js';
 import { AppContext, type AppApi } from '../context/appContext.js';
 import { TerminalSizeProvider } from '../hooks/useTerminalSize.js';
+import { ColorSchemeProvider } from '../hooks/useColorScheme.js';
 import { ErrorBoundary, type ErrorSource } from '../components/ErrorBoundary.js';
 
 // One backend key listener per render tree; useInput subscribers are managed
@@ -126,6 +127,10 @@ export interface RenderHandle {
    *  after unmount. Fires `onCopy` with `source: 'api'`.
    *  See docs/app.md (the clipboard). */
   copy(text: string): boolean;
+  /** Whether the terminal is light or dark, as of now — the same answer
+   *  `useApp().colorScheme` gives inside the tree. See docs/app.md (the color
+   *  scheme). */
+  readonly colorScheme: TerminalColorScheme;
 }
 
 export async function render(
@@ -343,6 +348,9 @@ export async function render(
     runCallback(() => options.onCopy?.({ text, delivered, source: 'api' }));
     return delivered;
   };
+  // Read through to the backend on every access: the answer changes when the
+  // terminal says so, and this object is created once.
+  const colorScheme = (): TerminalColorScheme => backend.colorScheme?.() ?? UNKNOWN_COLOR_SCHEME;
   const appApi: AppApi = {
     exit: (result) => {
       exitResult = result;
@@ -351,9 +359,11 @@ export async function render(
     bell,
     notify,
     copy,
+    get colorScheme() { return colorScheme(); },
   };
   const withApp = createElement(AppContext.Provider, { value: appApi }, withAbort);
-  const tree = createElement(TerminalSizeProvider, { backend }, withApp);
+  const withScheme = createElement(ColorSchemeProvider, { backend }, withApp);
+  const tree = createElement(TerminalSizeProvider, { backend }, withScheme);
 
   root.render(tree);
   // Wait for the initial scheduled paint (via resetAfterCommit → queueMicrotask).
@@ -374,6 +384,7 @@ export async function render(
     bell,
     notify,
     copy,
+    get colorScheme() { return colorScheme(); },
     unmount() {
       if (unmounted) return;
       unmounted = true;

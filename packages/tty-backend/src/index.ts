@@ -4,7 +4,11 @@ export { bufferToAnsi, type BufferToAnsiOptions } from './bufferToAnsi.js';
 export { detectHyperlinkSupport } from './hyperlinks.js';
 export { isInteractive, NotInteractiveError } from './interactive.js';
 export { detectColorDepth, rgbToAnsi256, rgbToAnsi16, type ColorDepth } from './colorDepth.js';
-export { parseKeypress, decodeKeys } from './key-parser.js';
+export { parseKeypress, decodeKeys, type TerminalReport } from './key-parser.js';
+// Following the terminal's light / dark scheme — the tracker both TTY backends
+// drive their `colorScheme()` / `onColorScheme()` from, exposed so a sibling
+// backend can reuse it. See docs/terminal.md (light and dark).
+export { createColorSchemeTracker, type ColorSchemeTracker } from './colorScheme.js';
 // The bell and desktop notifications — pure text-to-bytes, plus the small
 // factory both TTY backends drive their `bell()` / `notify()` from. Exposed so
 // a sibling backend can reuse them instead of assembling OSC sequences itself.
@@ -27,6 +31,7 @@ export {
   ALT_SCREEN_ON, ALT_SCREEN_OFF,
   BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF,
   MOUSE_ON, MOUSE_OFF,
+  BACKGROUND_QUERY, COLOR_SCHEME_REPORTS_ON, COLOR_SCHEME_REPORTS_OFF,
   OSC8_CLOSE, osc8Open,
   sgr, cursorTo, cellsEqual, parseColor, takeUnknownColors, detectColorSupport,
   type SgrOptions,

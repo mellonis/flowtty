@@ -136,6 +136,18 @@ nothing is recorded, and `onCopy` still fires with `delivered: false` — which 
 how an app's `pbcopy` fallback gets tested. See [Selection](input.md#selection)
 and [The clipboard](app.md#the-clipboard).
 
+`TestBackend` never answers the light-or-dark question by itself — a component
+sees `'unknown'`, as it would in a terminal that does not answer. Set the answer
+to test the other branches:
+
+```tsx
+backend.setColorScheme('dark');                   // { scheme: 'dark' }, every useColorScheme() re-renders
+backend.setColorScheme('light', '#fdf6e3');       // …with the background the terminal would have reported
+```
+
+Setting what is already set tells no one, as a TTY backend tells no one about an
+unchanged reply. See [The color scheme](app.md#the-color-scheme).
+
 ## Driving a whole app with a script
 
 For end-to-end tests, wrap the backend and feed it a script. The showcase in

@@ -291,3 +291,36 @@ describe('InlineTtyBackend', () => {
     expect(noisyFrame).toBe(quietFrame);
   });
 });
+
+describe('light and dark', () => {
+  test('asks for the scheme with the first key subscription, hears the reply, and turns the reports off on dispose', () => {
+    const out = mockStdout();
+    const stdin = mockStdin();
+    const b = new InlineTtyBackend({ out, in: stdin });
+    expect(b.colorScheme()).toEqual({ scheme: 'unknown' });
+    const keys: string[] = [];
+    b.onKey((k) => keys.push(k.name));
+    expect(out.captured()).toContain('\x1b[?2031h\x1b[?1004h\x1b]11;?\x07');
+    (stdin as unknown as EventEmitter).emit('data', '\x1b]11;rgb:0000/0000/0000\x07x');
+    expect(b.colorScheme()).toEqual({ scheme: 'dark', background: '#000000' });
+    expect(keys).toEqual(['x']);
+    b.dispose();
+    expect(out.captured()).toContain('\x1b[?1004l\x1b[?2031l');
+  });
+
+  test('{ colorScheme: false } asks nothing; a pipe asks nothing either', () => {
+    const out = mockStdout();
+    const b = new InlineTtyBackend({ out, in: mockStdin(), colorScheme: false });
+    b.onKey(() => {});
+    expect(out.captured()).not.toContain('\x1b[?2031h');
+    b.dispose();
+
+    const piped = mockStdout();
+    (piped as unknown as { isTTY: boolean }).isTTY = false;
+    const log = new InlineTtyBackend({ out: piped, in: mockStdin() });
+    log.onKey(() => {});
+    expect(piped.captured()).toBe('');
+    expect(log.colorScheme()).toEqual({ scheme: 'unknown' });
+    log.dispose();
+  });
+});

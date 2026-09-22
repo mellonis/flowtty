@@ -368,3 +368,64 @@ test('CSI-u / modifyOtherKeys forms of Tab, Escape, Backspace and printable keys
     ['a', false, true, false],
   ]);
 });
+
+// ─── terminal reports ────────────────────────────────────────────────────────
+// What the terminal says back — a background query answered, a scheme change
+// announced, the window focused — comes down the same stdin as the keys. The
+// parser hands it out as reports, and no key handler ever sees it.
+
+test('an OSC 11 reply is a background report, not a key — BEL or ST terminated', () => {
+  const bel = decodeKeys('\x1b]11;rgb:fdfd/f6f6/e3e3\x07');
+  expect(bel.keys).toEqual([]);
+  expect(bel.reports).toEqual([{ type: 'background', color: { r: 0xfd, g: 0xf6, b: 0xe3 } }]);
+  const st = decodeKeys('\x1b]11;rgb:0000/2b2b/3636\x1b\\');
+  expect(st.keys).toEqual([]);
+  expect(st.reports).toEqual([{ type: 'background', color: { r: 0, g: 0x2b, b: 0x36 } }]);
+});
+
+test('the reply comes out of the middle of a key stream untouched by it', () => {
+  const r = decodeKeys('a\x1b]11;rgb:ffff/ffff/ffff\x07b');
+  expect(r.keys.map((k) => k.name)).toEqual(['a', 'b']);
+  expect(r.reports).toHaveLength(1);
+});
+
+test('a reply split across reads waits whole in `rest`, like a paste', () => {
+  const first = decodeKeys('\x1b]11;rgb:ff');
+  expect(first.keys).toEqual([]);
+  expect(first.reports).toEqual([]);
+  expect(first.rest).toBe('\x1b]11;rgb:ff');
+  const second = decodeKeys(first.rest + 'ff/ffff/ffff\x07');
+  expect(second.reports).toEqual([{ type: 'background', color: { r: 255, g: 255, b: 255 } }]);
+  expect(second.rest).toBe('');
+});
+
+test('a channel is 1 to 4 hex digits, scaled to 8 bits; an unreadable reply is swallowed', () => {
+  expect(decodeKeys('\x1b]11;rgb:f/8/0\x07').reports).toEqual([{ type: 'background', color: { r: 255, g: 136, b: 0 } }]);
+  expect(decodeKeys('\x1b]11;rgb:ff/88/00\x07').reports).toEqual([{ type: 'background', color: { r: 255, g: 136, b: 0 } }]);
+  expect(decodeKeys('\x1b]11;#ff8800\x07').reports).toEqual([{ type: 'background', color: { r: 255, g: 136, b: 0 } }]);
+  const bad = decodeKeys('\x1b]11;purple\x07');
+  expect(bad.keys).toEqual([]);
+  expect(bad.reports).toEqual([]);
+});
+
+test('any other OSC the terminal sends is swallowed whole', () => {
+  const r = decodeKeys('\x1b]10;rgb:0000/0000/0000\x07x');
+  expect(r.keys.map((k) => k.name)).toEqual(['x']);
+  expect(r.reports).toEqual([]);
+});
+
+test('a DEC 2031 notification is a colorScheme report: 1 is dark, 2 is light', () => {
+  expect(decodeKeys('\x1b[?997;1n').reports).toEqual([{ type: 'colorScheme', scheme: 'dark' }]);
+  expect(decodeKeys('\x1b[?997;2n').reports).toEqual([{ type: 'colorScheme', scheme: 'light' }]);
+  expect(decodeKeys('\x1b[?997;1n').keys).toEqual([]);
+});
+
+test('focus in and out are focus reports, not csi-I / csi-O keys', () => {
+  const r = decodeKeys('\x1b[I\x1b[O');
+  expect(r.keys).toEqual([]);
+  expect(r.reports).toEqual([{ type: 'focus', focused: true }, { type: 'focus', focused: false }]);
+});
+
+test('parseKeypress drops the reports and keeps the keys', () => {
+  expect(parseKeypress('\x1b[?997;2nq').map((k) => k.name)).toEqual(['q']);
+});

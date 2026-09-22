@@ -6,6 +6,7 @@ export { useApp } from './hooks/useApp.js';
 export type { AppApi } from './context/appContext.js';
 export type { ErrorSource } from './components/ErrorBoundary.js';
 export { useTerminalSize, type TerminalSize } from './hooks/useTerminalSize.js';
+export { useColorScheme } from './hooks/useColorScheme.js';
 export { Box } from './components/base/Box.js';
 export { Text } from './components/base/Text.js';
 export { Span, type SpanProps } from './components/base/Span.js';
@@ -14,7 +15,7 @@ export { inputRows, caretPosition, rowIndexAt } from '@flowtty/core';
 // Re-export core types from @flowtty/core so consumers using only @flowtty/react
 // have a single import surface for everything they typically need.
 export { Buffer } from '@flowtty/core';
-export type { Backend, Cell, Style, Key, KeyName, NamedKey, MouseButton, Color, NamedColor } from '@flowtty/core';
+export type { Backend, Cell, Style, Key, KeyName, NamedKey, MouseButton, Color, NamedColor, ColorScheme, TerminalColorScheme } from '@flowtty/core';
 export { NAMED_KEYS, NAMED_COLORS } from '@flowtty/core';
 export type { BorderStyle, BorderChars, GridChars } from '@flowtty/core';
 export { DEFAULT_BORDER_STYLE, GRID_CHARS } from '@flowtty/core';

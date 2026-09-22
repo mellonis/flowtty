@@ -16,6 +16,17 @@ export const BRACKETED_PASTE_OFF = '\x1b[?2004l';
 export const MOUSE_ON = '\x1b[?1000h\x1b[?1002h\x1b[?1006h';
 export const MOUSE_OFF = '\x1b[?1006l\x1b[?1002l\x1b[?1000l';
 
+// Following the terminal's light / dark scheme (docs/terminal.md, light and
+// dark). OSC 11 with `?` asks for the default background, answered as
+// `OSC 11 ; rgb:rrrr/gggg/bbbb ST`. DEC mode 2031 asks to be told when the
+// scheme changes (`CSI ? 997 ; 1|2 n`); mode 1004 asks for focus events
+// (`CSI I` / `CSI O`), the fallback for terminals without 2031: the scheme
+// usually flips while the window is in the background, so the background is
+// asked for again on every focus-in. Turned off in reverse order.
+export const BACKGROUND_QUERY = '\x1b]11;?\x07';
+export const COLOR_SCHEME_REPORTS_ON = '\x1b[?2031h\x1b[?1004h';
+export const COLOR_SCHEME_REPORTS_OFF = '\x1b[?1004l\x1b[?2031l';
+
 // The 8 ANSI colors plus their bright variants (`redBright` …, 90–97), with
 // `gray` / `grey` as the familiar names for bright black. Background codes are
 // the same numbers + 10. Typed over core's NamedColor: a name added there does

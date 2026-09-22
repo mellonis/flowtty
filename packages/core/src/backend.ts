@@ -1,5 +1,6 @@
 import type { Buffer } from './cells.js';
 import type { Key } from './keys.js';
+import type { TerminalColorScheme } from './colorScheme.js';
 
 // The seam every renderer backend implements. Drawing is required; key input
 // and the inline static-region API are optional capabilities — detect at
@@ -30,6 +31,21 @@ export interface Backend {
    */
   onResize?(handler: () => void): () => void;
   dispose?(): void;
+  /**
+   * Whether the terminal is light or dark, and its default background when it
+   * reported one — `{ scheme: 'unknown' }` until it has answered, and for good
+   * where it never will. The TTY backends ask the terminal on the first key
+   * subscription and keep listening for a change; backends with no terminal to
+   * ask omit this, and the app then sees `'unknown'`. See docs/app.md (the
+   * color scheme).
+   */
+  colorScheme?(): TerminalColorScheme;
+  /**
+   * Subscribe to color-scheme changes — the terminal switched between light and
+   * dark, or first answered. Handlers are called AFTER `colorScheme()` reflects
+   * the new value, with that value. Returns an unsubscribe function.
+   */
+  onColorScheme?(handler: (scheme: TerminalColorScheme) => void): () => void;
   /**
    * Append plain (already-styled, ANSI-ready) lines ABOVE the live region.
    * The lines scroll naturally into the terminal's scrollback. Backends

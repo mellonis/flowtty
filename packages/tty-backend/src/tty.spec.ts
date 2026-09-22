@@ -746,3 +746,63 @@ test('a copy between two frames leaves the next frame diff byte-identical', () =
   expect(clip[0]!.startsWith('\x1b]52;c;')).toBe(true);
   expect(copierDiff).toBe(quietDiff);
 });
+
+// ─── light and dark ──────────────────────────────────────────────────────────
+
+test('TtyBackend asks for the scheme with the first key subscription, and turns the reports off on dispose', () => {
+  const { stub: out, writes } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  expect(back.colorScheme()).toEqual({ scheme: 'unknown' });
+  expect(writes.join('')).not.toContain('\x1b]11;?'); // passive backend: asks nothing
+  back.onKey(() => {});
+  expect(writes.join('')).toContain('\x1b[?2031h\x1b[?1004h\x1b]11;?\x07');
+  back.dispose();
+  const all = writes.join('');
+  expect(all).toContain('\x1b[?1004l\x1b[?2031l');
+  // Off before the mouse / paste modes, in the same order they came on.
+  expect(all.indexOf('\x1b[?2031l')).toBeLessThan(all.indexOf('\x1b[?2004l'));
+});
+
+test('TtyBackend { colorScheme: false } asks nothing and stays unknown', () => {
+  const { stub: out, writes } = makeStub();
+  const back = new TtyBackend(out, makeStdinStub(), { colorScheme: false });
+  back.onKey(() => {});
+  expect(writes.join('')).not.toContain('\x1b[?2031h');
+  expect(writes.join('')).not.toContain('\x1b]11;?');
+  back.dispose();
+  expect(writes.join('')).not.toContain('\x1b[?2031l');
+  expect(back.colorScheme()).toEqual({ scheme: 'unknown' });
+});
+
+test('the reply comes back through stdin: colorScheme() and onColorScheme() see it, no key handler does', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const keys: string[] = [];
+  const heard: unknown[] = [];
+  back.onKey((k) => keys.push(k.name));
+  back.onColorScheme((s) => heard.push(s));
+  stdin.emit('data', '\x1b]11;rgb:fdfd/f6f6/e3e3\x07q');
+  expect(back.colorScheme()).toEqual({ scheme: 'light', background: '#fdf6e3' });
+  expect(heard).toEqual([{ scheme: 'light', background: '#fdf6e3' }]);
+  expect(keys).toEqual(['q']);
+  // A 2031 notification flips it at once and asks for the ground again.
+  stdin.emit('data', '\x1b[?997;1n');
+  expect(back.colorScheme().scheme).toBe('dark');
+  expect(keys).toEqual(['q']);
+  back.dispose();
+});
+
+test('a focus-in re-asks for the background; the focus events never reach a key handler', () => {
+  const { stub: out, writes } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin);
+  const keys: string[] = [];
+  back.onKey((k) => keys.push(k.name));
+  writes.length = 0;
+  stdin.emit('data', '\x1b[O\x1b[I');
+  expect(writes).toEqual(['\x1b]11;?\x07']);
+  expect(keys).toEqual([]);
+  back.dispose();
+});

@@ -1,5 +1,5 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
-import { stringWidth, takeWarnings, type Buffer, type Style, type Backend, type Key } from '@flowtty/core';
+import { stringWidth, takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme } from '@flowtty/core';
 import {
   decodeKeys,
   detectHyperlinkSupport,
@@ -13,6 +13,7 @@ import {
   sgr,
   createAttention, type Attention, type NotificationProtocol,
   createClipboard, type Clipboard, type ClipboardProtocol,
+  createColorSchemeTracker, type ColorSchemeTracker,
 } from '@flowtty/tty-backend';
 
 export interface InlineTtyBackendOptions {
@@ -25,6 +26,10 @@ export interface InlineTtyBackendOptions {
   out?: NodeJS.WriteStream;
   /** Input stream for keys; defaults to process.stdin. */
   in?: NodeJS.ReadStream;
+  /** Follow the terminal's light / dark scheme once keys are read, as
+   *  `TtyBackend` does. On by default; `false` asks nothing. Nothing is asked
+   *  in log-only mode either way. See docs/terminal.md (light and dark). */
+  colorScheme?: boolean;
   /** Emit color. Default: from the environment — off when `NO_COLOR` is set,
    *  `FORCE_COLOR` overriding it. Bold, dim, underline and inverse are emitted
    *  either way. */
@@ -84,8 +89,10 @@ export class InlineTtyBackend implements Backend {
   private pendingInput = '';
   private readonly inputDataHandler = (chunk: NodeBuffer | string): void => {
     const s = this.pendingInput + (typeof chunk === 'string' ? chunk : chunk.toString('utf-8'));
-    const { keys, rest } = decodeKeys(s);
+    const { keys, rest, reports } = decodeKeys(s);
     this.pendingInput = rest;
+    // The terminal's replies are not input — see TtyBackend.
+    if (reports.length > 0) this.scheme.handle(reports);
     for (const key of keys) {
       if (key.ctrl && (key.name === 'c' || key.name === 'd')) {
         this.dispose();
@@ -110,6 +117,8 @@ export class InlineTtyBackend implements Backend {
   private disposed = false;
   private readonly attention: Attention;
   private readonly clipboard: Clipboard;
+  private readonly scheme: ColorSchemeTracker;
+  private readonly followsScheme: boolean;
   private readonly sgrOptions: { color: boolean; depth: ColorDepth };
   /**
    * True when stdout is not an interactive terminal (piped, redirected, CI,
@@ -131,6 +140,21 @@ export class InlineTtyBackend implements Backend {
       ...(options.clipboard === undefined ? {} : { clipboard: options.clipboard }),
       ...(options.clipboardLimit === undefined ? {} : { limit: options.clipboardLimit }),
     });
+    this.followsScheme = options.colorScheme !== false;
+    // Its writes stop with stop(), which dispose() calls before the input goes;
+    // after that no report can arrive to prompt another.
+    this.scheme = createColorSchemeTracker((bytes) => this.out.write(bytes));
+  }
+
+  /** Whether the terminal is light or dark — `'unknown'` until it has answered,
+   *  and always in log-only mode. See docs/app.md (the color scheme). */
+  colorScheme(): TerminalColorScheme {
+    return this.scheme.current();
+  }
+
+  /** Hear a change of scheme, after `colorScheme()` reflects it. */
+  onColorScheme(handler: (scheme: TerminalColorScheme) => void): () => void {
+    return this.scheme.subscribe(handler);
   }
 
   size(): { width: number; height: number } {
@@ -225,6 +249,7 @@ export class InlineTtyBackend implements Backend {
       this.inputAttached = true;
       // Only a backend that reads keys asks for bracketed paste; dispose() undoes it.
       this.out.write(BRACKETED_PASTE_ON);
+      if (this.followsScheme) this.scheme.start();
     }
     this.subscribers.add(handler);
     return () => { this.subscribers.delete(handler); };
@@ -239,6 +264,7 @@ export class InlineTtyBackend implements Backend {
       this.input.pause();
       this.inputAttached = false;
       this.pendingInput = '';
+      this.scheme.stop();
       this.out.write(BRACKETED_PASTE_OFF);
     }
     if (this.resizeAttached) {

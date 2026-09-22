@@ -14,6 +14,8 @@ export type { Cell, ContinuationMark, Style } from './cells.js';
 export { NAMED_KEYS } from './keys.js';
 export type { Key, KeyName, NamedKey, MouseButton } from './keys.js';
 export type { Backend } from './backend.js';
+export { colorSchemeOf, rgbToHex, UNKNOWN_COLOR_SCHEME } from './colorScheme.js';
+export type { ColorScheme, TerminalColorScheme } from './colorScheme.js';
 
 // ─── Component-author types ──────────────────────────────────────────────────
 // Component authors building Box-shaped widgets reach for BoxProps;

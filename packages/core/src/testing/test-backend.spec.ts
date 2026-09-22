@@ -125,3 +125,18 @@ test('clipboardAvailable = false refuses the copy, so an app can test its fallba
   expect(backend.copy('hello')).toBe(false);
   expect(backend.clipboard).toEqual([]);
 });
+
+test('colorScheme: unknown until set; setColorScheme tells subscribers of a change only', () => {
+  const b = new TestBackend(10, 1);
+  expect(b.colorScheme()).toEqual({ scheme: 'unknown' });
+  const heard: unknown[] = [];
+  const unsubscribe = b.onColorScheme((s) => heard.push(s));
+  b.setColorScheme('dark');
+  b.setColorScheme('dark');
+  b.setColorScheme('light', '#fdf6e3');
+  expect(b.colorScheme()).toEqual({ scheme: 'light', background: '#fdf6e3' });
+  expect(heard).toEqual([{ scheme: 'dark' }, { scheme: 'light', background: '#fdf6e3' }]);
+  unsubscribe();
+  b.setColorScheme('dark');
+  expect(heard).toHaveLength(2);
+});

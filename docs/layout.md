@@ -57,6 +57,8 @@ Both accept `'default'`, the terminal's own color: `color="default"` on a box
 resets its text and everything below it to the terminal foreground, as
 `backgroundColor="default"` does for the background. `dim`, `bold` and the other
 attributes are not inherited; they apply on top of whatever color is in effect.
+To pick the colors for the scheme the terminal is actually on, see
+[The color scheme](app.md#the-color-scheme).
 
 ## Padding
 
