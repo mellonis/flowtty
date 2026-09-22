@@ -7,6 +7,19 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Fixed
+
+- Drag-selection stays readable over text that carries a color of its own. A
+  selected cell used to move its `fg` into `bg` under `inverse`, which put the
+  glyph in its own color on a band of the terminal's default foreground; once a
+  box's `color` reached every descendant, an app whose ink sat near that
+  foreground saw the selected text vanish into the band. A selected cell now
+  keeps its `fg` and `bg` as they are and lets `inverse` swap them, so the band
+  is the text's own color and the glyph its own background — a pair that
+  contrasts on either theme.
+
 ## 1.0.0-alpha.17 — 2026-09-22
 
 ### Added

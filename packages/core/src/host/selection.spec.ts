@@ -250,32 +250,51 @@ test('applySelection toggles inverse on the selected cells and leaves the rest a
   expect(out.get(3, 0).style.inverse).toBeFalsy();
 });
 
-test('a selected cell moves its fg into bg under inverse — band uniform, text in color', () => {
+test('a selected cell keeps its own two colors under inverse — the band takes the text color', () => {
   const b = new Buffer(2, 1);
   b.set(0, 0, 'a', { fg: 'red', bg: '#3b0000', dim: true, bold: true, underline: true });
   b.set(1, 0, 'b', { fg: 'cyan' });
   const out = applySelection(b, [{ y: 0, x0: 0, x1: 1 }]);
-  // `inverse` swaps the two in the terminal: bg becomes the default FOREGROUND
-  // (one band on any theme) and the glyph takes what we put in bg — its own
-  // color. The row's own band (#3b0000) and `dim` go.
+  // `inverse` swaps the two in the terminal: the band is the cell's own fg and
+  // the glyph its own bg — a pair that contrasted before the swap and so
+  // contrasts after it. Only `dim` goes.
   expect(out.get(0, 0).char).toBe('a');
-  expect(out.get(0, 0).style).toEqual({ inverse: true, bg: 'red', bold: true, underline: true });
+  expect(out.get(0, 0).style).toEqual({ inverse: true, fg: 'red', bg: '#3b0000', bold: true, underline: true });
   // The cell beside it was not selected and is untouched.
   expect(out.get(1, 0).style).toEqual({ fg: 'cyan' });
 });
 
 test('a selected cell with no color of its own is the plain band', () => {
   expect(selectedStyle({})).toEqual({ inverse: true });
-  expect(selectedStyle({ fg: 'cyan' })).toEqual({ inverse: true, bg: 'cyan' });
-  expect(selectedStyle({ bg: 'yellow' })).toEqual({ inverse: true });
+  expect(selectedStyle({ bg: 'yellow' })).toEqual({ inverse: true, bg: 'yellow' });
 });
 
-test('a selected cell that was already inverse keeps its fg and drops its bg', () => {
+test('a cell painted in the inherited ink selects to a band of that ink, never moved into bg', () => {
+  // A box's `color` reaches every cell in it, and an app picks that ink to sit
+  // near the terminal's own foreground. Moving it into `bg` would put the glyph
+  // in the ink on a band of the default foreground — the same color twice.
+  // Keeping it as `fg` makes the band the ink and the glyph the default
+  // background, readable on a light theme and on a dark one.
+  const ink = '#d0d0d0';
+  expect(selectedStyle({ fg: ink })).toEqual({ inverse: true, fg: ink });
+  // A deliberately different fg — a syntax-highlighted keyword — is kept too.
+  expect(selectedStyle({ fg: 'cyan' })).toEqual({ inverse: true, fg: 'cyan' });
+});
+
+test('a selected cell with fg and bg keeps both — white on black selects to black on white', () => {
+  expect(selectedStyle({ fg: 'white', bg: 'black' })).toEqual({ inverse: true, fg: 'white', bg: 'black' });
+});
+
+test('a selected cell that was already inverse keeps its colors and is not inverted again', () => {
   const b = new Buffer(1, 1);
   b.set(0, 0, 'a', { inverse: true, fg: 'green', bg: 'cyan', dim: true, bold: true });
   const out = applySelection(b, [{ y: 0, x0: 0, x1: 1 }]);
-  // A hole in the band: not inverse where everything around it is.
-  expect(out.get(0, 0).style).toEqual({ fg: 'green', bold: true });
+  // A hole in the band: not inverse where everything around it is, showing its
+  // own pair the way the box around it does. Only `dim` goes.
+  expect(out.get(0, 0).style).toEqual({ fg: 'green', bg: 'cyan', bold: true });
+  // With only an inherited ink, the hole is that ink on the default background.
+  expect(selectedStyle({ inverse: true, fg: '#d0d0d0' })).toEqual({ fg: '#d0d0d0' });
+  expect(selectedStyle({ inverse: true })).toEqual({});
 });
 
 test('applySelection un-inverts a cell that was already inverse, so it stays visible', () => {

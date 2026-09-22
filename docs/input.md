@@ -100,21 +100,23 @@ await render(<App />, backend, {
   nothing and fires nothing.
 - **A stream, not a rectangle.** From the anchor to the current cell in reading
   order, with the rows in between spanning the full width of the scope.
-- **One uniform band, text still in color.** A selected cell turns on `inverse`,
-  which paints the band in the terminal's own default foreground — the one color
-  that suits any theme, and the only one flowtty can name without knowing the
-  theme. Inverse swaps the two slots, so the cell's own color travels the other
-  way: its `fg` MOVES INTO `bg` (and the original `bg` goes), and the terminal
-  swaps it back onto the glyph. The band is therefore the same on every cell
-  while a cyan heading, a diff's red and green and every syntax color stay
-  readable on it. Bold, underline, strikethrough and an OSC 8 link are kept;
-  `dim` is dropped, because SGR 2 and 7 combine differently across terminals and
-  a dim cell would punch a hole in the band. With no color support at all
-  (`NO_COLOR`, a `color: false` backend) the band is all that is emitted, which
-  is the right fallback. A cell that was already inverse (a selected table row,
-  a focused button, the cursor) is drawn the other way round — not inverse,
-  keeping its own color — so it reads as a hole in the band instead of vanishing
-  into it.
+- **A band in the text's own colors.** A selected cell turns on `inverse` and
+  keeps its `fg` and `bg` exactly as they were, so the terminal draws the band
+  from the one and the glyph from the other. The two colors of a cell contrast
+  by construction — that is what made the text readable before the drag — so
+  the swap contrasts too, on a light theme and on a dark one, and flowtty never
+  has to name a color it cannot know. A plain cell is the default band with the
+  glyph in the default background; text painted in a box's inherited `color`
+  (see [Inherited colors](layout.md#inherited-colors)) is a band of that ink;
+  white on a black panel selects to black on white; a cyan heading, a diff's
+  red and green and every syntax color become a band of that color. Bold,
+  underline, strikethrough and an OSC 8 link are kept; `dim` is dropped,
+  because SGR 2 and 7 combine differently across terminals and a dim cell would
+  punch a hole in the band. With no color support at all (`NO_COLOR`, a
+  `color: false` backend) the band is all that is emitted, which is the right
+  fallback. A cell that was already inverse (a selected table row, a focused
+  button, the cursor) is drawn the other way round — not inverse, keeping both
+  its colors — so it reads as a hole in the band instead of vanishing into it.
 - **The keys still arrive.** `mousedown` / `mousedrag` / `mouseup` go on to every
   `useInput` subscriber as usual, so an app keeps its own press / drag / release
   behaviour. Selection rides that same path: an app with no `useInput` subscriber

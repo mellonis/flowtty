@@ -1276,9 +1276,10 @@ test('a row that is frame from edge to edge is no line of the document', async (
   );
 });
 
-test('a highlight over colored content is one uniform band', async () => {
-  // A diff row (red on a dark band) and a cyan heading: inverting each cell's
-  // own colors made the selection look like a rendering glitch.
+test('a highlight over colored content keeps each cell\'s own pair of colors under the band', async () => {
+  // A diff row (red on a dark band) and a cyan heading: each cell keeps its
+  // own fg and bg and only `inverse` is added, so the band is the text's color
+  // and the glyph its background — the pair that contrasted before the drag.
   const doc = '## Heading\n\n```diff\n-const a = 1;\n+const a = 2;\n```';
   const backend = new TestBackend(24, 10);
   await render(
@@ -1290,6 +1291,7 @@ test('a highlight over colored content is one uniform band', async () => {
     backend,
   );
   await flushAsync(backend);
+  const before = backend.lastBuffer!.clone();
   const rows = backend.lastFrame.split('\n');
   let last = rows.length - 1;
   while (last > 0 && !/[^ ]/u.test(rows[last]!)) last--;
@@ -1298,21 +1300,27 @@ test('a highlight over colored content is one uniform band', async () => {
   await flush();
   const frame = backend.lastBuffer!;
   let selected = 0;
+  let withBand = 0;
   for (let y = 0; y <= last; y++) {
     for (let x = 0; x < frame.width; x++) {
       const { style } = frame.get(x, y);
       if (style.inverse !== true) continue;
       selected++;
-      // The band's color is the terminal's default foreground, swapped in by
-      // `inverse` — never a color of the cell's own, so it is the same width to
-      // width. What the cell contributes is its glyph color, in the bg slot.
-      expect(style.fg, `cell ${x},${y}`).toBeUndefined();
+      const own = before.get(x, y).style;
+      // Never a color the cell did not have, and never one it had taken away:
+      // the band is the cell's own fg and the glyph its own bg. `dim` goes.
+      expect(style.fg, `cell ${x},${y}`).toBe(own.fg);
+      expect(style.bg, `cell ${x},${y}`).toBe(own.bg);
       expect(style.dim, `cell ${x},${y}`).toBeUndefined();
+      if (own.fg !== undefined && own.bg !== undefined) withBand++;
     }
   }
   expect(selected).toBeGreaterThan(30);
-  // The heading keeps its cyan — as the glyph color under the band.
+  // The diff rows carry a color on a band of their own, and keep both.
+  expect(withBand).toBeGreaterThan(0);
+  // The heading keeps its cyan — as the band's color, with the glyph in the
+  // default background.
   const heading = frame.get(3, 0);
   expect(heading.char).toBe('H');
-  expect(heading.style).toEqual({ inverse: true, bg: 'cyan', bold: true });
+  expect(heading.style).toEqual({ inverse: true, fg: 'cyan', bold: true });
 });

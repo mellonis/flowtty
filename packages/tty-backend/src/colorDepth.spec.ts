@@ -67,20 +67,21 @@ describe('downgrading a 24-bit color', () => {
 });
 
 describe('a selected cell', () => {
-  // The band comes from `inverse` alone — the terminal's own default foreground
-  // — so the glyph's color rides in the BACKGROUND slot and is swapped onto it.
-  test('emits inverse plus a background code, never a foreground one', () => {
+  // The band comes from `inverse` and the cell's own colors: the glyph's color
+  // stays in the FOREGROUND slot and the terminal swaps it onto the band.
+  test('emits inverse plus the cell\'s own color codes, in their own slots', () => {
     const style = selectedStyle({ fg: 'cyan', bg: '#3b0000', dim: true });
-    expect(style).toEqual({ inverse: true, bg: 'cyan' });
-    for (const depth of [4, 8, 24] as const) expect(sgr(style, { depth })).toBe('\x1b[7;46m');
-    // A hex color downgrades through the same background mapping as any other.
+    expect(style).toEqual({ inverse: true, fg: 'cyan', bg: '#3b0000' });
+    expect(sgr(style)).toBe('\x1b[7;36;48;2;59;0;0m');
+    expect(sgr(style, { depth: 4 })).toBe('\x1b[7;36;40m');
+    // A hex color downgrades through the same foreground mapping as any other.
     const hex = selectedStyle({ fg: '#ff0000' });
-    expect(sgr(hex)).toBe('\x1b[7;48;2;255;0;0m');
-    expect(sgr(hex, { depth: 8 })).toBe('\x1b[7;48;5;196m');
-    expect(sgr(hex, { depth: 4 })).toBe('\x1b[7;101m');
-    // `gray` and the bright names are backgrounds like any other.
-    expect(sgr(selectedStyle({ fg: 'gray' }))).toBe('\x1b[7;100m');
-    expect(sgr(selectedStyle({ fg: 'redBright' }))).toBe('\x1b[7;101m');
+    expect(sgr(hex)).toBe('\x1b[7;38;2;255;0;0m');
+    expect(sgr(hex, { depth: 8 })).toBe('\x1b[7;38;5;196m');
+    expect(sgr(hex, { depth: 4 })).toBe('\x1b[7;91m');
+    // `gray` and the bright names are foregrounds like any other.
+    expect(sgr(selectedStyle({ fg: 'gray' }))).toBe('\x1b[7;90m');
+    expect(sgr(selectedStyle({ fg: 'redBright' }))).toBe('\x1b[7;91m');
   });
 
   test('degrades to the plain band where color is off', () => {

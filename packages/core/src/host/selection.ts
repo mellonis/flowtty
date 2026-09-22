@@ -235,29 +235,39 @@ export function selectionText(buffer: Buffer, range: SelectionRange): string {
 }
 
 /**
- * How one selected cell is drawn: one uniform band, with the text on it still
- * in its own colors — what a terminal's own selection looks like.
+ * How one selected cell is drawn: a band with the text on it still readable —
+ * what a terminal's own selection looks like.
  *
- * Only `inverse` can paint a band that suits the theme, because the terminal
- * draws it with ITS default foreground color and nothing else names that color.
- * Inverse swaps the two slots, so the cell's own color has to travel the other
- * way: `fg` MOVES INTO `bg` and the original `bg` is dropped. The terminal then
- * paints the background from the (unset) foreground — the same band on every
- * cell, on a light theme or a dark one — and the glyph from what we put in the
- * background: the color the cell had. A cell with no `fg` of its own is the
- * plain band, and where the backend has no color at all the band is all that is
- * left, which is exactly right.
+ * Only `inverse` can paint a band that suits the theme: nothing else names the
+ * terminal's default colors, and the selection code names no color of its own.
+ * Inverse swaps a cell's two slots, so a selected cell keeps its `fg` and `bg`
+ * EXACTLY as they are and lets the terminal draw the band from the one and the
+ * glyph from the other. The two colors of a cell contrast by construction —
+ * that is what made the text readable before it was selected — so the swap
+ * contrasts too: a plain cell is the default band with the glyph in the
+ * default background; a cell whose `fg` is the box's inherited ink (see
+ * docs/layout.md, inherited colors) is a band of that ink with the glyph in
+ * the default background; white on a black panel is a white band with a black
+ * glyph; a cyan token is a cyan band. Where the backend has no color at all
+ * the band is all that is left, which is exactly right.
  *
- * `dim` goes with the original background. SGR 2 and 7 combine differently
- * across terminals — some faint the color before the swap, some after — so a
- * dim cell can come out as a hole in the band, which is the patchiness this
- * avoids. Bold, underline, strikethrough and an OSC 8 link (so a selected link
- * is still clickable) stay.
+ * The band is NOT uniform: it takes the color of the text on it. The earlier
+ * rule moved `fg` into `bg` so that the band came out in the default foreground
+ * everywhere and the glyph in the cell's own color — sound while most cells had
+ * no `fg`, but once a box's `color` reaches every descendant nearly every cell
+ * has one, chosen to sit close to the terminal's own foreground, and the glyph
+ * then drowned in a band of the same color. Per-cell bands of contrasting pairs
+ * are what stays readable on either theme.
+ *
+ * `dim` goes. SGR 2 and 7 combine differently across terminals — some faint the
+ * color before the swap, some after — so a dim cell can come out as a hole in
+ * the band, which is the patchiness this avoids. Bold, underline, strikethrough
+ * and an OSC 8 link (so a selected link is still clickable) stay.
  *
  * A cell that was ALREADY inverse — a selected table row, a focused button, the
  * cursor — would vanish into the band, so it is drawn the other way round: not
- * inverse, keeping its own `fg` and dropping its `bg`. It reads as a hole in
- * the band, which is how it stays distinguishable.
+ * inverse, keeping its own `fg` and `bg`. It shows the pair the way the box
+ * around it does, a hole in the band, which is how it stays distinguishable.
  *
  * The one place the look of a selection is decided.
  */
@@ -267,16 +277,13 @@ export function selectedStyle(style: Style): Style {
   if (style.underline) out.underline = true;
   if (style.strikethrough) out.strikethrough = true;
   if (style.link !== undefined) out.link = style.link;
-  if (style.inverse) {
-    // Already inverted on screen; inverting again would bury it in the band.
-    if (style.fg !== undefined) out.fg = style.fg;
-    return out;
-  }
+  if (style.fg !== undefined) out.fg = style.fg;
+  if (style.bg !== undefined) out.bg = style.bg;
   // Set the key only when it is on: backends compare whole styles, and
   // `{ inverse: false }` would read as a change to every plain cell it is
-  // compared against.
-  out.inverse = true;
-  if (style.fg !== undefined) out.bg = style.fg;
+  // compared against. An already-inverse cell is left un-inverted: inverting
+  // it again would bury it in the band.
+  if (!style.inverse) out.inverse = true;
   return out;
 }
 
