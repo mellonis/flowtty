@@ -1,0 +1,180 @@
+# Changelog
+
+All notable changes to the `@flowtty/*` packages. The four packages
+(`@flowtty/core`, `@flowtty/react`, `@flowtty/tty-backend`,
+`@flowtty/inline-tty-backend`) share one version and are released together.
+
+The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
+the project is still on `1.0.0-alpha`, so any release may change an API.
+
+## Unreleased
+
+## 1.0.0-alpha.15 — 2026-09-21
+
+### Added
+
+- Mouse selection with copy-on-select: drag over the drawn frame to select,
+  release to copy. Selection scopes per pane, `selectable={false}` to keep
+  chrome out of it, soft-wrapped paragraphs pasted back as one line.
+  `useApp().copy()` and the `copy` backend capability (OSC 52) with an `onCopy`
+  fallback signal; `TestBackend` records clipboard writes and drives the mouse.
+
+## 1.0.0-alpha.14 — 2026-09-21
+
+### Added
+
+- `useApp().bell()` and `useApp().notify()` to get attention from another
+  window; `TestBackend` records both.
+- Markdown code blocks: a highlighter for 25 languages, diff blocks, and a quiet
+  fence for plain output.
+
+## 1.0.0-alpha.13 — 2026-09-21
+
+### Added
+
+- `<Span>` for styled runs inside a `<Text>`: pieces of one paragraph that wrap
+  together and carry their style across a line break.
+- `FinalFrameBackend`, `renderToString` and `NotInteractiveError`: one-shot
+  output on a surface as tall as its content.
+- `CONTRIBUTING.md`, "writing a component" and "writing a backend" pages, and
+  documentation of the input components.
+- The TTY backend brings 24-bit colors down to what the terminal can show.
+- A dev warning when a `<Text>` mixes text with child boxes.
+
+### Fixed
+
+- `Select` sends `j` and `k` to the filter instead of navigating.
+
+## 1.0.0-alpha.12 — 2026-09-21
+
+### Added
+
+- The TTY backend honors `NO_COLOR` and `FORCE_COLOR`.
+- The README became a landing page; the reference moved to `docs/`.
+
+### Fixed
+
+- The terminal is restored on SIGTERM, SIGHUP and SIGINT.
+- Backends no longer write control sequences into a stdout that is not a terminal.
+- The selected `Table` row no longer highlights the outer borders.
+
+## 1.0.0-alpha.11 — 2026-09-21
+
+### Added
+
+- A dimming backdrop: `<Box backdrop="dim">` and `<DialogHost backdrop>`.
+- A self-playing showcase in the examples, recorded as an asciicast and a GIF by
+  the same script that tests it.
+
+### Fixed
+
+- `Select` and `MultiSelect` show focus.
+- Markdown hard-wraps fenced code lines to the width.
+
+## 1.0.0-alpha.10 — 2026-09-21
+
+### Added
+
+- `NAMED_COLORS` and a `Color` type on every color prop, so editors complete the
+  names while hex and `rgb()` values stay valid.
+
+### Changed
+
+- The build moved from tsup to tsdown; TypeScript 7.
+- `multiSelectReducer` takes `extraRows`; `MultiSelect` drops its placeholder item.
+- The editor's unknown-key contract is pinned in the documentation.
+
+## 1.0.0-alpha.9 — 2026-09-21
+
+### Added
+
+- `waitUntilExit()` on the render handle and `useApp().exit()`.
+- `MultiSelect.onAddNew` can return the new item's value.
+
+### Fixed
+
+- A scroll viewport is the containing block of its overlays.
+
+## 1.0.0-alpha.8 — 2026-09-21
+
+### Fixed
+
+- The editor treats an astral character (an emoji, for example) as one character.
+
+## 1.0.0-alpha.7 — 2026-09-21
+
+### Added
+
+- Scroll viewports and `<ScrollBox>`.
+- Multi-line editing and `<TextArea>`.
+- The TTY backend decodes keys reported by code point (CSI-u, modifyOtherKeys).
+- `TextInput` renders its `validate` error, gains `defaultValue`, and reads in
+  dark themes.
+- `gray` and the bright color names; unknown color names are reported on exit.
+- A named key list and types; `TestBackend.press` rejects impossible names.
+- A scripted publish that flips `exports` to `dist/` and always restores them.
+
+### Fixed
+
+- Readable `TextArea` text on its default light field.
+
+## 1.0.0-alpha.6 — 2026-09-20
+
+### Added
+
+- Bracketed paste delivered as a single `paste` key.
+- The mouse wheel as `wheelup` / `wheeldown` keys (opt-in).
+
+## 1.0.0-alpha.5 — 2026-09-20
+
+### Fixed
+
+- Re-ordering keyed children no longer aborts Yoga.
+- An empty `<Text>` takes one row.
+
+## 1.0.0-alpha.4 — 2026-09-20
+
+### Fixed
+
+- Markdown layout is measured in grid columns, not display cells.
+
+## 1.0.0-alpha.3 — 2026-09-20
+
+### Added
+
+- Markdown nested lists, source numbering and GFM tables.
+
+### Fixed
+
+- React is acquired through a single ESM import in the dist, so a consumer never
+  ends up with two copies.
+- East Asian Wide BMP emoji take two cells.
+
+## 1.0.0-alpha.2 — 2026-08-07
+
+### Added
+
+- `borderBackgroundColor`; border cells inherit the box background.
+
+## 1.0.0-alpha.1 — 2026-06-03
+
+The first published release. What the four packages held at that point:
+
+- `@flowtty/core`: the cell `Buffer`, `Style` and `Key` types, the `Backend`
+  interface, the text `wrap` and display-width helpers, the editor and the
+  select reducers, `TestBackend`; the adapter-facing `host` subpath with Yoga
+  layout and paint.
+- `@flowtty/react`: `render()` on a `react-reconciler` host, `<Box>` and
+  `<Text>` with the flexbox prop set (borders with titles, padding, margin, gap,
+  flex sizing and wrap, `alignContent`, min/max sizes, `aspectRatio`, `display`,
+  absolute positioning, `zIndex`, `overflow`, `onLayout`), `useInput`,
+  `useTerminalSize`, `FocusGroup` and `useFocus`, `Button`, `TextInput`,
+  `Select`, `MultiSelect`, `Confirm`, `Form` and `useField`, `DialogHost` with a
+  dialog stack, `Menu`, `<Static>`, `ErrorBoundary` and the `onError` option, a
+  root abort signal, ticker-driven `Spinner`, `ProgressBar` and `TaskList`,
+  `<Markdown>`, `<Link>` and OSC 8 hyperlinks, `<Table>`.
+- `@flowtty/tty-backend`: the alt screen with a frame diff, raw-mode key
+  parsing with modifiers, named and 24-bit color.
+- `@flowtty/inline-tty-backend`: a redrawable live region with an append-only
+  log above it, the backend behind `<Static>`.
+

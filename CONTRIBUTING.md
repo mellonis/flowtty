@@ -104,7 +104,9 @@ a landing page. Code that a page quotes lives as a real file under
 
 ## Releasing (maintainers)
 
-Bump the four package versions and their cross-dependencies together, commit, then
+Every user-visible change lands under `Unreleased` in `CHANGELOG.md` in the same
+commit. To release: rename that section to the new version with today's date,
+bump the four package versions and their cross-dependencies together, commit, then
 `npm run release:publish -- --otp <code>`. The script builds, points `exports` at
 `dist/` for the publish, publishes in dependency order, tags `alpha`, and always
 restores the source form. Never publish by hand, and never commit the flipped
