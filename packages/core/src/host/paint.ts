@@ -16,7 +16,7 @@ export function paint(container: Container, width: number, height: number): Buff
 function textStyleOf(inst: Instance): Style {
   const p = inst.props;
   const style: Style = {};
-  if (p.color !== undefined) style.fg = p.color;
+  if (p.color !== undefined) style.fg = fgOf(p.color);
   if (p.bold) style.bold = true;
   if (p.dim) style.dim = true;
   if (p.underline) style.underline = true;
@@ -33,7 +33,7 @@ function runStyles(runs: readonly TextRun[], base: Style): Style[] {
   const out: Style[] = [];
   for (const run of runs) {
     const style: Style = { ...base };
-    if (run.color !== undefined) style.fg = run.color;
+    if (run.color !== undefined) style.fg = fgOf(run.color);
     if (run.backgroundColor !== undefined) style.bg = run.backgroundColor;
     if (run.bold !== undefined) style.bold = run.bold;
     if (run.dim !== undefined) style.dim = run.dim;
@@ -44,6 +44,13 @@ function runStyles(runs: readonly TextRun[], base: Style): Style[] {
     for (const _ch of run.text) out.push(style);
   }
   return out;
+}
+
+// A foreground to put on a cell: `'default'` is the "terminal's own
+// foreground" sentinel (see docs/layout.md, inherited colors), so it resolves
+// to no fg at all — cells never carry the sentinel.
+function fgOf(color: string | undefined): string | undefined {
+  return color === 'default' ? undefined : color;
 }
 
 // Gate a buffer write on a clip rect. If clip is null, write unconditionally.
@@ -95,14 +102,18 @@ function markContinuation(
 // box's effective bg (same fallback rule as own-text) — so a filled box's
 // border ring shares its fill instead of punching through to the terminal
 // default. The 'default' sentinel resolves to "no bg", mirroring the fill.
-function paintBorder(inst: Instance, buffer: Buffer, box: Rect, clip: Rect | null, effectiveBg: string | undefined): void {
+// The glyphs take borderColor if set, else the box's effective text color —
+// a panel that sets `color` for its text keeps its frame visible on the same
+// theme; `borderColor: 'default'` keeps the terminal's own foreground.
+function paintBorder(inst: Instance, buffer: Buffer, box: Rect, clip: Rect | null, effectiveBg: string | undefined, effectiveFg: string | undefined): void {
   const style = inst.props.border;
   if (!style) return;
   if (box.width < 2 || box.height < 2) return; // can't draw a border without an interior
 
   const chars = BORDER_CHARS[style];
   const cellStyle: Style = {};
-  if (inst.props.borderColor !== undefined) cellStyle.fg = inst.props.borderColor;
+  const fg = fgOf(inst.props.borderColor ?? effectiveFg);
+  if (fg !== undefined) cellStyle.fg = fg;
   const bg = inst.props.borderBackgroundColor ?? effectiveBg;
   if (bg !== undefined && bg !== 'default') cellStyle.bg = bg;
 
@@ -154,6 +165,7 @@ function paintInstance(
   offsetY: number,
   inheritedBg: string | undefined = undefined,
   clip: Rect | null = null,
+  inheritedFg: string | undefined = undefined,
 ): void {
   // display: 'none' removes the box from layout (Yoga gives it zero size) AND
   // skips its entire subtree from paint. Without this short-circuit the existing
@@ -165,6 +177,10 @@ function paintInstance(
   inst.props.onLayout?.(box);
   const ownBg = inst.props.backgroundColor;
   const effectiveBg = ownBg ?? inheritedBg;
+  // The text color a box's descendants paint with when they set none: own
+  // `color`, else the parent's. 'default' is passed down as is, so a subtree
+  // reset to the terminal foreground stays reset; text resolves it to no fg.
+  const effectiveFg = inst.props.color ?? inheritedFg;
 
   // 1. Fill the box rect with own backgroundColor (if set). Clipped by inherited clip.
   // Sentinel `backgroundColor: 'default'` fills with spaces using NO bg style —
@@ -206,7 +222,7 @@ function paintInstance(
   }
 
   // 1b. Border (if set), clipped by inherited clip.
-  if (!offscreen) paintBorder(inst, buffer, box, clip, effectiveBg);
+  if (!offscreen) paintBorder(inst, buffer, box, clip, effectiveBg, effectiveFg);
 
   // 2. Own text — clipped by content rect (existing behavior) AND inherited clip.
   const text = offscreen ? '' : ownText(inst);
@@ -219,6 +235,10 @@ function paintInstance(
     const textStyle = textStyleOf(inst);
     if (textStyle.bg === undefined && effectiveBg !== undefined) {
       textStyle.bg = effectiveBg;
+    }
+    if (inst.props.color === undefined) {
+      const fg = fgOf(effectiveFg);
+      if (fg !== undefined) textStyle.fg = fg;
     }
     // With runs, every character has its own style: the run's on top of the box's.
     const styles = inst.props.runs !== undefined ? runStyles(inst.props.runs, textStyle) : null;
@@ -319,9 +339,9 @@ function paintInstance(
   const byZ = (a: Instance, b: Instance) => (a.props.zIndex ?? 0) - (b.props.zIndex ?? 0);
   stackFlow.sort(byZ);
   absolutes.sort(byZ);
-  for (const child of stackFlow) paintInstance(child, buffer, box.left, box.top - scrollTop, effectiveBg, childClip);
+  for (const child of stackFlow) paintInstance(child, buffer, box.left, box.top - scrollTop, effectiveBg, childClip, effectiveFg);
   // Overlays of a scroll viewport may sit in its padding (a scrollbar in the
   // column reserved by paddingRight), so they clip to the padding box instead.
   const overlayClip = scrolls ? intersectRects(clip, paddingRectOf(inst, box)) : childClip;
-  for (const child of absolutes) paintInstance(child, buffer, box.left, box.top, effectiveBg, overlayClip);
+  for (const child of absolutes) paintInstance(child, buffer, box.left, box.top, effectiveBg, overlayClip, effectiveFg);
 }

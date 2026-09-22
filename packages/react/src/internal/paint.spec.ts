@@ -1392,3 +1392,102 @@ describe('Box onLayout', () => {
     expect(handler).toHaveBeenCalledTimes(3);
   });
 });
+
+// A box's `color` reaches every descendant that sets none of its own — the
+// same rule as `backgroundColor`. A panel sets its text color once, and the
+// hints inside it stay readable on a light terminal theme.
+describe('inherited text color', () => {
+  async function paintTree(element: ReturnType<typeof createElement>, width: number, height: number) {
+    const Yoga = await getYoga();
+    const { container, root } = createRoot(Yoga);
+    root.render(element);
+    computeLayout(container, width, height);
+    return paint(container, width, height);
+  }
+
+  test('a nested text with no color of its own takes the parent box color', async () => {
+    const buf = await paintTree(
+      createElement('flowtty-box', { color: 'red', width: 4, height: 1 },
+        createElement('flowtty-box', { width: 4, height: 1 }, 'hi'),
+      ), 4, 1);
+    expect(buf.get(0, 0).style.fg).toBe('red');
+  });
+
+  test('the color passes through intermediate boxes that set none', async () => {
+    const buf = await paintTree(
+      createElement('flowtty-box', { color: 'red', width: 4, height: 1 },
+        createElement('flowtty-box', { width: 4, height: 1 },
+          createElement('flowtty-box', { width: 4, height: 1 }, 'hi'),
+        ),
+      ), 4, 1);
+    expect(buf.get(0, 0).style.fg).toBe('red');
+  });
+
+  test('an explicit color on the text wins over the inherited one', async () => {
+    const buf = await paintTree(
+      createElement('flowtty-box', { color: 'red', width: 4, height: 1 },
+        createElement('flowtty-box', { color: 'green', width: 4, height: 1 }, 'hi'),
+      ), 4, 1);
+    expect(buf.get(0, 0).style.fg).toBe('green');
+  });
+
+  test("color 'default' resets to the terminal foreground, for the box and its descendants", async () => {
+    const buf = await paintTree(
+      createElement('flowtty-box', { color: 'red', flexDirection: 'row', width: 8, height: 1 },
+        createElement('flowtty-box', { color: 'default', width: 2, height: 1 }, 'ab'),
+        createElement('flowtty-box', { color: 'default', width: 2, height: 1 },
+          createElement('flowtty-box', { width: 2, height: 1 }, 'cd'),
+        ),
+        createElement('flowtty-box', { width: 2, height: 1 }, 'ef'),
+      ), 8, 1);
+    expect(buf.get(0, 0).style.fg).toBeUndefined(); // own 'default'
+    expect(buf.get(2, 0).style.fg).toBeUndefined(); // inherited 'default'
+    expect(buf.get(4, 0).style.fg).toBe('red'); // sibling still inherits red
+  });
+
+  test('runs without a color take the inherited one; a run color still wins', async () => {
+    const buf = await paintTree(
+      createElement('flowtty-box', { color: 'red', width: 4, height: 1 },
+        createElement('flowtty-box', { width: 4, height: 1, runs: [{ text: 'a' }, { text: 'b', color: 'green' }, { text: 'c', color: 'default' }] }),
+      ), 4, 1);
+    expect(buf.get(0, 0).style.fg).toBe('red');
+    expect(buf.get(1, 0).style.fg).toBe('green');
+    expect(buf.get(2, 0).style.fg).toBeUndefined();
+  });
+
+  test('dim stays on top of the inherited color', async () => {
+    const buf = await paintTree(
+      createElement('flowtty-box', { color: 'red', width: 4, height: 1 },
+        createElement('flowtty-box', { dim: true, width: 4, height: 1 }, 'hi'),
+      ), 4, 1);
+    expect(buf.get(0, 0).style).toMatchObject({ fg: 'red', dim: true });
+  });
+
+  test('a border with no borderColor takes the effective color; borderColor wins', async () => {
+    const buf = await paintTree(
+      createElement('flowtty-box', { color: 'red', flexDirection: 'row', width: 6, height: 3 },
+        createElement('flowtty-box', { border: 'single', borderTitle: 'T', width: 3, height: 3 }),
+        createElement('flowtty-box', { border: 'single', borderColor: 'blue', width: 3, height: 3 }),
+      ), 6, 3);
+    expect(buf.get(0, 0)).toEqual({ char: '┌', style: { fg: 'red' } });
+    expect(buf.get(0, 1)).toEqual({ char: '│', style: { fg: 'red' } });
+    expect(buf.get(3, 0)).toEqual({ char: '┌', style: { fg: 'blue' } });
+  });
+
+  test("borderColor 'default' keeps the border on the terminal foreground", async () => {
+    const buf = await paintTree(
+      createElement('flowtty-box', { color: 'red', width: 3, height: 3 },
+        createElement('flowtty-box', { border: 'single', borderColor: 'default', width: 3, height: 3 }),
+      ), 3, 3);
+    expect(buf.get(0, 0)).toEqual({ char: '┌', style: {} });
+  });
+
+  test('the box own text and the border use its own color, not just the inherited one', async () => {
+    const buf = await paintTree(
+      createElement('flowtty-box', { color: 'red', width: 4, height: 3 },
+        createElement('flowtty-box', { color: 'green', border: 'single', width: 4, height: 3 }, 'hi'),
+      ), 4, 3);
+    expect(buf.get(0, 0).style.fg).toBe('green');
+    expect(buf.get(1, 1).style.fg).toBe('green');
+  });
+});

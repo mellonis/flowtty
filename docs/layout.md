@@ -3,6 +3,7 @@
 Every `<Box>` is a Yoga flexbox node. These are the props that size, place, clip and scroll it. Yoga's defaults are not CSS's — most importantly `flexShrink` is `0`, so a child keeps its natural size and overflows unless you give it `flexShrink={1}`.
 
 - [Borders](#borders)
+- [Inherited colors](#inherited-colors)
 - [Padding](#padding)
 - [Margin](#margin)
 - [Gap](#gap)
@@ -37,6 +38,25 @@ background color (own `backgroundColor`, else the inherited one), so a filled
 modal keeps its fill under the border ring. `borderBackgroundColor` overrides
 that for the border cells only; the `'default'` value keeps them on the
 terminal default background.
+
+Border glyphs follow the same rule for the foreground: with no `borderColor`
+they take the box's effective text color (own `color`, else the inherited one),
+so a panel that sets `color` keeps its frame visible; `borderColor: 'default'`
+keeps them on the terminal's own foreground.
+
+## Inherited colors
+
+A box's `backgroundColor` and `color` reach every descendant that sets none of
+its own: text, `<Span>` runs and border glyphs inside a `<Box color="white"
+backgroundColor="black">` all paint white on black, and a `<Text color="cyan">`
+inside it still paints cyan. Set a panel's colors once, on the panel, instead of
+on every line in it — that is what keeps a dark panel readable on a light
+terminal theme, where the default foreground is black.
+
+Both accept `'default'`, the terminal's own color: `color="default"` on a box
+resets its text and everything below it to the terminal foreground, as
+`backgroundColor="default"` does for the background. `dim`, `bold` and the other
+attributes are not inherited; they apply on top of whatever color is in effect.
 
 ## Padding
 

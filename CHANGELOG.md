@@ -9,6 +9,18 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
 
 ## Unreleased
 
+### Added
+
+- A box's `color` reaches every descendant that sets none of its own, the way
+  `backgroundColor` already did: text, `<Span>` runs and border glyphs inside a
+  `<Box color="white">` paint white unless they say otherwise. `color: 'default'`
+  resets a subtree to the terminal's own foreground. A panel that paints a dark
+  background can now set its text color once and stay readable on a light
+  terminal theme.
+- A border with no `borderColor` takes the box's effective text color, so a
+  colored panel keeps its frame visible; `borderColor: 'default'` keeps the
+  terminal foreground.
+
 ## 1.0.0-alpha.15 — 2026-09-21
 
 ### Added

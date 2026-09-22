@@ -19,7 +19,9 @@ The building blocks beyond `<Box>` and `<Text>`. Forms, focus and buttons are in
 `<Text>` is a box that holds text: it takes the text-style props (`color`,
 `backgroundColor`, `bold`, `dim`, `underline`, `inverse`, `strikethrough`, `link`)
 and `wrap` — `'none'` (default), `'wrap'` (by word, a too-long word by character)
-or `'truncate'` (one line, `…` in the last cell).
+or `'truncate'` (one line, `…` in the last cell). A `<Text>` that sets no `color`
+or `backgroundColor` takes the nearest ancestor box's — see
+[Inherited colors](layout.md#inherited-colors).
 
 **It is a box, not an inline span.** A `<Text>` inside a `<Text>` does not flow in
 the line — a box lays its children out as flex items. For styled pieces *inside* a

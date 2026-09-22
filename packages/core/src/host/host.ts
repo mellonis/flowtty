@@ -46,7 +46,9 @@ export interface BoxProps {
   runs?: TextRun[];
   // Text wrap mode for direct text children (default: 'none').
   wrap?: 'wrap' | 'truncate' | 'none';
-  // Text styling applied to direct text children:
+  // Text styling applied to direct text children. `color` also reaches every
+  // descendant that sets none of its own, the way `backgroundColor` does;
+  // 'default' resets the subtree to the terminal's own foreground.
   color?: Color;
   bold?: boolean;
   dim?: boolean;
@@ -62,6 +64,8 @@ export interface BoxProps {
   // reserves 1 cell on each edge so border doesn't overlap content.
   border?: BorderStyle;
   // Color for border glyphs — same string format as `color` (named or truecolor).
+  // Defaults to the box's effective text color (own `color`, else the
+  // inherited one). Set to 'default' to keep the terminal's own foreground.
   borderColor?: Color;
   // Background color for border cells. Defaults to the box's effective
   // background (own backgroundColor, else the inherited one) so a filled box's
