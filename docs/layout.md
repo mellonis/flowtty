@@ -282,7 +282,7 @@ metrics and the scrollbar are the same as with every row present.
 | `items` | The rows, in order. Read, never copied or wrapped: hand over the same array while nothing changed and nothing re-renders. |
 | `renderItem(item, index)` | Draws one row. Called only for rows inside the rendered window. |
 | `keyOf(item, index)` | A stable key per row, so React keeps a row's subtree while the window moves. Default: the index — fine while rows are only appended. |
-| `rowHeight` | Rows every item takes (default 1). **Every row is exactly this tall**: each is drawn in a clipped box of that height, so an item that would be taller loses its bottom rather than moving the rows below it. Variable heights are not supported. |
+| `rowHeight` | Rows every item takes (default 1). **Every row is exactly this tall**: each is laid out in a box of that height, so an item that would be taller spills under the next row, which paints over it, rather than moving the rows below. (The box is not a clip: a clip one row tall would drop the `wrapContinues` mark a wrapped paragraph needs to copy as one line.) Variable heights are not supported. |
 | `overscan` | Rows rendered beyond each edge of the viewport (default: one viewport height), so a small scroll step finds its rows already there. |
 | `children` | Overlays only: `position="absolute"` children, as in `<ScrollBox>`. |
 

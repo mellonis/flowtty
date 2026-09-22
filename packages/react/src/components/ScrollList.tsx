@@ -106,9 +106,13 @@ export function ScrollList<T>({
   for (let i = win.start; i < win.end; i++) {
     const item = items[i] as T;
     rendered.push(
-      // A fixed-height clip, so a row that would be taller cannot push the
-      // ones below it and break the arithmetic.
-      <Box key={keyOf ? keyOf(item, i) : i} height={rowHeight} flexShrink={0} flexGrow={0} overflow="hidden">
+      // A fixed height, so a row that would be taller cannot push the ones
+      // below it and break the arithmetic. NOT a clip (`overflow="hidden"`):
+      // a continuation mark (`wrapContinues`) is dropped when the row below
+      // lies outside the box's clip, and under a one-row clip it always would
+      // — a wrapped paragraph would copy as several lines. A taller item
+      // spills under the next row, which paints over it.
+      <Box key={keyOf ? keyOf(item, i) : i} height={rowHeight} flexShrink={0} flexGrow={0}>
         {renderItem(item, i)}
       </Box>,
     );

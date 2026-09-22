@@ -7,6 +7,16 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Fixed
+
+- `<ScrollList>`: a soft-wrapped paragraph inside a row copies as one line
+  again. The row box was a one-row clip, and a continuation mark is dropped
+  when the row below lies outside its clip — so under the list every wrapped
+  row came back as several lines. The row box now fixes the height without
+  clipping.
+
 ## 1.0.0-alpha.19 — 2026-09-22
 
 ### Added

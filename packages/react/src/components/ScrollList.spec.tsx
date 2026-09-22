@@ -4,7 +4,7 @@ import { render } from '../internal/render.js';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { ScrollList } from './ScrollList.js';
-import type { ScrollBoxHandle } from './ScrollBox.js';
+import { ScrollBox, type ScrollBoxHandle } from './ScrollBox.js';
 import { TestBackend, flushAsync } from '@flowtty/core/testing';
 
 const lines = (n: number, from = 0) => Array.from({ length: n }, (_, i) => `row ${from + i}`);
@@ -222,7 +222,7 @@ describe('ScrollList', () => {
     unmount();
   });
 
-  test('rowHeight > 1: rows are exactly that tall, a taller row is clipped', async () => {
+  test('rowHeight > 1: rows are exactly that tall, a taller row loses its bottom under the next one', async () => {
     const items = ['a', 'b', 'c', 'd', 'e'];
     const tall = (t: string) => <><Text>{t}1</Text><Text>{t}2</Text><Text>{t}3</Text></>;
     const { backend, frame, unmount } = await mount(<ScrollList height={4} rowHeight={2} items={items} renderItem={tall} />);
@@ -308,6 +308,37 @@ describe('ScrollList', () => {
     await frame();
     expect(backend.clipboard).toEqual(['row 1\nrow 2']);
     unmount();
+  });
+
+  test('a soft-wrapped paragraph laid out as two rows still copies as one line, as under ScrollBox', async () => {
+    // A component that wraps text itself (Markdown, a chat) paints each row as
+    // its own box, marks the upper one with `wrapContinues`, and indents the
+    // continuation row with blanks. Under the list that mark has to survive:
+    // the row below is the next item.
+    const items = [
+      { gutter: '> ', text: 'hello', continues: { dropped: ' ', textWidth: 5 } },
+      { gutter: '  ', text: 'world', continues: undefined },
+      { gutter: '> ', text: 'after', continues: undefined },
+    ];
+    const wrapped = (r: typeof items[number]) => (
+      <Box flexDirection="row" flexShrink={0}>
+        <Text>{r.gutter}</Text>
+        <Box flexDirection="row" flexShrink={0} wrapContinues={r.continues}><Text>{r.text}</Text></Box>
+      </Box>
+    );
+    for (const el of [
+      <ScrollBox height={4}>{items.map((r, i) => <React.Fragment key={i}>{wrapped(r)}</React.Fragment>)}</ScrollBox>,
+      <ScrollList height={4} items={items} renderItem={wrapped} />,
+    ]) {
+      const { backend, frame, unmount } = await mount(el);
+      await frame();
+      backend.mouse('down', 2, 0);
+      backend.mouse('drag', 6, 2);
+      backend.mouse('up', 6, 2);
+      await frame();
+      expect(backend.clipboard).toEqual(['hello world\n> after']);
+      unmount();
+    }
   });
 
   test('a drag selects the rows on screen after a jump into the list', async () => {
