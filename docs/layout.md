@@ -17,6 +17,7 @@ Every `<Box>` is a Yoga flexbox node. These are the props that size, place, clip
 - [zIndex](#zindex)
 - [Overflow](#overflow)
 - [Scrolling](#scrolling)
+  - [ScrollList (virtualized)](#scrolllist-virtualized)
 - [Selection scopes](#selection-scopes)
 
 ## Borders
@@ -251,6 +252,51 @@ re-render — one memoized component per message, not one per line.
 A `<ScrollBox>` is a selection scope of its own: a drag inside it is confined to
 the rows in view, and the scrollbar column is not part of it. See
 [Selection scopes](#selection-scopes).
+
+### ScrollList (virtualized)
+
+A `<ScrollBox>` lays out every child each frame, so a keystroke over a long
+conversation costs more the longer it gets. `<ScrollList>` is a `<ScrollBox>` for
+long lists of equal-height rows — a chat, a log, a result set — that renders only
+the rows near the viewport and stands in for the rest with two spacers of the
+right height:
+
+```tsx
+<ScrollList
+  flexGrow={1} flexShrink={1} anchor="bottom" scrollbar
+  items={messages}
+  keyOf={(m) => m.id}
+  renderItem={(m) => <Message {...m} />}
+/>
+```
+
+It *is* a `<ScrollBox>` underneath, so everything above holds: `anchor`,
+`offset` / `onScroll`, `onMetrics`, `isActive`, `wheelStep` / `pageStep`,
+`scrollbar`, the `ref` handle and the `<Box>` sizing props pass straight
+through, and `position="absolute"` children are overlays over the viewport. The
+content is exactly `items.length × rowHeight` rows tall, so anchoring, the
+metrics and the scrollbar are the same as with every row present.
+
+| Prop | |
+|---|---|
+| `items` | The rows, in order. Read, never copied or wrapped: hand over the same array while nothing changed and nothing re-renders. |
+| `renderItem(item, index)` | Draws one row. Called only for rows inside the rendered window. |
+| `keyOf(item, index)` | A stable key per row, so React keeps a row's subtree while the window moves. Default: the index — fine while rows are only appended. |
+| `rowHeight` | Rows every item takes (default 1). **Every row is exactly this tall**: each is drawn in a clipped box of that height, so an item that would be taller loses its bottom rather than moving the rows below it. Variable heights are not supported. |
+| `overscan` | Rows rendered beyond each edge of the viewport (default: one viewport height), so a small scroll step finds its rows already there. |
+| `children` | Overlays only: `position="absolute"` children, as in `<ScrollBox>`. |
+
+The window follows the scroll position: a key, the wheel or a handle call moves
+it in the same batch as the scroll, so the next frame has its rows. A position
+the list only learns from the paint — a controlled `offset` set by the app, a
+jump that lands outside the window — can leave the viewport blank for one frame
+until the metrics arrive and the window catches up.
+
+Rows in view are real children, so a drag over them selects their cells, a
+wrapped paragraph inside a row still copies as one line and `selectable={false}`
+chrome is left out, as in any `<ScrollBox>`; a drag that runs past the edge stops
+at the viewport, as every scoped drag does. Copy-on-select copies **what is on
+screen** — the rows painted, not the rows outside the window.
 
 ## Selection scopes
 

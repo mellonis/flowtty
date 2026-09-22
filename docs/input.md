@@ -146,8 +146,9 @@ a dialog over a menu bar covers the bar, and a region nobody can see must not
 cut a hole in the selection on top of it. An unscoped drag covers the whole
 frame and takes every opted-out region with it.
 
-Five built-ins are already wired: `<ScrollBox>` scopes to its viewport (the rows
-in view, with the scrollbar column left out), `<DialogHost>` scopes each dialog
+Five built-ins are already wired: `<ScrollBox>` (and so `<ScrollList>`) scopes
+to its viewport (the rows in view, with the scrollbar column left out),
+`<DialogHost>` scopes each dialog
 to its content, `<Table>` scopes to its grid, `<Menu>`'s bar and dropdowns are
 `selectable={false}`, and `<Markdown>` marks the frame it draws — a fenced
 block's gutter and label, a blockquote's bar — the same way, so a drag over a

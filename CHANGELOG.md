@@ -7,6 +7,17 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- `<ScrollList>`: a `<ScrollBox>` for long lists of equal-height rows that
+  renders only the rows near the viewport, so a keystroke over a 400-message
+  chat costs what a short one does. It takes `items`, `renderItem`, `keyOf`,
+  `rowHeight` and `overscan` on top of every `<ScrollBox>` prop — anchoring,
+  paging, the wheel, the scrollbar, overlays and the `ref` handle all carry
+  over. See docs/layout.md (ScrollList).
+
 ## 1.0.0-alpha.18 — 2026-09-22
 
 ### Fixed

@@ -70,6 +70,7 @@ export { TaskList, type TaskListProps, type TaskItem, type TaskState } from './c
 export { Table, type TableProps, type TableColumn, type TableAlign, type TableCellStyle } from './components/Table.js';
 export { Link, type LinkProps } from './components/Link.js';
 export { ScrollBox, type ScrollBoxProps, type ScrollBoxHandle } from './components/ScrollBox.js';
+export { ScrollList, type ScrollListProps } from './components/ScrollList.js';
 export { Markdown, type MarkdownProps } from './components/Markdown.js';
 export { layoutMarkdown, layoutMarkdownDetailed, type StyledLine, type StyledSpan } from './components/markdown/layout.js';
 export type {
