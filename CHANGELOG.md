@@ -7,7 +7,7 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
-## Unreleased
+## 1.0.0-alpha.18 — 2026-09-22
 
 ### Fixed
 
