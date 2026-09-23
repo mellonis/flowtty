@@ -110,4 +110,6 @@ bump the four package versions and their cross-dependencies together, commit, th
 `npm run release:publish -- --otp <code>`. The script builds, points `exports` at
 `dist/` for the publish, publishes in dependency order, tags `alpha`, and always
 restores the source form. Never publish by hand, and never commit the flipped
-`exports`.
+`exports`. Then tag the release commit `v<version>`, push it with the branch, and
+create the forge release from that tag, marked as a pre-release while the version
+is an alpha, with the version's CHANGELOG section as its notes.
