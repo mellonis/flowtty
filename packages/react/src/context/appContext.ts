@@ -21,6 +21,14 @@ export interface AppApi {
    *  back to `pbcopy` / `wl-copy` / `clip.exe` in one place. See docs/app.md
    *  (the clipboard). */
   copy(text: string): boolean;
+  /** Hand the terminal to another program for the duration of `fn` — an
+   *  editor, a pager, `git commit` — and take it back afterwards with a full
+   *  repaint; component state survives. Resolves with what `fn` returned, and
+   *  rejects with what it threw (the terminal is taken back either way), or
+   *  when a suspension is already in progress. Where the backend has no
+   *  terminal to hand over, `fn` simply runs. See docs/app.md (handing the
+   *  terminal over). */
+  suspend<T>(fn: () => T | Promise<T>): Promise<T>;
   /** Whether the terminal is light or dark, and its background when known —
    *  the backend's answer as of now. For a value that re-renders on a change,
    *  use `useColorScheme()`. See docs/app.md (the color scheme). */
@@ -34,5 +42,6 @@ export const AppContext: Context<AppApi> = createContext<AppApi>({
   bell: () => {},
   notify: () => {},
   copy: () => false,
+  suspend: async (fn) => fn(),
   colorScheme: UNKNOWN_COLOR_SCHEME,
 });

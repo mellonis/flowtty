@@ -3,6 +3,7 @@ import { createElement, useEffect, useState } from 'react';
 import { render, Box, Text } from '../index.js';
 import { TestBackend, flush, flushAsync } from '@flowtty/core/testing';
 import { useInput } from '../hooks/useInput.js';
+import { useApp } from '../hooks/useApp.js';
 
 // Defensive cross-test cleanup: render() registers process listeners for
 // uncaughtException + unhandledRejection. If a test forgets handle.unmount()
@@ -143,5 +144,79 @@ describe('render error handling', () => {
     // After unmount, emit shouldn't reach onError
     process.emit('uncaughtException', new Error('after-unmount'));
     expect(onError).not.toHaveBeenCalled();
+  });
+});
+
+describe('suspend(fn) — handing the terminal over', () => {
+  test('hands the terminal over for the callback and repaints once after it', async () => {
+    const backend = new TestBackend(8, 1);
+    let setLabel!: (s: string) => void;
+    function App() {
+      const [label, set] = useState('before');
+      setLabel = set;
+      return createElement(Text, null, label);
+    }
+    const app = await render(createElement(App), backend);
+    await flushAsync(backend);
+    const frames = backend.frames.length;
+
+    const result = await app.suspend(async () => {
+      expect(backend.suspended).toBe(true);
+      setLabel('after');
+      await flushAsync(backend);
+      expect(backend.frames.length).toBe(frames); // nothing painted while suspended
+      return 42;
+    });
+
+    expect(result).toBe(42);
+    expect(backend.suspended).toBe(false);
+    expect(backend.suspensions).toBe(1);
+    await flushAsync(backend);
+    expect(backend.frames.length).toBe(frames + 1);
+    expect(backend.lastFrame).toBe('after');
+    app.unmount();
+  });
+
+  test('resumes when the callback throws, and rethrows', async () => {
+    const backend = new TestBackend(8, 1);
+    const app = await render(createElement(Text, null, 'x'), backend);
+    await expect(app.suspend(() => { throw new Error('vim: not found'); })).rejects.toThrow('vim: not found');
+    expect(backend.suspended).toBe(false);
+    app.unmount();
+  });
+
+  test('a nested suspend() is refused', async () => {
+    const backend = new TestBackend(8, 1);
+    const app = await render(createElement(Text, null, 'x'), backend);
+    await app.suspend(async () => {
+      await expect(app.suspend(() => {})).rejects.toThrow(/already suspended/);
+    });
+    expect(backend.suspensions).toBe(1);
+    app.unmount();
+  });
+
+  test('useApp().suspend from a key handler', async () => {
+    const backend = new TestBackend(8, 1);
+    let done: Promise<unknown> | undefined;
+    function App() {
+      const { suspend } = useApp();
+      useInput((key) => { if (key.name === 'e') done = suspend(() => 'edited'); });
+      return createElement(Text, null, 'x');
+    }
+    const app = await render(createElement(App), backend);
+    await flushAsync(backend);
+    backend.press({ name: 'e' });
+    expect(backend.suspended).toBe(true);
+    await expect(done).resolves.toBe('edited');
+    expect(backend.suspended).toBe(false);
+    app.unmount();
+  });
+
+  test('a backend without the capability just runs the callback', async () => {
+    const backend = new TestBackend(8, 1);
+    const bare = { size: () => backend.size(), draw: (b: never) => backend.draw(b) };
+    const app = await render(createElement(Text, null, 'x'), bare as never);
+    await expect(app.suspend(() => 'ran')).resolves.toBe('ran');
+    app.unmount();
   });
 });

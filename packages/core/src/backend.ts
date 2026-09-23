@@ -93,6 +93,20 @@ export interface Backend {
    */
   copy?(text: string): boolean;
   /**
+   * Hand the terminal to another program: leave the alternate screen (or clear
+   * the live region), show the cursor, turn off mouse and paste reporting,
+   * leave raw mode and stop reading input — so a child process gets the
+   * terminal as the shell left it, and nothing typed into it reaches `onKey`.
+   * `resume` is the reverse; it must also forget any frame-diff baseline, so
+   * the next `draw` is a full frame, and tell the `onResize` subscribers, so
+   * the app repaints (the terminal may have been resized meanwhile). Backends
+   * with no terminal to hand over omit both; `render()` then runs the
+   * callback and nothing else. See docs/app.md (handing the terminal over).
+   */
+  suspend?(): void;
+  /** The reverse of `suspend`. A no-op when not suspended. */
+  resume?(): void;
+  /**
    * Whether this backend owns the entire render area — i.e. components can
    * use the full `size()` for layout and overlay larger panels (Menu cascade,
    * full-screen DialogHost) on top.

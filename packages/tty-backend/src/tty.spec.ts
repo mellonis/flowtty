@@ -1,9 +1,9 @@
 import { expect, test, vi } from 'vitest';
 import { EventEmitter } from 'node:events';
-import { Buffer } from '@flowtty/core';
+import { Buffer, type Key } from '@flowtty/core';
 import { TtyBackend } from './tty.js';
 import { isInteractive, NotInteractiveError } from './interactive.js';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open, MOUSE_ON, MOUSE_OFF, BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF } from './ansi.js';
 
 function makeStdinStub() {
   const emitter = new EventEmitter() as EventEmitter & {
@@ -805,4 +805,148 @@ test('a focus-in re-asks for the background; the focus events never reach a key 
   expect(writes).toEqual(['\x1b]11;?\x07']);
   expect(keys).toEqual([]);
   back.dispose();
+});
+
+test('suspend() hands the terminal back: input off, cursor shown, alt screen left; resume() takes it again and repaints', () => {
+  const { stub, writes } = makeStub();
+  const stdin = makeStdinStub();
+  const b = new TtyBackend(stub, stdin, { mouse: true, colorScheme: false });
+  const keys: string[] = [];
+  b.onKey((k) => keys.push(k.name));
+  const resized = vi.fn();
+  b.onResize(resized);
+  const buf = new Buffer(6, 1);
+  buf.set(0, 0, 'x');
+  b.draw(buf); // a baseline for the frame diff
+  writes.length = 0;
+
+  b.suspend();
+  expect(stdin.__rawMode()).toBe(false);
+  expect(stdin.listenerCount('data')).toBe(0);
+  expect(writes).toEqual([MOUSE_OFF + BRACKETED_PASTE_OFF, SHOW_CURSOR + RESET + ALT_SCREEN_OFF]);
+  stdin.emit('data', 'a'); // typed into the child, not into the app
+  expect(keys).toEqual([]);
+
+  writes.length = 0;
+  b.resume();
+  expect(stdin.__rawMode()).toBe(true);
+  expect(stdin.listenerCount('data')).toBe(1);
+  expect(writes).toEqual([ALT_SCREEN_ON + HIDE_CURSOR, BRACKETED_PASTE_ON + MOUSE_ON]);
+  expect(resized).toHaveBeenCalledTimes(1);
+  stdin.emit('data', 'a');
+  expect(keys).toEqual(['a']);
+
+  // The same frame again is a full one: the diff baseline is gone.
+  writes.length = 0;
+  b.draw(buf);
+  expect(writes[0]!.startsWith(CLEAR)).toBe(true);
+  b.dispose();
+});
+
+test('nothing is drawn while suspended', () => {
+  const { stub, writes } = makeStub();
+  const b = new TtyBackend(stub, makeStdinStub());
+  b.suspend();
+  writes.length = 0;
+  b.draw(new Buffer(6, 1));
+  expect(writes).toEqual([]);
+  b.dispose();
+});
+
+test('suspend() twice, or resume() when not suspended, writes nothing', () => {
+  const { stub, writes } = makeStub();
+  const b = new TtyBackend(stub, makeStdinStub());
+  b.resume();
+  expect(writes).toHaveLength(1); // only the constructor's write
+  b.suspend();
+  writes.length = 0;
+  b.suspend();
+  expect(writes).toEqual([]);
+  b.dispose();
+});
+
+test('dispose() after suspend() does not leave the alt screen a second time', () => {
+  const { stub, writes } = makeStub();
+  const b = new TtyBackend(stub, makeStdinStub());
+  b.onKey(() => {});
+  b.suspend();
+  writes.length = 0;
+  b.dispose();
+  expect(writes).toEqual([]);
+});
+
+test('Ctrl+Z suspends the backend and stops the process; SIGCONT resumes it', () => {
+  const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+  const on = vi.spyOn(process, 'on');
+  try {
+    const { stub, writes } = makeStub();
+    const stdin = makeStdinStub();
+    const b = new TtyBackend(stub, stdin, { colorScheme: false });
+    const keys: string[] = [];
+    b.onKey((k) => keys.push(k.name));
+    const onCont = on.mock.calls.find(([sig]) => sig === 'SIGCONT')?.[1] as (() => void) | undefined;
+    expect(onCont).toBeDefined();
+    writes.length = 0;
+
+    stdin.emit('data', '\x1a');
+    expect(keys).toEqual([]); // not delivered
+    expect(writes.at(-1)).toBe(SHOW_CURSOR + RESET + ALT_SCREEN_OFF);
+    expect(kill).toHaveBeenCalledWith(process.pid, 'SIGTSTP');
+
+    writes.length = 0;
+    onCont!();
+    expect(writes[0]).toBe(ALT_SCREEN_ON + HIDE_CURSOR);
+    expect(stdin.__rawMode()).toBe(true);
+    b.dispose();
+  } finally {
+    kill.mockRestore();
+    on.mockRestore();
+  }
+});
+
+test('suspendKey: false delivers Ctrl+Z as a key', () => {
+  const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+  try {
+    const { stub } = makeStub();
+    const stdin = makeStdinStub();
+    const b = new TtyBackend(stub, stdin, { suspendKey: false });
+    const keys: Key[] = [];
+    b.onKey((k) => keys.push(k));
+    stdin.emit('data', '\x1a');
+    expect(keys).toEqual([expect.objectContaining({ name: 'z', ctrl: true })]);
+    expect(kill).not.toHaveBeenCalled();
+    b.dispose();
+  } finally {
+    kill.mockRestore();
+  }
+});
+
+test('SIGCONT after a stop the backend did not ask for (kill -STOP) still takes the terminal back', () => {
+  const on = vi.spyOn(process, 'on');
+  try {
+    const { stub, writes } = makeStub();
+    const stdin = makeStdinStub();
+    const b = new TtyBackend(stub, stdin, { colorScheme: false });
+    b.onKey(() => {});
+    const resized = vi.fn();
+    b.onResize(resized);
+    const onCont = on.mock.calls.find(([sig]) => sig === 'SIGCONT')?.[1] as () => void;
+    writes.length = 0;
+    onCont();
+    expect(writes[0]).toBe(ALT_SCREEN_ON + HIDE_CURSOR);
+    expect(resized).toHaveBeenCalledTimes(1);
+    b.dispose();
+  } finally {
+    on.mockRestore();
+  }
+});
+
+test('dispose() removes the SIGCONT listener', () => {
+  const before = process.listenerCount('SIGCONT');
+  const { stub } = makeStub();
+  const b = new TtyBackend(stub, makeStdinStub());
+  b.onKey(() => {});
+  expect(process.listenerCount('SIGCONT')).toBe(before + 1);
+  b.dispose();
+  expect(process.listenerCount('SIGCONT')).toBe(before);
 });

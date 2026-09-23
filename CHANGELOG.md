@@ -7,6 +7,21 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- `useApp().suspend(fn)` and `handle.suspend(fn)`: hand the terminal to another
+  program — `$EDITOR`, a pager, `git commit` — for the duration of `fn`, and
+  take it back with a full repaint and the component state intact. Backed by a
+  new optional `suspend()` / `resume()` on `Backend`, implemented by both TTY
+  backends and recorded by `TestBackend`. See docs/app.md (handing the terminal
+  over).
+- Ctrl+Z suspends the process: the TTY backends hand the terminal back, stop
+  with `SIGTSTP`, and take it again on `fg`. `suspendKey: false` delivers Ctrl+Z
+  as a key instead. A `SIGCONT` after a stop the app never asked for repaints
+  too.
+
 ## 1.0.0-alpha.22 — 2026-09-23
 
 ### Fixed

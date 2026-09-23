@@ -127,6 +127,12 @@ export interface RenderHandle {
    *  after unmount. Fires `onCopy` with `source: 'api'`.
    *  See docs/app.md (the clipboard). */
   copy(text: string): boolean;
+  /** Hand the terminal to another program for the duration of `fn`, from
+   *  outside the tree — the same thing `useApp().suspend()` does. Resolves with
+   *  what `fn` returned; rejects with what it threw, after unmount, and while
+   *  another suspension is in progress. See docs/app.md (handing the terminal
+   *  over). */
+  suspend<T>(fn: () => T | Promise<T>): Promise<T>;
   /** Whether the terminal is light or dark, as of now — the same answer
    *  `useApp().colorScheme` gives inside the tree. See docs/app.md (the color
    *  scheme). */
@@ -147,6 +153,10 @@ export async function render(
   const exited = new Promise<unknown>((resolve) => { resolveExit = resolve; });
 
   let unmounted = false;
+  // The terminal is another program's (`suspend()`): state still commits, but
+  // nothing is painted until it is ours again.
+  let suspended = false;
+  let paints = 0;
   // One AbortController per render root. Its signal is handed to the tree (via
   // AbortContext) so user async/timers can cancel on teardown. The controller
   // is never exposed — only abort()ed here, in the teardown paths below.
@@ -163,7 +173,7 @@ export async function render(
   // clears it, because a painted frame always carries the current highlight.
   let overlayStale = false;
   const draw = () => {
-    if (unmounted) return;
+    if (unmounted || suspended) return;
     const { width, height } = backend.size();
     // A non-finite height means an unbounded surface: lay out with the height
     // left auto (Yoga grows the tree to its content) and paint a buffer exactly
@@ -179,6 +189,7 @@ export async function render(
     // decorate() hands the frame straight back when nothing is selected, so a
     // buffer is only ever copied for an actual highlight.
     backend.draw(selection === null ? frame : selection.decorate(frame));
+    paints += 1;
     overlayStale = false;
   };
 
@@ -348,6 +359,28 @@ export async function render(
     runCallback(() => options.onCopy?.({ text, delivered, source: 'api' }));
     return delivered;
   };
+  // One suspension at a time: the backend's suspend/resume are not a stack,
+  // and a second hand-over from inside the first would take the terminal back
+  // under the child's feet. While suspended, draw() is a no-op — state updates
+  // still commit, and the frame they add up to is painted on resume.
+  const suspend = async <T>(fn: () => T | Promise<T>): Promise<T> => {
+    if (unmounted) throw new Error('flowtty: suspend() after unmount');
+    if (suspended) throw new Error('flowtty: suspend() while already suspended');
+    suspended = true;
+    backend.suspend?.();
+    try {
+      return await fn();
+    } finally {
+      suspended = false;
+      if (!unmounted) {
+        // A TTY backend's resume() tells the resize subscribers, and that
+        // repaints; count paints so a backend that does not is painted here.
+        const before = paints;
+        backend.resume?.();
+        if (paints === before) draw();
+      }
+    }
+  };
   // Read through to the backend on every access: the answer changes when the
   // terminal says so, and this object is created once.
   const colorScheme = (): TerminalColorScheme => backend.colorScheme?.() ?? UNKNOWN_COLOR_SCHEME;
@@ -359,6 +392,7 @@ export async function render(
     bell,
     notify,
     copy,
+    suspend,
     get colorScheme() { return colorScheme(); },
   };
   const withApp = createElement(AppContext.Provider, { value: appApi }, withAbort);
@@ -384,6 +418,7 @@ export async function render(
     bell,
     notify,
     copy,
+    suspend,
     get colorScheme() { return colorScheme(); },
     unmount() {
       if (unmounted) return;

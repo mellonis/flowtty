@@ -136,6 +136,11 @@ nothing is recorded, and `onCopy` still fires with `delivered: false` — which 
 how an app's `pbcopy` fallback gets tested. See [Selection](input.md#selection)
 and [The clipboard](app.md#the-clipboard).
 
+A hand-over of the terminal (`useApp().suspend(fn)` — an editor, a pager) is
+recorded the same way: `backend.suspended` is true while `fn` runs, and
+`backend.suspensions` counts the hand-overs. Nothing is written anywhere. See
+[Handing the terminal over](app.md#handing-the-terminal-over).
+
 `TestBackend` never answers the light-or-dark question by itself — a component
 sees `'unknown'`, as it would in a terminal that does not answer. Set the answer
 to test the other branches:

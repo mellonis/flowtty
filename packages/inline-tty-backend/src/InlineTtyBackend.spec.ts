@@ -324,3 +324,107 @@ describe('light and dark', () => {
     log.dispose();
   });
 });
+
+describe('InlineTtyBackend suspend / resume', () => {
+  const PASTE_ON = '\x1b[?2004h';
+  const PASTE_OFF = '\x1b[?2004l';
+  const HIDE = '\x1b[?25l';
+  const SHOW = '\x1b[?25h';
+  const RESET = '\x1b[0m';
+
+  test('suspend() clears the live region and gives the terminal back; resume() takes it and asks for a repaint', () => {
+    const out = mockStdout(4);
+    const input = mockStdin();
+    const b = new InlineTtyBackend({ out, in: input, liveHeight: 2, colorScheme: false });
+    const keys: string[] = [];
+    b.onKey((k) => keys.push(k.name));
+    const resized = vi.fn();
+    b.onResize(resized);
+    b.draw(newBuffer(4, 2, 'a'));
+    out.writes.length = 0;
+
+    b.suspend();
+    expect(out.writes).toEqual([PASTE_OFF, '\r\x1b[1A\x1b[J' + SHOW + RESET]);
+    expect(input.listenerCount('data')).toBe(0);
+    input.emit('data', 'q'); // typed into the child, not into the app
+    expect(keys).toEqual([]);
+
+    out.writes.length = 0;
+    b.resume();
+    expect(out.writes).toEqual([PASTE_ON]);
+    expect(input.listenerCount('data')).toBe(1);
+    expect(resized).toHaveBeenCalledTimes(1);
+    input.emit('data', 'q');
+    expect(keys).toEqual(['q']);
+
+    // The next draw starts a fresh region below whatever the child printed:
+    // the cursor is hidden again and no rows are erased first.
+    out.writes.length = 0;
+    b.draw(newBuffer(4, 2, 'a'));
+    expect(out.writes[0]).toBe(HIDE);
+    expect(out.writes[1]!.startsWith('\r')).toBe(false);
+    b.dispose();
+  });
+
+  test('nothing is drawn or printed while suspended', () => {
+    const out = mockStdout(4);
+    const b = new InlineTtyBackend({ out, in: mockStdin(), liveHeight: 2 });
+    b.suspend();
+    out.writes.length = 0;
+    b.draw(newBuffer(4, 2, 'a'));
+    b.printStatic(['log']);
+    expect(out.writes).toEqual([]);
+    b.dispose();
+  });
+
+  test('dispose() after suspend() writes nothing more', () => {
+    const out = mockStdout(4);
+    const b = new InlineTtyBackend({ out, in: mockStdin(), liveHeight: 2 });
+    b.onKey(() => {});
+    b.draw(newBuffer(4, 2, 'a'));
+    b.suspend();
+    out.writes.length = 0;
+    b.dispose();
+    expect(out.writes).toEqual([]);
+  });
+
+  test('Ctrl+Z suspends and stops the process; SIGCONT resumes; suspendKey: false delivers the key', () => {
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    const on = vi.spyOn(process, 'on');
+    try {
+      const out = mockStdout(4);
+      const input = mockStdin();
+      const b = new InlineTtyBackend({ out, in: input, liveHeight: 2, colorScheme: false });
+      const keys: string[] = [];
+      b.onKey((k) => keys.push(k.name));
+      const onCont = on.mock.calls.find(([sig]) => sig === 'SIGCONT')?.[1] as (() => void) | undefined;
+      expect(onCont).toBeDefined();
+      b.draw(newBuffer(4, 2, 'a'));
+      out.writes.length = 0;
+
+      input.emit('data', '\x1a');
+      expect(keys).toEqual([]);
+      expect(out.writes.at(-1)).toBe('\r\x1b[1A\x1b[J' + SHOW + RESET);
+      expect(kill).toHaveBeenCalledWith(process.pid, 'SIGTSTP');
+
+      out.writes.length = 0;
+      onCont!();
+      expect(out.writes).toEqual([PASTE_ON]);
+      expect(input.listenerCount('data')).toBe(1);
+      const before = process.listenerCount('SIGCONT');
+      b.dispose();
+      expect(process.listenerCount('SIGCONT')).toBe(before - 1);
+
+      const plain = new InlineTtyBackend({ out: mockStdout(4), in: input, suspendKey: false });
+      kill.mockClear();
+      plain.onKey((k) => keys.push(k.name));
+      input.emit('data', '\x1a');
+      expect(keys).toEqual(['z']);
+      expect(kill).not.toHaveBeenCalled();
+      plain.dispose();
+    } finally {
+      kill.mockRestore();
+      on.mockRestore();
+    }
+  });
+});

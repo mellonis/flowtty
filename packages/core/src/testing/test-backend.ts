@@ -34,6 +34,11 @@ export class TestBackend implements Backend {
    * `onCopy` still fires, with `delivered: false`.
    */
   clipboardAvailable: boolean = true;
+  /** Whether the app has handed the terminal over (`suspend()` without a
+   *  `resume()` yet). Nothing is written anywhere. */
+  suspended: boolean = false;
+  /** How many times the app suspended. */
+  suspensions: number = 0;
   private buffers: Buffer[] = [];
   private readonly subscribers = new Set<(key: Key) => void>();
   private scheme: TerminalColorScheme = UNKNOWN_COLOR_SCHEME;
@@ -118,6 +123,18 @@ export class TestBackend implements Backend {
     if (!this.clipboardAvailable || text === '') return false;
     this.clipboard.push(text);
     return true;
+  }
+
+  /** Record a hand-over instead of leaving any screen. */
+  suspend(): void {
+    if (this.suspended) return;
+    this.suspended = true;
+    this.suspensions += 1;
+  }
+
+  /** Record the return. */
+  resume(): void {
+    this.suspended = false;
   }
 
   /** Deliver one mouse-wheel step at cell (x, y) — what a TTY backend with `mouse` on emits. */

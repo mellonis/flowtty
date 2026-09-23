@@ -24,6 +24,8 @@ interface Backend {
   bell?(): void;                                     // BEL — the portable "over here"
   notify?(title: string, body?: string): void;       // a desktop notification
   copy?(text: string): boolean;                      // put text on the clipboard
+  suspend?(): void;                                  // hand the terminal to another program
+  resume?(): void;                                   // take it back, drop the diff baseline, repaint
   fullScreen?: boolean;                              // false = a bounded region, not the whole screen
   hyperlinks?: boolean;                              // the terminal honors OSC 8
 }
@@ -63,6 +65,16 @@ Only `size` and `draw` are required; everything else is feature-detected.
   hand the clipboard back. `createClipboard(write, options)` from
   `@flowtty/tty-backend` does all of that; see
   [Terminal specifics](terminal.md#the-clipboard).
+- **`suspend`** and **`resume`** are what `useApp().suspend(fn)` calls around
+  `fn`, and what Ctrl+Z uses. `suspend` undoes what the constructor and `onKey`
+  did — leave the alternate screen or clear the live region, show the cursor,
+  turn reports off, leave raw mode, and stop reading input, so nothing typed
+  into the child reaches a subscriber. `resume` redoes it, forgets any
+  frame-diff baseline (the next `draw` must be a full frame) and calls the
+  `onResize` subscribers — that is what makes the app repaint, and the terminal
+  may well have been resized meanwhile. Make `dispose` after `suspend` write
+  nothing: the terminal is not yours then. Omit both where there is no terminal
+  to hand over; `render()` then runs `fn` and nothing else.
 
 ## A complete backend
 

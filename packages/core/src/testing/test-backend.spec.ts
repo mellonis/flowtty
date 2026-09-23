@@ -140,3 +140,17 @@ test('colorScheme: unknown until set; setColorScheme tells subscribers of a chan
   b.setColorScheme('dark');
   expect(heard).toHaveLength(2);
 });
+
+test('suspend() and resume() are recorded, so an app can test its editor flow', () => {
+  const b = new TestBackend(4, 1);
+  expect(b.suspended).toBe(false);
+  expect(b.suspensions).toBe(0);
+  b.suspend();
+  expect(b.suspended).toBe(true);
+  expect(b.suspensions).toBe(1);
+  b.suspend(); // a second call while suspended records nothing
+  expect(b.suspensions).toBe(1);
+  b.resume();
+  expect(b.suspended).toBe(false);
+  expect(b.suspensions).toBe(1);
+});

@@ -344,6 +344,46 @@ await flushAsync(backend);
 expect(backend.lastBuffer!.get(1, 1).style.bg).toBe('#f4f0e6');
 ```
 
+## Handing the terminal over
+
+Open `$EDITOR` on a file, page through a diff, run `git commit`: another program
+needs the real terminal — the normal screen, cooked mode, no mouse or paste
+reporting — and the app needs all of it back afterwards. `suspend(fn)`, on
+`useApp()` and on the render handle, does both:
+
+```tsx
+function Note({ path }: { path: string }) {
+  const { suspend } = useApp();
+  useInput((key) => {
+    if (key.name === 'e') {
+      void suspend(() => spawnSync(process.env.EDITOR ?? 'vi', [path], { stdio: 'inherit' }));
+    }
+  });
+  // …
+}
+```
+
+While `fn` runs the terminal is the child's: the alternate screen is left (an
+inline app clears its live region), the cursor is shown, raw mode and every
+report are off, and nothing typed reaches a `useInput` handler. When `fn`
+returns — or throws; the terminal is taken back either way, and the error is
+rethrown — the app repaints a full frame at whatever size the terminal is now.
+Component state survives: nothing is unmounted. State updates committed
+meanwhile add up to that one frame.
+
+`suspend` resolves with what `fn` returned. One suspension at a time: a call
+while another is in progress rejects. Where the backend has no terminal to hand
+over (`TestBackend`, `renderToString`), `fn` simply runs; `TestBackend` records
+the hand-over as `suspended` / `suspensions`, so an app can test its editor
+flow — see [Testing](testing.md#sending-input).
+
+**Ctrl+Z** does the same for the shell: the TTY backends hand the terminal
+back, stop the process with `SIGTSTP`, and take the terminal again with a full
+repaint when `fg` continues it. An app that uses Ctrl+Z itself — an editor's
+undo — turns that off with `suspendKey: false` in the backend options, and
+Ctrl+Z arrives as `{ name: 'z', ctrl: true }`. A `kill -STOP` / `fg` cycle the
+app never asked for is handled the same way on `SIGCONT`.
+
 ## Root abort signal
 
 `useRootAbortSignal()` returns the render root's `AbortSignal` — the one flowtty

@@ -47,6 +47,13 @@ export interface TtyBackendOptions {
    *  is not written AT ALL and `copy()` reports `false`: half a paste presented
    *  as a whole one is worse than none. */
   clipboardLimit?: number;
+  /** Ctrl+Z suspends the process the way a shell user expects: the terminal
+   *  is handed back, `SIGTSTP` stops the process, and `fg` (`SIGCONT`) takes
+   *  the terminal again and repaints. On by default. `false` delivers Ctrl+Z
+   *  as a key (`{ name: 'z', ctrl: true }`) for an app that uses it — an
+   *  editor's undo — and leaves suspension to `useApp().suspend()`.
+   *  See docs/app.md (handing the terminal over). */
+  suspendKey?: boolean;
 }
 
 export class TtyBackend implements Backend {
@@ -80,6 +87,14 @@ export class TtyBackend implements Backend {
         this.dispose();
         process.exit(130);
       }
+      // Ctrl+Z, the shell's suspend, arrives as a key in raw mode too. Hand
+      // the terminal back before stopping, so the shell prompt lands on the
+      // normal screen; `onContinue` takes it again on `fg`.
+      if (key.ctrl && key.name === 'z' && this.options.suspendKey !== false) {
+        this.suspend();
+        process.kill(process.pid, 'SIGTSTP');
+        continue;
+      }
       for (const h of [...this.subscribers]) h(key);
     }
   };
@@ -93,6 +108,17 @@ export class TtyBackend implements Backend {
     for (const h of [...this.resizeSubscribers]) h();
   };
   private resizeAttached = false;
+  // `fg` after Ctrl+Z, or after a `kill -STOP` the backend never saw: either
+  // way the terminal is ours again and the screen is whatever the shell left.
+  // Marked suspended first when it was not, so resume() re-asserts everything.
+  private readonly onContinue = (): void => {
+    if (this.disposed) return;
+    if (!this.suspended) {
+      this.suspended = true;
+      this.terminalEntered = false;
+    }
+    this.resume();
+  };
   private previousBuffer: Buffer | null = null;
   // The bell + desktop notifications. Assigned in the constructor rather than
   // here, because it reads `options` — a constructor parameter property.
@@ -104,6 +130,9 @@ export class TtyBackend implements Backend {
   // for with the first key subscription, since the reply comes down stdin.
   private readonly scheme: ColorSchemeTracker;
   private disposed = false;
+  // The terminal has been handed to another program (`suspend()`): nothing is
+  // ours to write to until `resume()`.
+  private suspended = false;
 
   constructor(
     private readonly out: NodeJS.WriteStream = process.stdout,
@@ -136,6 +165,7 @@ export class TtyBackend implements Backend {
   }
 
   draw(buffer: Buffer): void {
+    if (this.suspended) return;
     if (
       this.previousBuffer === null ||
       this.previousBuffer.width !== buffer.width ||
@@ -313,6 +343,8 @@ export class TtyBackend implements Backend {
       this.input.on('data', this.inputDataHandler);
       this.input.resume();
       this.inputAttached = true;
+      // Lazy like raw mode: a passive view never stops or continues.
+      process.on('SIGCONT', this.onContinue);
       // Only a backend that reads keys asks for bracketed paste; dispose() undoes it.
       this.out.write(BRACKETED_PASTE_ON + (this.options.mouse ? MOUSE_ON : ''));
       // Same for the scheme: its answer arrives as input, so it is only asked
@@ -327,29 +359,78 @@ export class TtyBackend implements Backend {
     };
   }
 
-  dispose(): void {
-    // Set first: from here on the terminal is being handed back, so a late
-    // bell() or notify() has nowhere to write.
-    this.disposed = true;
+  /**
+   * Hand the terminal to another program: alt screen left, cursor shown, raw
+   * mode and every report off, and stdin no longer read — so a child gets the
+   * terminal as the shell had it, and nothing typed into it reaches a key
+   * subscriber. A no-op while suspended, and after dispose.
+   * See docs/app.md (handing the terminal over).
+   */
+  suspend(): void {
+    if (this.disposed || this.suspended) return;
+    this.suspended = true;
+    this.leaveTerminal();
+  }
+
+  /**
+   * Take the terminal back after `suspend()`: alt screen, cursor hidden, raw
+   * mode and reports on, stdin read again. The frame-diff baseline is dropped
+   * (the child drew whatever it drew) and the resize subscribers are told, so
+   * the app repaints a full frame at whatever size the terminal is now.
+   * A no-op when not suspended, and after dispose.
+   */
+  resume(): void {
+    if (this.disposed || !this.suspended) return;
+    this.suspended = false;
+    this.out.write(ALT_SCREEN_ON + HIDE_CURSOR);
+    this.terminalEntered = true;
+    if (this.inputAttached) {
+      if (this.input.isTTY) this.input.setRawMode(true);
+      this.input.on('data', this.inputDataHandler);
+      this.input.resume();
+      this.out.write(BRACKETED_PASTE_ON + (this.options.mouse ? MOUSE_ON : ''));
+      if (this.options.colorScheme !== false) this.scheme.start();
+    }
+    this.previousBuffer = null;
+    for (const h of [...this.resizeSubscribers]) h();
+  }
+
+  // Give the terminal back the way the shell had it: input decoding off (the
+  // child's keystrokes must not reach a subscriber), raw mode off, reports
+  // off, cursor shown, alt screen left. `dispose()` and `suspend()` both end
+  // here; `resume()` is its reverse. `inputAttached` is left as it is — it
+  // says a subscriber holds the input, which `resume()` reads to know whether
+  // to take it back.
+  private leaveTerminal(): void {
     if (this.inputAttached) {
       this.input.removeListener('data', this.inputDataHandler);
       if (this.input.isTTY) this.input.setRawMode(false);
       this.input.pause();
-      this.inputAttached = false;
       this.pendingInput = '';
       // Reports off first — they were turned on last.
       this.scheme.stop();
       this.out.write((this.options.mouse ? MOUSE_OFF : '') + BRACKETED_PASTE_OFF);
-    }
-    if (this.resizeAttached) {
-      this.out.removeListener('resize', this.resizeNotify);
-      this.resizeAttached = false;
     }
     if (this.terminalEntered) {
       // Show cursor + reset SGR while still in alt-screen, then exit alt-screen
       // so the user's original terminal content returns clean.
       this.out.write(SHOW_CURSOR + RESET + ALT_SCREEN_OFF);
       this.terminalEntered = false;
+    }
+  }
+
+  dispose(): void {
+    // Set first: from here on the terminal is being handed back, so a late
+    // bell() or notify() has nowhere to write.
+    this.disposed = true;
+    // Already handed over: the terminal is the shell's, and writing the leave
+    // sequence again would disturb what it shows now.
+    if (!this.suspended) this.leaveTerminal();
+    if (this.inputAttached) process.removeListener('SIGCONT', this.onContinue);
+    this.inputAttached = false;
+    if (this.resizeAttached) {
+      this.out.removeListener('resize', this.resizeNotify);
+      this.resizeAttached = false;
     }
     // Only now is it safe to print: the alt screen is gone.
     // eslint-disable-next-line no-console

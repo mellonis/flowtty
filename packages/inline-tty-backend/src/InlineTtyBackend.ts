@@ -53,6 +53,13 @@ export interface InlineTtyBackendOptions {
    *  74,994. A text over it is not written AT ALL and `copy()` reports
    *  `false` — never a truncated copy presented as a complete one. */
   clipboardLimit?: number;
+  /** Ctrl+Z suspends the process the way a shell user expects: the live
+   *  region is cleared and the terminal handed back, `SIGTSTP` stops the
+   *  process, and `fg` (`SIGCONT`) takes the terminal again and repaints. On
+   *  by default. `false` delivers Ctrl+Z as a key (`{ name: 'z', ctrl: true }`)
+   *  for an app that uses it, and leaves suspension to `useApp().suspend()`.
+   *  See docs/app.md (handing the terminal over). */
+  suspendKey?: boolean;
 }
 
 /**
@@ -98,10 +105,24 @@ export class InlineTtyBackend implements Backend {
         this.dispose();
         process.exit(130);
       }
+      // Ctrl+Z, the shell's suspend — see TtyBackend.
+      if (key.ctrl && key.name === 'z' && this.options.suspendKey !== false) {
+        this.suspend();
+        process.kill(process.pid, 'SIGTSTP');
+        continue;
+      }
       for (const h of [...this.subscribers]) h(key);
     }
   };
   private inputAttached = false;
+  // `fg` after Ctrl+Z, or after a `kill -STOP` the backend never saw — see
+  // TtyBackend. Marked suspended first when it was not, so resume() takes
+  // the input back either way.
+  private readonly onContinue = (): void => {
+    if (this.disposed) return;
+    if (!this.suspended) this.suspended = true;
+    this.resume();
+  };
 
   private readonly resizeSubscribers = new Set<() => void>();
   private readonly resizeNotify = (): void => {
@@ -115,6 +136,8 @@ export class InlineTtyBackend implements Backend {
   private liveLines: string[] = [];
   private cursorHidden = false;
   private disposed = false;
+  // The terminal has been handed to another program (`suspend()`).
+  private suspended = false;
   private readonly attention: Attention;
   private readonly clipboard: Clipboard;
   private readonly scheme: ColorSchemeTracker;
@@ -129,7 +152,7 @@ export class InlineTtyBackend implements Backend {
    */
   readonly logOnly: boolean;
 
-  constructor(options: InlineTtyBackendOptions = {}) {
+  constructor(private readonly options: InlineTtyBackendOptions = {}) {
     this.sgrOptions = { color: options.color ?? detectColorSupport(), depth: options.colorDepth ?? detectColorDepth() };
     this.out = options.out ?? process.stdout;
     this.logOnly = !isInteractive(this.out);
@@ -162,7 +185,7 @@ export class InlineTtyBackend implements Backend {
   }
 
   draw(buffer: Buffer): void {
-    if (this.logOnly) return;
+    if (this.logOnly || this.suspended) return;
     this.ensureCursorHidden();
     // Erase the previous live region (cursor up + clear-from-cursor) and
     // write the new one in its place. The cursor sits at the start of the
@@ -186,6 +209,7 @@ export class InlineTtyBackend implements Backend {
   printStatic(lines: string[]): void {
     if (lines.length === 0) return;
     if (this.logOnly) { this.out.write(lines.join('\n') + '\n'); return; }
+    if (this.suspended) return;
     let out = this.eraseLiveRegion();
     out += lines.join('\n') + '\n';
     // Now redraw the live region beneath the new static lines.
@@ -247,6 +271,8 @@ export class InlineTtyBackend implements Backend {
       this.input.on('data', this.inputDataHandler);
       this.input.resume();
       this.inputAttached = true;
+      // Lazy like raw mode: a passive view never stops or continues.
+      process.on('SIGCONT', this.onContinue);
       // Only a backend that reads keys asks for bracketed paste; dispose() undoes it.
       this.out.write(BRACKETED_PASTE_ON);
       if (this.followsScheme) this.scheme.start();
@@ -255,27 +281,72 @@ export class InlineTtyBackend implements Backend {
     return () => { this.subscribers.delete(handler); };
   }
 
-  dispose(): void {
-    if (this.disposed) return;
-    this.disposed = true;
+  /**
+   * Hand the terminal to another program: the live region is erased, the
+   * cursor shown, raw mode and paste reports off, stdin no longer read. The
+   * scrollback above stays. A no-op in log-only mode, while suspended, and
+   * after dispose. See docs/app.md (handing the terminal over).
+   */
+  suspend(): void {
+    if (this.logOnly || this.disposed || this.suspended) return;
+    this.suspended = true;
+    this.leaveTerminal(true);
+  }
+
+  /**
+   * Take the terminal back after `suspend()`: raw mode, paste reports and
+   * stdin again, and the resize subscribers told, so the app draws a fresh
+   * live region below whatever the child printed. A no-op when not
+   * suspended, in log-only mode, and after dispose.
+   */
+  resume(): void {
+    if (this.logOnly || this.disposed || !this.suspended) return;
+    this.suspended = false;
+    if (this.inputAttached) {
+      if (this.input.isTTY) this.input.setRawMode(true);
+      this.input.on('data', this.inputDataHandler);
+      this.input.resume();
+      this.out.write(BRACKETED_PASTE_ON);
+      if (this.followsScheme) this.scheme.start();
+    }
+    for (const h of [...this.resizeSubscribers]) h();
+  }
+
+  // Give the terminal back: input decoding off (the child's keystrokes must
+  // not reach a subscriber), raw mode off, paste reports off, the cursor
+  // shown. `suspend()` also erases the live region — a child must start on a
+  // clean line, and the region comes back with the next draw; `dispose()`
+  // leaves the last frame in the scrollback and ends the line instead.
+  // `inputAttached` is left as it is: it says a subscriber holds the input,
+  // which `resume()` reads to know whether to take it back.
+  private leaveTerminal(erase: boolean): void {
     if (this.inputAttached) {
       this.input.removeListener('data', this.inputDataHandler);
       if (this.input.isTTY) this.input.setRawMode(false);
       this.input.pause();
-      this.inputAttached = false;
       this.pendingInput = '';
       this.scheme.stop();
       this.out.write(BRACKETED_PASTE_OFF);
     }
+    if (this.cursorHidden) {
+      // Show cursor + drop the pen to default. On dispose, a trailing newline
+      // so the next shell prompt isn't on the same row as the last live frame.
+      this.out.write((erase ? this.eraseLiveRegion() : '') + SHOW_CURSOR + RESET + (erase ? '' : '\n'));
+      this.cursorHidden = false;
+      if (erase) this.liveLines = [];
+    }
+  }
+
+  dispose(): void {
+    if (this.disposed) return;
+    this.disposed = true;
+    // Already handed over: the terminal is the shell's, nothing more to write.
+    if (!this.suspended) this.leaveTerminal(false);
+    if (this.inputAttached) process.removeListener('SIGCONT', this.onContinue);
+    this.inputAttached = false;
     if (this.resizeAttached) {
       this.out.removeListener('resize', this.resizeNotify);
       this.resizeAttached = false;
-    }
-    if (this.cursorHidden) {
-      // Show cursor + drop the pen to default. Emit a trailing newline so
-      // the next shell prompt isn't on the same row as the last live frame.
-      this.out.write(SHOW_CURSOR + RESET + '\n');
-      this.cursorHidden = false;
     }
     // The live region is gone — now a warning cannot land in the middle of it.
     // eslint-disable-next-line no-console
