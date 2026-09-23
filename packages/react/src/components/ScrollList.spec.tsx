@@ -250,6 +250,20 @@ describe('ScrollList', () => {
     unmount();
   });
 
+  test('a wheel step inside the overscan re-renders no rows', async () => {
+    let calls = 0;
+    const counting = (t: string) => { calls++; return <Text>{t}</Text>; };
+    const { backend, frame, unmount } = await mount(
+      <ScrollList height={4} overscan={20} items={lines(100)} renderItem={counting} />,
+    );
+    await frame();
+    calls = 0;
+    backend.wheel('down', 0, 0); // 3 rows: still deep inside the 20 rows rendered below the viewport
+    expect(await frame()).toEqual(['row 3', 'row 4', 'row 5', 'row 6']);
+    expect(calls).toBe(0);
+    unmount();
+  });
+
   test('only the windowed rows are rendered: 10,000 items, a 10-row viewport', async () => {
     let calls = 0;
     const counting = (t: string) => { calls++; return <Text>{t}</Text>; };

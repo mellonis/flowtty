@@ -17,7 +17,9 @@ export interface ScrollListProps<T> extends Omit<ScrollBoxProps, 'children'> {
   /** Rows of the terminal every item takes. Default 1. */
   rowHeight?: number;
   /** Rows rendered beyond each edge of the viewport, so a small scroll step
-   *  finds its rows already there. Default: one viewport height. */
+   *  finds its rows already there and re-renders nothing: the window moves
+   *  only once the viewport gets within half this many rows of its edge, so
+   *  up to half as many again may be rendered. Default: one viewport height. */
   overscan?: number;
   /** Overlays only: `position="absolute"` children that stay put while the
    *  list scrolls, as in `<ScrollBox>`. Rows come from `items`. */
@@ -25,15 +27,20 @@ export interface ScrollListProps<T> extends Omit<ScrollBoxProps, 'children'> {
 }
 
 /** Rows `[start, end)` that cover `[top, top + viewportHeight)` widened by
- *  `overscan` on each side, clamped to the list. */
+ *  at least `overscan` on each side, clamped to the list. */
 interface Window { start: number; end: number }
 
 function windowOf(top: number, viewportHeight: number, count: number, rowHeight: number, overscan: number): Window {
   const first = Math.floor(top / rowHeight);
   const last = Math.ceil((top + viewportHeight) / rowHeight);
+  // The edges snap to a grid half the overscan wide, so a small scroll step
+  // keeps the window — and the list re-renders nothing. Widened exactly by
+  // `overscan`, the window would move with every row scrolled, and every step
+  // would re-render all of it: the overscan would buy no render at all.
+  const grid = Math.max(1, Math.floor(overscan / 2));
   return {
-    start: Math.max(0, Math.min(count, first - overscan)),
-    end: Math.max(0, Math.min(count, last + overscan)),
+    start: Math.max(0, Math.min(count, Math.floor((first - overscan) / grid) * grid)),
+    end: Math.max(0, Math.min(count, Math.ceil((last + overscan) / grid) * grid)),
   };
 }
 

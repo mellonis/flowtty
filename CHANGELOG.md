@@ -7,6 +7,20 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Fixed
+
+- `<ScrollList>` re-rendered its whole window — the viewport plus the overscan
+  on each side — on every scroll step, because the window was recomputed
+  exactly around the viewport and so moved with every row. The window's edges
+  now snap to a grid half the overscan wide: a small step keeps the window and
+  re-renders nothing, and the cost of a step no longer grows with how rich the
+  rows are. See docs/layout.md (ScrollList).
+- `<ScrollBox scrollbar>` painted two frames per scroll step: the paint's
+  metrics moved the thumb in a second render. The step now sets the metrics
+  it will produce, so the thumb moves in the same frame as the rows.
+
 ## 1.0.0-alpha.21 — 2026-09-22
 
 ### Added

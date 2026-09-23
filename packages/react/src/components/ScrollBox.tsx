@@ -83,6 +83,14 @@ export function ScrollBox({
     const max = m?.maxScrollTop ?? 0;
     const next = Math.max(0, Math.min(max, wantedTop));
     pendingTopRef.current = next;
+    if (m) {
+      // The metrics the next paint will report, known now: with the scrollbar
+      // drawn from them in this same commit, that paint finds nothing changed
+      // and queues no second frame for the step.
+      const moved = { ...m, scrollTop: next };
+      metricsRef.current = moved;
+      if (scrollbar) setBarMetrics(moved);
+    }
     if (!controlled) setTop(fromBottom ? (next >= max ? null : next) : next);
     if (onScroll && m) onScroll(fromBottom ? max - next : next, { ...m, scrollTop: next });
   };

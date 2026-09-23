@@ -165,6 +165,16 @@ describe('ScrollBox', () => {
     unmount();
   });
 
+  test('a wheel step with the scrollbar paints one frame, not two', async () => {
+    const { backend, frame, unmount } = await mount(<ScrollBox height={4} scrollbar><Rows items={lines(8)} /></ScrollBox>, 8, 4);
+    await frame();
+    const before = backend.frames.length;
+    backend.wheel('down', 0, 0);
+    expect(await frame()).toEqual(['row 3  │', 'row 4  │', 'row 5  █', 'row 6  █']);
+    expect(backend.frames.length - before).toBe(1);
+    unmount();
+  });
+
   test('no scrollbar is drawn when everything fits', async () => {
     const { frame, unmount } = await mount(<ScrollBox height={4} scrollbar><Rows items={lines(2)} /></ScrollBox>, 8, 4);
     expect(await frame()).toEqual(['row 0', 'row 1']);
