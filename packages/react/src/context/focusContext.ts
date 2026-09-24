@@ -9,6 +9,9 @@ export interface FocusGroupApi {
   unregister(id: string): void;
   /** True iff the focusable with this id is currently the focused one. */
   isFocused(id: string): boolean;
+  /** Make the focusable with this id the focused one — a click on it. An id
+   *  that is not registered is ignored. */
+  focus(id: string): void;
 }
 
 /** Sentinel singleton used outside a FocusGroup. Stable reference. */
@@ -18,6 +21,7 @@ const noop: FocusGroupApi = {
   // Outside a FocusGroup, "always focused" so default behavior works —
   // components outside a FocusGroup still receive input (backward compat).
   isFocused: () => true,
+  focus: () => {},
 };
 
 /** Outside a FocusGroup, useFocus() reads from this default → always focused

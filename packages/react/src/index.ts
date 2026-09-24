@@ -3,6 +3,7 @@ export type { RenderOptions, RenderHandle, CopyEvent } from './internal/render.j
 export { renderToString } from './internal/renderToString.js';
 export type { RenderToStringOptions } from './internal/renderToString.js';
 export { useApp } from './hooks/useApp.js';
+export { useClick } from './hooks/useClick.js';
 export type { AppApi } from './context/appContext.js';
 export type { ErrorSource } from './components/ErrorBoundary.js';
 export { useTerminalSize, type TerminalSize } from './hooks/useTerminalSize.js';

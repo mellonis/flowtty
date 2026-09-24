@@ -7,6 +7,7 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import { useClick } from '../hooks/useClick.js';
 import { useDialog, useDialogHost } from '../hooks/useDialog.js';
 import { DialogHostPresentContext } from '../context/dialogContext.js';
 import { checkboxMarker, type CheckboxFrame } from './checkboxMarker.js';
@@ -111,7 +112,7 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
     items, placeholder = '—', frame = 'field', filter = true, maxRows = 8, isFocused: explicitFocus,
     width, minWidth, maxWidth, flexGrow, flexShrink,
   } = props;
-  const { isFocused: ctxFocused } = useFocus();
+  const { isFocused: ctxFocused, focus } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   const host = useDialogHost();
   const hasHost = useContext(DialogHostPresentContext);
@@ -155,12 +156,8 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
     ).then(() => setOpen(false));
   };
 
+  useClick(rectRef, () => { if (!open) { focus(); openPopup(); } }); // a click opens, and focuses
   useInput((key: Key) => {
-    if (key.name === 'mousedown') {
-      if (!inside(rectRef.current, key.x, key.y)) return;
-      openPopup();
-      return true;
-    }
     if (!isFocused) return;
     if (key.name === 'return' || key.name === ' ' || key.name === 'down') {
       openPopup();

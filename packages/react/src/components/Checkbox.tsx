@@ -6,6 +6,7 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import { useClick } from '../hooks/useClick.js';
 import { checkboxMarker, type CheckboxFrame, type CheckboxState } from './checkboxMarker.js';
 
 export type { CheckboxFrame, CheckboxState } from './checkboxMarker.js';
@@ -33,19 +34,13 @@ export interface CheckboxProps {
  * alone — in a form it is the submit. See docs/components.md (Checkbox).
  */
 export function Checkbox({ checked, onChange, label, frame = 'brackets', isFocused: explicitFocus }: CheckboxProps): ReactNode {
-  const { isFocused: ctxFocused } = useFocus();
+  const { isFocused: ctxFocused, focus } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   const rectRef = useRef<Rect | null>(null);
   const toggle = () => onChange(checked === 'mixed' ? true : !checked);
 
+  useClick(rectRef, () => { focus(); toggle(); }); // a click toggles, and focuses
   useInput((key: Key) => {
-    if (key.name === 'mousedown') {
-      const r = rectRef.current;
-      if (r === null || key.x === undefined || key.y === undefined) return;
-      if (key.x < r.left || key.x >= r.left + r.width || key.y < r.top || key.y >= r.top + r.height) return;
-      toggle();
-      return true;
-    }
     if (isFocused && key.name === ' ') {
       toggle();
       return true;

@@ -4,6 +4,8 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import { useClick } from '../hooks/useClick.js';
+import type { Rect } from '@flowtty/core/host';
 import type { Color } from '@flowtty/core';
 
 export interface TextAreaProps {
@@ -65,7 +67,9 @@ export function TextArea(props: TextAreaProps): ReactNode {
     value, onChange, onSubmit, onCancel, onKey, onCursorChange, maxRows,
     prefix, continuationPrefix, ghost, suffix, placeholder, backgroundColor = FIELD_BG,
   } = props;
-  const { isFocused: ctxFocused } = useFocus();
+  const { isFocused: ctxFocused, focus } = useFocus();
+  const clickRef = useRef<Rect | null>(null);
+  useClick(clickRef, focus); // a click on the area focuses it
   const isFocused = props.isFocused !== undefined ? props.isFocused : ctxFocused;
 
   const [ownCursor, setOwnCursor] = useState(value.length);
@@ -132,7 +136,7 @@ export function TextArea(props: TextAreaProps): ReactNode {
   const faded = onDefaultField ? { color: FIELD_FADED } : { dim: true };
 
   return (
-    <Box flexDirection="row" backgroundColor={backgroundColor}>
+    <Box flexDirection="row" backgroundColor={backgroundColor} onLayout={(r) => { clickRef.current = r; }}>
       {hasGutter ? (
         <Box flexDirection="column" flexShrink={0}>
           {rows.slice(first, first + visible).map((_, i) => (

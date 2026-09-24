@@ -4,6 +4,7 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import { useClick } from '../hooks/useClick.js';
 import { editorReducer as reduce, type EditorState } from '@flowtty/core';
 import { type Rect } from '@flowtty/core/host';
 
@@ -46,8 +47,10 @@ export function TextInput(props: TextInputProps): ReactNode {
   const [ownValue, setOwnValue] = useState(props.defaultValue ?? '');
   const value = props.value ?? ownValue;
   const [error, setError] = useState<string | null>(null);
-  const { isFocused: ctxFocused } = useFocus();
+  const { isFocused: ctxFocused, focus } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
+  const rectRef = useRef<Rect | null>(null);
+  useClick(rectRef, focus); // a click on the field focuses it
   const [cursor, setCursor] = useState(value.length);
   const safeCursor = Math.max(0, Math.min(value.length, cursor));
   // Allocated cell width of the input's viewport — captured via onLayout. null
@@ -124,6 +127,7 @@ export function TextInput(props: TextInputProps): ReactNode {
   const display = chars.join('');
 
   const onLayout = (r: Rect) => {
+    rectRef.current = r;
     if (r.width !== width) setWidth(r.width);
   };
 

@@ -1,10 +1,13 @@
-import { useContext, useEffect, useId } from 'react';
+import { useCallback, useContext, useEffect, useId } from 'react';
 import { FocusContext, FocusedIdContext } from '../context/focusContext.js';
 
 export interface UseFocusResult {
   /** True iff this component is currently the focused one in its enclosing FocusGroup.
    *  Outside a FocusGroup, always true (backward-compat: single component receives input). */
   isFocused: boolean;
+  /** Make this component the focused one — what a field does on a click.
+   *  Stable across renders. A no-op outside a FocusGroup. */
+  focus: () => void;
 }
 
 /** Register the calling component as focusable in the enclosing FocusGroup.
@@ -25,6 +28,7 @@ export function useFocus(): UseFocusResult {
   // reads a ref maintained by FocusGroup — so we get the correct answer as long
   // as we re-render (which this subscription ensures).
   useContext(FocusedIdContext); // subscribed for re-render only (value unused intentionally)
+  const focus = useCallback(() => group.focus(id), [group, id]);
 
-  return { isFocused: group.isFocused(id) };
+  return { isFocused: group.isFocused(id), focus };
 }

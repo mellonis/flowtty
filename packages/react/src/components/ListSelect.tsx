@@ -1,9 +1,11 @@
 import React from "react";
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import { useClick } from '../hooks/useClick.js';
+import type { Rect } from '@flowtty/core/host';
 import { selectReducer as reduce, visibleIndices, type SelectItem, type SelectState } from '@flowtty/core';
 
 export type { SelectItem } from '@flowtty/core';
@@ -26,8 +28,10 @@ export interface ListSelectProps<T> {
 
 export function ListSelect<T>(props: ListSelectProps<T>): ReactNode {
   const { items, value, onChange, onSubmit, onCancel, isFocused: explicitFocus } = props;
-  const { isFocused: ctxFocused } = useFocus();
+  const { isFocused: ctxFocused, focus } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
+  const rectRef = useRef<Rect | null>(null);
+  useClick(rectRef, focus); // a click on the list focuses it
 
   // Initial cursor: position of the controlled value in the (unfiltered) item list.
   const initialCursor = Math.max(0, items.findIndex((it) => it.value === value));
@@ -56,7 +60,7 @@ export function ListSelect<T>(props: ListSelectProps<T>): ReactNode {
   const cursorClamped = Math.min(state.cursor, Math.max(0, visible.length - 1));
 
   return (
-    <Box>
+    <Box onLayout={(r) => { rectRef.current = r; }}>
       {state.filter !== '' && <Text>{`filter: ${state.filter}`}</Text>}
       {/* Focus has to be visible (see ListMultiSelect): colored bold marker + bold row
           when focused, a dim marker when not; the text is the same either way. */}

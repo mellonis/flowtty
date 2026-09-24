@@ -4,6 +4,8 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import { useClick } from '../hooks/useClick.js';
+import type { Rect } from '@flowtty/core/host';
 import { checkboxMarker, type CheckboxFrame } from './checkboxMarker.js';
 import { multiSelectReducer as reduce, type MultiSelectState, type SelectItem } from '@flowtty/core';
 
@@ -33,7 +35,9 @@ export interface ListMultiSelectProps<T> {
 
 export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
   const { items, value, onChange, onSubmit, onCancel, onAddNew, isFocused: explicitFocus, checkboxFrame = 'brackets' } = props;
-  const { isFocused: ctxFocused } = useFocus();
+  const { isFocused: ctxFocused, focus } = useFocus();
+  const rectRef = useRef<Rect | null>(null);
+  useClick(rectRef, focus); // a click on the list focuses it
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   const totalRows = items.length + (onAddNew ? 1 : 0);
   const [state, setState] = useState<MultiSelectState>({ cursor: 0 });
@@ -105,7 +109,7 @@ export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
     </Box>
   );
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" onLayout={(r) => { rectRef.current = r; }}>
       {items.map((it, i) => row(i === cursor, `${checkboxMarker(value.includes(it.value), checkboxFrame).text} ${it.label}`, i))}
       {onAddNew !== undefined && row(cursor === items.length, '+ add new', '__add__')}
     </Box>

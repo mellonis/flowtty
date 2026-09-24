@@ -56,9 +56,15 @@ export function FocusGroup({ isActive = true, children }: FocusGroupProps): Reac
   // Consumers' useFocus useEffects depend on this object; stability means
   // effects only re-run when the FocusGroup itself mounts/unmounts, NOT on
   // every focus change.
+  // A click on a focusable asks for it by id; an id that never registered
+  // (a component outside the group, a stale one) is ignored.
+  const focus = useCallback((id: string) => {
+    if (idsRef.current.includes(id)) setFocusedId(id);
+  }, []);
+
   const api = useMemo<FocusGroupApi>(
-    () => ({ register, unregister, isFocused }),
-    [register, unregister, isFocused],
+    () => ({ register, unregister, isFocused, focus }),
+    [register, unregister, isFocused, focus],
   );
 
   useInput((key) => {
