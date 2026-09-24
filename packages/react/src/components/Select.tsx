@@ -1,5 +1,5 @@
 import React from 'react';
-import { useContext, useEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
+import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { DEFAULT_BORDER_STYLE, type BoxProps, type Key } from '@flowtty/core';
 import { visibleIndices, type SelectItem } from '@flowtty/core';
 import type { Rect } from '@flowtty/core/host';
@@ -119,7 +119,10 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
   const rectRef = useRef<Rect | null>(null);
   const store = useRef<Store<T> | null>(null);
   if (store.current === null) store.current = createStore<T>({ items, value: props.value });
-  store.current.set({ items, value: props.value });
+  // After the commit, not during the render: the popup subscribes to the store,
+  // and waking it from inside this render would be a state update in one
+  // component while another renders, which React refuses.
+  useLayoutEffect(() => { store.current!.set({ items, value: props.value }); }, [items, props.value]);
   // The latest callbacks, for a popup opened with an earlier render's closure.
   const propsRef = useRef(props);
   propsRef.current = props;

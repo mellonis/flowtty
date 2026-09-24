@@ -338,6 +338,25 @@ describe('Select multiple', () => {
     unmount();
   });
 
+  test('props changing while the popup is open reach it without a React warning', async () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {});
+    try {
+      const onChange = vi.fn();
+      const { backend, frame, unmount } = await mount(<Multi onChange={onChange} onAddNew={() => 'extra'} />);
+      backend.press({ name: 'return' });
+      await frame();
+      backend.press({ name: ' ' });            // toggles: value changes while open
+      backend.press({ name: 'up' });
+      backend.press({ name: 'return' });       // + add new: items change while open
+      const lines = await frame();
+      expect(row(lines, '[x] extra')).toBeDefined();
+      expect(error).not.toHaveBeenCalled();
+      unmount();
+    } finally {
+      error.mockRestore();
+    }
+  });
+
   test('a narrow field says how many are selected instead of listing them', async () => {
     const { backend, frame, unmount } = await mount(<Multi width={12} />);
     backend.press({ name: 'return' });

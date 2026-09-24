@@ -28,7 +28,7 @@ export function FormScene() {
           <Text dim>Plan — ↑/↓</Text>
           <ListSelect items={PLANS} value={plan} onChange={setPlan} onSubmit={setPlan} />
           <Text>{''}</Text>
-          <Text dim>Features — Space toggles · “+ add new” adds one · the checkbox above is mixed while some are picked</Text>
+          <Text dim>Features — Space toggles · “+ add new” adds one · “select all” is mixed</Text>
           <Checkbox label="select all" checked={allFeatures} onChange={(on) => setPicked(on ? features.map((f) => f.value) : [])} />
           <ListMultiSelect
             items={features} value={picked} onChange={setPicked} onSubmit={() => {}}
