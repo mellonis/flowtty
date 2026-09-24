@@ -337,6 +337,13 @@ function parseChar(c: string): Key {
     const letter = String.fromCharCode(code + 0x60);
     return { name: letter, sequence: c, ctrl: true, meta: false, shift: false };
   }
+  // The control bytes past Ctrl+Z: 0x00 is Ctrl+@ (Ctrl+Space on most
+  // terminals), 0x1C–0x1F are Ctrl+\, Ctrl+], Ctrl+^, Ctrl+_ — named by the
+  // ASCII column they sit in, as the letters are, so an app can bind a chord
+  // and a field never types the raw byte.
+  if (code === 0x00 || (code >= 0x1C && code <= 0x1F)) {
+    return { name: String.fromCharCode(code + 0x40), sequence: c, ctrl: true, meta: false, shift: false };
+  }
   return { name: c, sequence: c, ctrl: false, meta: false, shift: false };
 }
 

@@ -22,6 +22,7 @@ export type { ColorScheme, TerminalColorScheme } from './colorScheme.js';
 // chrome helpers reach for the wrap / border / visual-line types.
 export type { BoxProps, ScrollMetrics, TextRun, WrapContinuation } from './host/host.js';
 export { takeWarnings } from './warnings.js';
+export { isPrintable } from './keys.js';
 export type { BorderStyle, BorderChars, GridChars } from './host/borders.js';
 export { DEFAULT_BORDER_STYLE, GRID_CHARS } from './host/borders.js';
 export type { WrapMode, WrappedLine } from './wrap.js';

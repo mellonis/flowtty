@@ -100,3 +100,10 @@ test('arrows still navigate', () => {
   expect(reduce(three, { cursor: 0, filter: '' }, key({ name: 'down' }))).toEqual({ kind: 'state', state: { cursor: 1, filter: '' } });
   expect(reduce(three, { cursor: 0, filter: '' }, key({ name: 'up' }))).toEqual({ kind: 'state', state: { cursor: 2, filter: '' } });
 });
+
+test('a control character is not a filter character: noop, so the app still sees its chord', () => {
+  const items = labels(['a', 'b']);
+  const state: SelectState = { cursor: 0, filter: '' };
+  expect(reduce(items, state, key({ name: '\x1d' }))).toEqual({ kind: 'noop' });
+  expect(reduce(items, state, key({ name: ']', ctrl: true }))).toEqual({ kind: 'noop' });
+});

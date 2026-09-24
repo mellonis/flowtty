@@ -118,7 +118,11 @@ In tests, `TestBackend` has `paste(text)`, `wheel('up' | 'down', x?, y?)` and
 and a `<ScrollBox>` only reacts while the pointer is over it, so pass coordinates
 inside the box unless it sits at the origin.
 
-**Key names.** A printable key is named by its character — `' '`, `':'`, `'a'` —
+**Key names.** A control chord is `{ name, ctrl: true }` with the letter or symbol
+of its ASCII column: Ctrl+A is `a`, Ctrl+] is `]`, Ctrl+Space (0x00) is `@`. A
+field types, and a list filters by, printable keys only (`isPrintable(key)` from
+`@flowtty/core` is the test) — a chord is never typed and never consumed by a
+component that does not act on it. A printable key is named by its character — `' '`, `':'`, `'a'` —
 and the rest come from a fixed list, exported as `NAMED_KEYS` (type `NamedKey`):
 `return`, `escape`, `tab`, `backspace`, `delete`, `insert`, the arrows, `home`,
 `end`, `pageup`, `pagedown`, `f1`–`f12`, `paste`, `wheelup`, `wheeldown`,

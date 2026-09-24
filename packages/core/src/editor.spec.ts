@@ -277,3 +277,8 @@ test('contract: a key the editor does not handle is a noop, never an edit', () =
   expect(reduce(s('hello', 3), key({ name: 'up' }))).toEqual({ kind: 'noop' });
   expect(reduce(s('hello', 3), key({ name: 'down' }))).toEqual({ kind: 'noop' });
 });
+
+test('a control character is not typed into the field: noop, so the app still sees its chord', () => {
+  expect(reduce(s('ab', 2), key({ name: '\x1d' }))).toEqual({ kind: 'noop' });
+  expect(reduce(s('ab', 2), key({ name: ']', ctrl: true }))).toEqual({ kind: 'noop' });
+});

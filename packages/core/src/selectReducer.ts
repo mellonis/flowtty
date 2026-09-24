@@ -1,4 +1,4 @@
-import type { Key } from './keys.js';
+import { isPrintable, type Key } from './keys.js';
 
 export interface SelectItem<T> {
   label: string;
@@ -61,7 +61,7 @@ export function reduce<T>(items: SelectItem<T>[], state: SelectState, key: Key):
 
   // Printable single-char (no ctrl/meta) appends to filter; cursor resets to 0
   // so the user always sees the first match after typing.
-  if (!key.ctrl && !key.meta && key.name.length === 1) {
+  if (isPrintable(key)) {
     return { kind: 'state', state: { cursor: 0, filter: state.filter + key.name } };
   }
 

@@ -7,6 +7,17 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Fixed
+
+- The control bytes 0x00 and 0x1C–0x1F (Ctrl+@, Ctrl+\, Ctrl+], Ctrl+^,
+  Ctrl+_) arrived as printable keys, so a focused list took Ctrl+] as a
+  filter character and consumed it. The parser names them like the other
+  chords, and `isPrintable(key)` — new in `@flowtty/core` — is what a field
+  types and a filter accepts: never a control character, whatever a backend
+  sends. See docs/input.md (paste and the mouse, key names).
+
 ## 1.0.0-alpha.26 — 2026-09-24
 
 ### Added

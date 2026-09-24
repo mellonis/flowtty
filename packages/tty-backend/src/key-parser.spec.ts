@@ -429,3 +429,8 @@ test('focus in and out are focus reports, not csi-I / csi-O keys', () => {
 test('parseKeypress drops the reports and keeps the keys', () => {
   expect(parseKeypress('\x1b[?997;2nq').map((k) => k.name)).toEqual(['q']);
 });
+
+test('the control bytes past Ctrl+Z are named like the rest: Ctrl+@, Ctrl+\\, Ctrl+], Ctrl+^, Ctrl+_', () => {
+  const { keys } = decodeKeys('\x00\x1c\x1d\x1e\x1f');
+  expect(keys.map((k) => [k.name, k.ctrl])).toEqual([['@', true], ['\\', true], [']', true], ['^', true], ['_', true]]);
+});

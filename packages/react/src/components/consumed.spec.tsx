@@ -89,6 +89,17 @@ describe('consumed keys — fields', () => {
     multi.unmount();
   });
 
+  test('a focused list or field lets a control chord through: Ctrl+] is not a filter character', async () => {
+    const list = await mount(<ListSelect items={ITEMS} value="a" onChange={() => {}} onSubmit={() => {}} />);
+    expect(list.backend.press({ name: ']', ctrl: true })).toBe(false);
+    expect(list.backend.press({ name: '\x1d' })).toBe(false); // a backend that let the raw byte through
+    list.unmount();
+    const field = await mount(<TextInput value="" onChange={() => {}} />);
+    expect(field.backend.press({ name: ']', ctrl: true })).toBe(false);
+    expect(field.backend.press({ name: '\x1d' })).toBe(false);
+    field.unmount();
+  });
+
   test('Button consumes Enter when focused and its shortcut from anywhere', async () => {
     const { backend, unmount } = await mount(<Button label="Save" shortcut="s" onPress={() => {}} />);
     expect(backend.press({ name: 'return' })).toBe(true);

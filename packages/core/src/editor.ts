@@ -1,4 +1,4 @@
-import type { Key } from './keys.js';
+import { isPrintable, type Key } from './keys.js';
 import { caretPosition, inputRows, rowIndexAt } from './inputRows.js';
 
 export interface EditorState {
@@ -183,7 +183,7 @@ export function reduce(state: EditorState, key: Key, opts: EditorOptions = {}): 
   // (ctrl/meta combinations that didn't match an earlier specific branch are noops,
   // NOT insertions — so Ctrl-Q does nothing rather than typing 'q'.)
   // One CODE POINT, not one UTF-16 unit: an emoji's name is two units long.
-  if (!key.ctrl && !key.meta && [...key.name].length === 1) return insert(key.name);
+  if (isPrintable(key)) return insert(key.name);
 
   return { kind: 'noop' };
 }

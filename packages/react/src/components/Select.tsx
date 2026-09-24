@@ -1,7 +1,7 @@
 import React from 'react';
 import { useContext, useEffect, useLayoutEffect, useRef, useState, useSyncExternalStore, type ReactNode } from 'react';
 import { DEFAULT_BORDER_STYLE, type BoxProps, type Key } from '@flowtty/core';
-import { visibleIndices, type SelectItem } from '@flowtty/core';
+import { isPrintable, visibleIndices, type SelectItem } from '@flowtty/core';
 import type { Rect } from '@flowtty/core/host';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
@@ -302,7 +302,7 @@ function SelectPopup<T>({ store, multiple, filter, maxRows, hasAddRow, checkboxF
     if (multiple && key.name === ' ') { if (!onAddRow) choose(at); return true; }
     if (filter) {
       if (key.name === 'backspace') { if (query !== '') { setQuery(query.slice(0, -1)); setCursor(0); } return true; }
-      if (!key.ctrl && !key.meta && key.name.length === 1) { setQuery(query + key.name); setCursor(0); return true; }
+      if (isPrintable(key)) { setQuery(query + key.name); setCursor(0); return true; }
     }
   });
 

@@ -72,3 +72,18 @@ export interface Key {
   meta: boolean; // Option / Alt
   shift: boolean;
 }
+
+/**
+ * Whether a key is a character to type or to filter by: one code point with
+ * neither ctrl nor meta, and not a control character — a backend that lets a
+ * raw control byte through (or a custom one that names keys loosely) must not
+ * get it inserted into a field or eaten by a filter, so an app's own chord
+ * still arrives. Shift is fine: a capital is printable.
+ */
+export function isPrintable(key: Key): boolean {
+  if (key.ctrl || key.meta) return false;
+  const chars = [...key.name];
+  if (chars.length !== 1) return false;
+  const code = key.name.codePointAt(0)!;
+  return code >= 0x20 && code !== 0x7f;
+}
