@@ -11,6 +11,10 @@ export interface SubscribeOptions {
   /** Hear a key before every ordinary subscriber — the capture phase. Capture
    *  handlers hear it in mount order among themselves, and can consume it. */
   capture?: boolean;
+  /** Hear a key only when no capture and no ordinary subscriber consumed it —
+   *  the fallback phase, for an app's own keymap. Fallbacks hear it in mount
+   *  order among themselves, and can consume it. */
+  fallback?: boolean;
 }
 
 export interface InputSource {

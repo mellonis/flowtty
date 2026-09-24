@@ -7,6 +7,16 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- `useInput(handler, { fallback: true })`: the fallback phase — a handler that
+  hears a key only when no capture and no ordinary handler consumed it, where
+  an app's global keymap belongs. Fallbacks hear a key in mount order among
+  themselves and are muted with their subtree. See docs/input.md (keys and
+  useInput).
+
 ## 1.0.0-alpha.29 — 2026-09-24
 
 ### Fixed

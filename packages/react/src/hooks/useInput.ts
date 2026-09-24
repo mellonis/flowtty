@@ -9,6 +9,12 @@ export interface UseInputOptions {
    *  app's own chords. Capture handlers hear a key in mount order among
    *  themselves and can consume it; a muted subtree mutes them too. */
   capture?: boolean;
+  /** Hear a key only when no capture and no ordinary handler consumed it —
+   *  the fallback phase, where an app's global keymap belongs: a focused field
+   *  or list takes the key first, and only what fell through reaches here.
+   *  Fallbacks hear a key in mount order among themselves; a muted subtree
+   *  mutes them too. Not with `capture`. */
+  fallback?: boolean;
 }
 
 /**
@@ -39,8 +45,10 @@ export function useInput(handler: (key: Key) => unknown, opts: UseInputOptions =
   // fall behind a parent's handler because it subscribed later. `isActive` is
   // checked on delivery instead.
   const capture = opts.capture === true;
+  const fallback = opts.fallback === true;
+  if (capture && fallback) throw new Error('flowtty: useInput takes capture or fallback, not both');
   useEffect(() => {
-    const unsubscribe = source.subscribe((key) => (activeRef.current ? ref.current(key) : undefined), { capture });
+    const unsubscribe = source.subscribe((key) => (activeRef.current ? ref.current(key) : undefined), { capture, fallback });
     return unsubscribe;
-  }, [source, capture]);
+  }, [source, capture, fallback]);
 }

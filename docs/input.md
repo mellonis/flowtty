@@ -69,7 +69,13 @@ delivery, not a new subscription. A handler that must hear first whatever was
 mounted when takes the capture phase: `useInput(handler, { capture: true })`
 hears every key before the ordinary handlers — an app's own chords, a host's
 command layer — can consume it, and is muted with its subtree like the rest.
-Capture handlers hear a key in mount order among themselves.
+Capture handlers hear a key in mount order among themselves. The mirror image
+is `useInput(handler, { fallback: true })`: a fallback hears a key only when no
+capture and no ordinary handler consumed it — where an app's global keymap
+belongs, so a focused field or list takes the key first and the app's own
+bindings see only what fell through. Fallbacks hear a key in mount order among
+themselves. Three phases, then: capture (a host's chords), ordinary (the
+components), fallback (the app's keymap); a muted subtree mutes all three.
 
 ## Paste and the mouse
 

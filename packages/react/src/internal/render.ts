@@ -33,12 +33,14 @@ function makeKeySource(
   beforeDispatch?: (key: Key) => void,
   afterDispatch?: () => void,
 ): InputSource {
-  // Two phases: the capture handlers first, then the ordinary ones — each in
-  // subscription order, which is mount order (a child subscribes before its
-  // parent, since effects run inside-out), stopping at the first that consumes.
+  // Three phases: the capture handlers, then the ordinary ones, then the
+  // fallbacks — each in subscription order, which is mount order (a child
+  // subscribes before its parent, since effects run inside-out), stopping at
+  // the first that consumes. A fallback hears only what nobody took.
   const capture = new Set<KeySubscriber>();
   const bubble = new Set<KeySubscriber>();
-  const count = () => capture.size + bubble.size;
+  const fallback = new Set<KeySubscriber>();
+  const count = () => capture.size + bubble.size + fallback.size;
   let detachBackend: (() => void) | undefined;
   return {
     subscribe(handler, options) {
@@ -47,7 +49,7 @@ function makeKeySource(
           beforeDispatch?.(key);
           let consumed = false;
           root.flushSync(() => {
-            for (const s of [...capture, ...bubble]) {
+            for (const s of [...capture, ...bubble, ...fallback]) {
               if (s(key) === true) { consumed = true; break; }
             }
           });
@@ -55,7 +57,7 @@ function makeKeySource(
           return consumed;
         });
       }
-      const phase = options?.capture ? capture : bubble;
+      const phase = options?.capture ? capture : options?.fallback ? fallback : bubble;
       phase.add(handler);
       return () => {
         phase.delete(handler);

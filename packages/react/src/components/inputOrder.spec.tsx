@@ -135,3 +135,58 @@ describe('useInput capture', () => {
     unmount();
   });
 });
+
+describe('useInput fallback', () => {
+  test('a fallback handler hears only what nobody consumed, after every ordinary handler', async () => {
+    const seen: string[] = [];
+    function App(): ReactNode {
+      useInput((key) => { seen.push(`fallback:${key.name}`); return key.name === 'q'; }, { fallback: true });
+      useInput((key) => { seen.push(`root:${key.name}`); });
+      return <Field />;
+    }
+    const { backend, unmount } = await mount(<App />);
+    expect(backend.press({ name: 'a' })).toBe(true);          // the field took it: no fallback
+    expect(backend.press({ name: 'tab' })).toBe(false);       // nowhere to go: falls all the way through
+    expect(backend.press({ name: 'q' })).toBe(true);          // typed into the field — consumed there
+    backend.press({ name: 'escape' });                        // nothing binds it: the fallback hears it
+    expect(seen).toEqual(['root:tab', 'fallback:tab', 'root:escape', 'fallback:escape']);
+    unmount();
+  });
+
+  test('phases run capture, ordinary, fallback; fallbacks in mount order; a consuming fallback stops the rest', async () => {
+    const seen: string[] = [];
+    function Child(): ReactNode {
+      useInput((key) => { seen.push(`child-fallback:${key.name}`); return true; }, { fallback: true });
+      useInput((key) => { seen.push(`child:${key.name}`); });
+      return <Text>x</Text>;
+    }
+    function App(): ReactNode {
+      useInput((key) => { seen.push(`root-fallback:${key.name}`); }, { fallback: true });
+      useInput((key) => { seen.push(`root-capture:${key.name}`); }, { capture: true });
+      useInput((key) => { seen.push(`root:${key.name}`); });
+      return <Child />;
+    }
+    const { backend, unmount } = await mount(<App />);
+    expect(backend.press({ name: 'k' })).toBe(true);
+    expect(seen).toEqual(['root-capture:k', 'child:k', 'root:k', 'child-fallback:k']);
+    unmount();
+  });
+
+  test('a fallback under a muted host is muted like the rest', async () => {
+    const seen: string[] = [];
+    let open!: () => void;
+    function Host(): ReactNode {
+      const { openDialog } = useDialogHost();
+      open = () => { void openDialog(<Closer />, { floating: true }); };
+      useInput((key) => { seen.push(key.name); }, { fallback: true });
+      return <Text>host</Text>;
+    }
+    const { backend, settle, unmount } = await mount(<DialogHost><Host /></DialogHost>);
+    backend.press({ name: 'a' });
+    open();
+    await settle();
+    backend.press({ name: 'b' });
+    expect(seen).toEqual(['a']);
+    unmount();
+  });
+});
