@@ -7,6 +7,30 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- A click focuses a field: `TextInput`, `TextArea`, `ListSelect`,
+  `ListMultiSelect`, `Select`, `Checkbox` and `Button` take focus on a mouse
+  click inside them; `Button` presses on one. `FocusGroup` gains `focus(id)`,
+  `useFocus()` returns `focus()`, and `useClick(rectRef, onClick)` — a press
+  and a release on an `onLayout` rect, a drag cancels — is public for any
+  clickable component. See docs/input.md (Focus + Button).
+- `TextInput frame`: `field` (default, the band), `none` (bare text sized to
+  its content, for a filter bar) or `border` — the same three `Select` has.
+  See docs/components.md (TextInput).
+
+### Changed
+
+- The built-in components consume the keys they act on: a focused field, a
+  list, a button, a scroll box, a menu and `FocusGroup` return `true` for a
+  key they used, so a root `useInput` handler no longer sees it — typing `q`
+  into a field no longer quits an app that binds `q`. Keys a component ignores
+  still fall through. `useInput` stays subscribed while `isActive` is false
+  and mutes on delivery, so focus no longer moves a handler in the delivery
+  order. See docs/input.md (keys and useInput).
+
 ## 1.0.0-alpha.25 — 2026-09-24
 
 ### Added

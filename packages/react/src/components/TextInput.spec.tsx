@@ -250,3 +250,48 @@ test('a mouse button key is never typed into the value', async () => {
   expect(captured).toBe('ab');
   expect(backend.lastFrame).toBe('ab');
 });
+
+// ─── frame ───────────────────────────────────────────────────────────────────
+
+test('frame="none" is bare text sized to its content, with no background', async () => {
+  const backend = new TestBackend(20, 1);
+  await render(
+    createElement(Box, { flexDirection: 'row' },
+      createElement(Text, null, 'Search: '),
+      createElement(TextInput, { value: 'ab', onChange: () => {}, frame: 'none', isFocused: false }),
+      createElement(Text, null, ' | next'),
+    ),
+    backend,
+  );
+  await flush();
+  expect(backend.lastFrame).toBe('Search: ab | next');
+  expect(backend.lastBuffer!.get(8, 0).style.bg).toBeUndefined();
+});
+
+test('frame="border" is a three-row box with the value inside; the error line goes below it', async () => {
+  const backend = new TestBackend(12, 5);
+  await render(
+    createElement(Box, { flexDirection: 'column' },
+      createElement(TextInput, { value: '', onChange: () => {}, frame: 'border', validate: () => 'required' }),
+    ),
+    backend,
+  );
+  await flush();
+  const lines = backend.lastFrame.split('\n');
+  expect(lines[0]!.trimEnd().length).toBe(12);   // top border across the column
+  expect(lines[2]!.trimEnd().length).toBe(12);   // bottom border
+  expect(backend.lastBuffer!.get(1, 1).style.bg).toBe('rgb(211,211,211)'); // the band inside
+  backend.press({ name: 'return' });
+  await flush();
+  expect(backend.lastFrame.split('\n')[3]).toBe('required');
+});
+
+test('the default frame is the band, stretched across the column', async () => {
+  const backend = new TestBackend(12, 1);
+  await render(
+    createElement(Box, { flexDirection: 'column' }, createElement(TextInput, { value: 'ab', onChange: () => {}, isFocused: false })),
+    backend,
+  );
+  await flush();
+  expect(backend.lastBuffer!.get(10, 0).style.bg).toBe('rgb(211,211,211)');
+});

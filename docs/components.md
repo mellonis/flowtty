@@ -78,6 +78,12 @@ word forward, Ctrl+K / Ctrl+U kill to the end / start. A paste is inserted at th
 caret with its line breaks turned into spaces. An emoji is one character. For
 several lines use [`<TextArea>`](#textarea).
 
+`frame` is the field's look, the same three `Select` has so a form's fields
+match: `field` (default) is the filled band, stretched across its column;
+`none` is bare text sized to its content with no background, for a filter bar
+(`Search: query_`); `border` is the band inside a bordered box, three rows tall.
+The validation error line goes below whichever frame.
+
 ## Choosing
 
 Four components let the person choose; they share one vocabulary and differ in
@@ -134,7 +140,8 @@ its text, for a filter bar (`Sprint: current ▾  Tags: 2 ▾`); `border` is a
 bordered box. `placeholder` (default `—`) shows when nothing is chosen. Focus is
 shown as on the other fields: a bold value and a cyan arrow; while the popup is
 open the arrow turns `▴` and the field is inverse. `width`, `minWidth`,
-`maxWidth`, `flexGrow` and `flexShrink` pass through to the box.
+`maxWidth`, `flexGrow` and `flexShrink` pass through to the box. `TextInput` has
+the same `frame`.
 
 ## ListSelect
 

@@ -5,7 +5,7 @@ import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
 import { useClick } from '../hooks/useClick.js';
-import { editorReducer as reduce, type EditorState } from '@flowtty/core';
+import { DEFAULT_BORDER_STYLE, editorReducer as reduce, type EditorState } from '@flowtty/core';
 import { type Rect } from '@flowtty/core/host';
 
 export interface TextInputProps {
@@ -25,6 +25,11 @@ export interface TextInputProps {
   /** Render the `validate` message under the field after a rejected submit;
    *  the next edit clears it. Default true — set false to show the error yourself. */
   showError?: boolean;
+  /** The field's look: the filled band (`field`, default), bare text sized to
+   *  its content with no background (`none`, for a filter bar), or the band
+   *  inside a bordered box (`border`). The same three `Select` has, so a form's
+   *  fields match. See docs/components.md (TextInput). */
+  frame?: 'field' | 'none' | 'border';
   /** When true, render U+2022 (•) per character instead of the actual value. */
   mask?: boolean;
   /** Override focus state. If unset (default), the component reads from the
@@ -43,7 +48,7 @@ const FIELD_BG = 'rgb(211,211,211)';
 const FIELD_FG = 'black';
 
 export function TextInput(props: TextInputProps): ReactNode {
-  const { onChange, onSubmit, onCancel, validate, mask, isFocused: explicitFocus, showError = true } = props;
+  const { onChange, onSubmit, onCancel, validate, mask, isFocused: explicitFocus, showError = true, frame = 'field' } = props;
   const [ownValue, setOwnValue] = useState(props.defaultValue ?? '');
   const value = props.value ?? ownValue;
   const [error, setError] = useState<string | null>(null);
@@ -135,26 +140,50 @@ export function TextInput(props: TextInputProps): ReactNode {
   // at a glance which field has focus (only the focused one shows the inverse cursor).
   const errorLine = showError && error !== null ? <Text color="red">{error}</Text> : null;
 
+  // The band: light-gray bg differentiates the input from the dialog content
+  // area. `none` drops it and takes only the room its text needs; `border`
+  // keeps it inside a box. The text color goes with the band.
+  const band = frame !== 'none';
+  const fg = band ? FIELD_FG : undefined;
+  const bg = band ? FIELD_BG : undefined;
+  let row: ReactNode;
   if (!isFocused) {
-    const flat = width === null ? display : display + ' '.repeat(Math.max(0, width - chars.length));
+    const flat = width === null || !band ? display : display + ' '.repeat(Math.max(0, width - chars.length));
+    row = (
+      <Box flexDirection="row" backgroundColor={bg} onLayout={onLayout}>
+        <Text color={fg}>{flat}</Text>
+      </Box>
+    );
+  } else {
+    row = (
+      <Box flexDirection="row" backgroundColor={bg} onLayout={onLayout}>
+        {before ? <Text color={fg}>{before}</Text> : null}
+        <Text inverse color={fg}>{cursorChar}</Text>
+        {after ? <Text color={fg}>{after}</Text> : null}
+      </Box>
+    );
+  }
+  if (frame === 'none') {
+    // In a row of its own, so the field sizes to its text instead of
+    // stretching across a column.
     return (
       <Box flexDirection="column">
-        <Box flexDirection="row" backgroundColor={FIELD_BG} onLayout={onLayout}>
-          <Text color={FIELD_FG}>{flat}</Text>
-        </Box>
+        <Box flexDirection="row">{row}</Box>
         {errorLine}
       </Box>
     );
   }
-
+  if (frame === 'border') {
+    return (
+      <Box flexDirection="column">
+        <Box border={DEFAULT_BORDER_STYLE} flexDirection="column">{row}</Box>
+        {errorLine}
+      </Box>
+    );
+  }
   return (
     <Box flexDirection="column">
-      {/* Light-gray bg differentiates the input from the dialog content area. */}
-      <Box flexDirection="row" backgroundColor={FIELD_BG} onLayout={onLayout}>
-        {before ? <Text color={FIELD_FG}>{before}</Text> : null}
-        <Text inverse color={FIELD_FG}>{cursorChar}</Text>
-        {after ? <Text color={FIELD_FG}>{after}</Text> : null}
-      </Box>
+      {row}
       {errorLine}
     </Box>
   );

@@ -50,8 +50,16 @@ which never consumes: no handler swallows keys by accident. Handlers that
 return nothing behave as before. `TestBackend.press()` returns whether the key
 was consumed, so a test can assert it.
 
-The built-in components (`TextInput`, `ListSelect`, …) consume nothing yet; a
-global shortcut still fires while a field is focused.
+The built-in components consume the keys they act on: a focused `TextInput`
+takes every key that edits or moves, and Enter or Escape when it has an
+`onSubmit` / `onCancel` to call; the lists take their navigation, their filter,
+Space and Enter; `Button` takes Enter when focused and its `shortcut` from
+anywhere; `FocusGroup` takes Tab when there is somewhere to move to; a scroll
+box the page keys and a wheel step over it; `Menu` its keys while engaged. A
+key a component ignores still falls through — so typing `q` into a field does
+not quit an app whose root handler binds `q`, and pressing `q` on a button
+does. `isActive` mutes a handler without moving it in the delivery order: a
+field's handler, gated on focus, keeps the place its mount gave it.
 
 ## Paste and the mouse
 
@@ -301,6 +309,24 @@ here; everything else is "varies":
 Components inside a `<FocusGroup>` can call `useFocus()` to know if they're the active focusable. Tab cycles forward, Shift-Tab backward. First registered = auto-focused.
 
 `<DialogHost>` wraps each stack entry in an implicit `FocusGroup`, so Tab is scoped to the top dialog by default — no setup needed. Host content also gets its own implicit group.
+
+**A click focuses.** Every field — `TextInput`, `TextArea`, `ListSelect`,
+`ListMultiSelect`, `Select`, `Checkbox`, `Button` — takes focus on a mouse click
+inside it; `Button` also presses, `Checkbox` toggles, `Select` opens. A click is
+a press and a release both on the field with no drag between: a drag that
+starts on a button is a selection, not a press. The pieces are public:
+`useFocus()` returns `focus()` for the calling component, and
+`useClick(rectRef, onClick)` acts on a click inside an `onLayout` rect and
+consumes it — any component can open a collapsed item on a click the same way:
+
+```tsx
+function Collapsed({ children }: { children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const rect = useRef<Rect | null>(null);
+  useClick(rect, () => setOpen((o) => !o));
+  return <Box onLayout={(r) => { rect.current = r; }}>{open ? children : <Text dim>▸ …</Text>}</Box>;
+}
+```
 
 `<Button>` is focusable. Props:
 
