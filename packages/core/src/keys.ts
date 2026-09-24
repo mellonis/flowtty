@@ -58,6 +58,14 @@ export interface Key {
    * that never sees its release stays stuck open.
    */
   button?: MouseButton;
+  /**
+   * How many presses in a row this 'mousedown' is: 1 for a single press, 2 for
+   * a second on the same cell with the same button within the double-click
+   * interval, 3 for a third; a fourth starts over at 1. The TTY backend counts
+   * (`createClickCounter`); a backend that does not sets nothing, which reads
+   * as 1. Undefined for every other key. See docs/input.md (selection).
+   */
+  clicks?: number;
   /** Raw byte sequence as received from the source (empty for synthetic keys). */
   sequence: string;
   ctrl: boolean;

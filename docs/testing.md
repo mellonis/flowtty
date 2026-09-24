@@ -110,8 +110,9 @@ impossible name exercises a branch real input never reaches, and would pass.
 
 `wheel()` and `mouse()` default to cell (0, 0). A `<ScrollBox>` only reacts while
 the pointer is over it, so pass coordinates inside the box unless it sits at the
-origin. `mouse()` takes a fourth argument, `{ button, shift, meta, ctrl }` —
-`button` defaults to `'left'`. A drag is a `'down'`, one `'drag'` per cell
+origin. `mouse()` takes a fourth argument, `{ button, shift, meta, ctrl, clicks }` —
+`button` defaults to `'left'`, and `clicks: 2` (or `3`) on a `'down'` is the
+double-click (triple-click) a TTY backend would have counted. A drag is a `'down'`, one `'drag'` per cell
 crossed and an `'up'`, which is how a terminal reports one; see
 [Paste and the mouse](input.md#paste-and-the-mouse).
 
@@ -142,6 +143,11 @@ A hand-over of the terminal (`useApp().suspend(fn)` — an editor, a pager) is
 recorded the same way: `backend.suspended` is true while `fn` runs, and
 `backend.suspensions` counts the hand-overs. Nothing is written anywhere. See
 [Handing the terminal over](app.md#handing-the-terminal-over).
+
+The selection API works against a `TestBackend` too: `handle.select(…)`,
+`selectWord`, `selectLine` return the text and put the highlight on the frame,
+and `onCopy` fires with `source: 'api'`. See
+[Selecting from code](app.md#selecting-from-code).
 
 `TestBackend` never answers the light-or-dark question by itself — a component
 sees `'unknown'`, as it would in a terminal that does not answer. Set the answer

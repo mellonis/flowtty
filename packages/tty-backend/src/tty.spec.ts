@@ -988,3 +988,16 @@ test('a subscriber that consumes Ctrl+Z keeps the terminal: no suspend, no SIGTS
     kill.mockRestore();
   }
 });
+
+test('two left presses on the same cell in quick succession arrive as clicks 1 and 2', () => {
+  const { stub } = makeStub();
+  const stdin = makeStdinStub();
+  const b = new TtyBackend(stub, stdin, { mouse: true, colorScheme: false });
+  const clicks: (number | undefined)[] = [];
+  b.onKey((k) => { if (k.name === 'mousedown') clicks.push(k.clicks); });
+  stdin.emit('data', '\x1b[<0;5;3M');
+  stdin.emit('data', '\x1b[<0;5;3m');
+  stdin.emit('data', '\x1b[<0;5;3M');
+  expect(clicks).toEqual([1, 2]);
+  b.dispose();
+});

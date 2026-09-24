@@ -272,6 +272,117 @@ describe('drag selection', () => {
   });
 });
 
+describe('double- and triple-click', () => {
+  test('a double-click selects the word under the pointer and copies it', async () => {
+    const onCopy = vi.fn();
+    const backend = new TestBackend(12, 1);
+    await render(createElement(Listening, null, createElement(Text, null, 'hello world')), backend, { onCopy });
+    await flushAsync(backend);
+    backend.mouse('down', 7, 0, { clicks: 2 });
+    backend.mouse('up', 7, 0);
+    await flush();
+    expect(inverseCells(backend)).toEqual(['6,0', '7,0', '8,0', '9,0', '10,0']);
+    expect(onCopy).toHaveBeenCalledWith({ text: 'world', delivered: true, source: 'selection' });
+  });
+
+  test('a triple-click on a wrapped paragraph copies it as one line', async () => {
+    const onCopy = vi.fn();
+    const backend = new TestBackend(8, 3);
+    await render(
+      createElement(Listening, null,
+        createElement(Box, { width: 8 }, createElement(Text, { wrap: 'wrap' }, 'aaa bbb ccc ddd'))),
+      backend, { onCopy },
+    );
+    await flushAsync(backend);
+    backend.mouse('down', 1, 1, { clicks: 3 });
+    backend.mouse('up', 1, 1);
+    await flush();
+    expect(onCopy).toHaveBeenCalledWith({ text: 'aaa bbb ccc ddd', delivered: true, source: 'selection' });
+  });
+
+  test('a double-click straddling a selectable={false} gutter stops at it', async () => {
+    const onCopy = vi.fn();
+    const backend = new TestBackend(12, 1);
+    await render(
+      createElement(Listening, null,
+        createElement(Box, { flexDirection: 'row' },
+          createElement(Text, null, 'abc'),
+          createElement(Text, { selectable: false }, '│'),
+          createElement(Text, null, 'def'))),
+      backend, { onCopy },
+    );
+    await flushAsync(backend);
+    backend.mouse('down', 5, 0, { clicks: 2 });
+    backend.mouse('up', 5, 0);
+    await flush();
+    expect(onCopy).toHaveBeenCalledWith({ text: 'def', delivered: true, source: 'selection' });
+  });
+
+  test('a single press after a double-click drops the word; a double-click on a blank selects nothing', async () => {
+    const onCopy = vi.fn();
+    const backend = new TestBackend(12, 1);
+    await render(createElement(Listening, null, createElement(Text, null, 'hello world')), backend, { onCopy });
+    await flushAsync(backend);
+    backend.mouse('down', 7, 0, { clicks: 2 });
+    backend.mouse('up', 7, 0);
+    await flush();
+    expect(inverseCells(backend)).toHaveLength(5);
+    backend.mouse('down', 1, 0);
+    backend.mouse('up', 1, 0);
+    await flush();
+    expect(inverseCells(backend)).toEqual([]);
+    backend.mouse('down', 5, 0, { clicks: 2 });
+    backend.mouse('up', 5, 0);
+    await flush();
+    expect(inverseCells(backend)).toEqual([]);
+    expect(onCopy).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('selection from code', () => {
+  test('select(anchor, head) highlights the range and copies with source api', async () => {
+    const onCopy = vi.fn();
+    const backend = new TestBackend(12, 1);
+    const app = await render(createElement(Listening, null, createElement(Text, null, 'hello world')), backend, { onCopy });
+    await flushAsync(backend);
+    expect(app.select({ x: 0, y: 0 }, { x: 4, y: 0 })).toBe('hello');
+    await flush();
+    expect(inverseCells(backend)).toEqual(['0,0', '1,0', '2,0', '3,0', '4,0']);
+    expect(onCopy).toHaveBeenCalledWith({ text: 'hello', delivered: true, source: 'api' });
+    app.clearSelection();
+    await flush();
+    expect(inverseCells(backend)).toEqual([]);
+  });
+
+  test('selectWord / selectLine from useApp follow the click rules; nothing selectable gives an empty string', async () => {
+    const onCopy = vi.fn();
+    const backend = new TestBackend(12, 2);
+    let api!: ReturnType<typeof useApp>;
+    function Probe(): null { api = useApp(); return null; }
+    await render(
+      createElement(Listening, null, createElement(Probe), createElement(Text, null, 'hello world')),
+      backend, { onCopy },
+    );
+    await flushAsync(backend);
+    expect(api.selectWord(7, 0)).toBe('world');
+    expect(api.selectLine(2, 0)).toBe('hello world');
+    expect(api.selectWord(5, 0)).toBe(''); // a blank cell
+    expect(api.selectWord(0, 1)).toBe(''); // an empty row
+    expect(onCopy).toHaveBeenCalledTimes(2);
+    await flush();
+    expect(inverseCells(backend)).toEqual([]); // the last two calls dropped the earlier selection
+  });
+
+  test('with selection: false the code API is inert', async () => {
+    const backend = new TestBackend(12, 1);
+    const app = await render(createElement(Listening, null, createElement(Text, null, 'hello')), backend, { selection: false });
+    await flushAsync(backend);
+    expect(app.select({ x: 0, y: 0 }, { x: 4, y: 0 })).toBe('');
+    await flush();
+    expect(inverseCells(backend)).toEqual([]);
+  });
+});
+
 describe('selection scopes', () => {
   const panes = (): ReactNode => createElement(Listening, null,
     createElement(Box, { flexDirection: 'row' },

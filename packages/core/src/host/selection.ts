@@ -100,6 +100,67 @@ export function selectionSegments(range: SelectionRange): SelectionSegment[] {
   return selectionRows(range).flatMap((row) => [...row.parts]);
 }
 
+// The selectable parts of one full row of the scope: the clip's width with
+// the excluded rects taken out — what a word or a line is bounded by.
+function rowParts(scope: SelectionScope, y: number): SelectionSegment[] {
+  const { clip } = scope;
+  if (y < clip.top || y >= clip.top + clip.height) return [];
+  const [row] = selectionRows({
+    anchor: { x: clip.left, y }, head: { x: clip.left + clip.width - 1, y }, clip, excluded: scope.excluded,
+  });
+  return row === undefined ? [] : [...row.parts];
+}
+
+/**
+ * The word under a cell: the run of non-space cells around it on that row,
+ * bounded by the scope's clip and its excluded regions — the range a
+ * double-click selects. Null on a blank cell, and on a cell nothing selectable
+ * covers. Punctuation counts as word characters. See docs/input.md (selection).
+ */
+export function wordAt(buffer: Buffer, scope: SelectionScope, x: number, y: number): SelectionRange | null {
+  const part = rowParts(scope, y).find((p) => x >= p.x0 && x < p.x1);
+  if (part === undefined || buffer.get(x, y).char === ' ') return null;
+  let x0 = x;
+  while (x0 > part.x0 && buffer.get(x0 - 1, y).char !== ' ') x0--;
+  let x1 = x;
+  while (x1 + 1 < part.x1 && buffer.get(x1 + 1, y).char !== ' ') x1++;
+  return { anchor: { x: x0, y }, head: { x: x1, y }, clip: scope.clip, excluded: scope.excluded };
+}
+
+/**
+ * The line under a cell: the whole row within the scope, extended up and down
+ * over the rows a soft wrap joins to it (see {@link rowContinuation}), so a
+ * wrapped paragraph is one line — the range a triple-click selects. Null on a
+ * cell outside the scope and on a row nothing selectable covers.
+ * See docs/input.md (selection).
+ */
+export function lineAt(buffer: Buffer, scope: SelectionScope, x: number, y: number): SelectionRange | null {
+  const { clip } = scope;
+  const rowAt = (row: number): SelectionRow | null => {
+    const parts = rowParts(scope, row);
+    return parts.length === 0 ? null : { y: row, parts };
+  };
+  if (x < clip.left || x >= clip.left + clip.width || rowAt(y) === null) return null;
+  let top = y;
+  for (;;) {
+    const above = rowAt(top - 1);
+    if (above === null || rowContinuation(buffer, above, rowAt(top)!) === null) break;
+    top--;
+  }
+  let bottom = y;
+  for (;;) {
+    const below = rowAt(bottom + 1);
+    if (below === null || rowContinuation(buffer, rowAt(bottom)!, below) === null) break;
+    bottom++;
+  }
+  return {
+    anchor: { x: clip.left, y: top },
+    head: { x: clip.left + clip.width - 1, y: bottom },
+    clip,
+    excluded: scope.excluded,
+  };
+}
+
 // Does `row`'s selection end exactly where a continuation span ends — covering
 // its last cell, and picking up nothing but blanks past it? Blanks are allowed
 // because a selection row always runs to the clip's edge while a painted line
@@ -449,6 +510,37 @@ export class SelectionController {
     this.frameSize = null;
   }
 
+  /** Select from `anchor` to `head` (frame cells, both inclusive) the way a
+   *  drag between them would, within the anchor's scope, and report the text
+   *  through `onSelect`. Returns the text; `''` when nothing there is
+   *  selectable. See docs/app.md (selecting from code). */
+  select(anchor: Point, head: Point): string {
+    this.drop();
+    const scope = this.scopeAt(anchor.x, anchor.y);
+    if (scope === null) return '';
+    return this.apply({
+      anchor: clampToRect(anchor, scope.clip),
+      head: clampToRect(head, scope.clip),
+      clip: scope.clip,
+      excluded: scope.excluded,
+    });
+  }
+
+  /** Select the word under a cell — the double-click rule. Returns the text. */
+  selectWord(x: number, y: number): string {
+    this.drop();
+    const scope = this.scopeAt(x, y);
+    return scope === null ? '' : this.apply(wordAt(this.host.frame()!, scope, x, y));
+  }
+
+  /** Select the line under a cell, a wrapped paragraph as one — the
+   *  triple-click rule. Returns the text. */
+  selectLine(x: number, y: number): string {
+    this.drop();
+    const scope = this.scopeAt(x, y);
+    return scope === null ? '' : this.apply(lineAt(this.host.frame()!, scope, x, y));
+  }
+
   // Drop a selection and show the frame without it.
   private drop(): void {
     const had = this.cached.length > 0;
@@ -460,17 +552,44 @@ export class SelectionController {
     this.drop(); // a new press always starts from nothing
     if (key.button !== undefined && key.button !== 'left') return;
     if (key.x === undefined || key.y === undefined) return;
-    const frame = this.host.frame();
-    if (frame === null) return;
-    const scope = selectionScopeAt(this.host.container, key.x, key.y, {
-      left: 0, top: 0, width: frame.width, height: frame.height,
-    });
+    const scope = this.scopeAt(key.x, key.y);
     if (scope === null) return;
+    // A double-click takes the word and a triple-click the line: the selection
+    // is complete on the press, and the release that follows has nothing to do.
+    if (key.clicks === 2 || key.clicks === 3) {
+      const frame = this.host.frame()!;
+      this.apply(key.clicks === 2 ? wordAt(frame, scope, key.x, key.y) : lineAt(frame, scope, key.x, key.y));
+      return;
+    }
     // The press may have landed on the scope's own border or padding; the
     // anchor belongs inside its content rect either way.
     const anchor = clampToRect({ x: key.x, y: key.y }, scope.clip);
     this.range = { anchor, head: anchor, clip: scope.clip, excluded: scope.excluded };
     this.dragging = true;
+  }
+
+  // The scope a press at (x, y) selects within, or null before the first frame.
+  private scopeAt(x: number, y: number): SelectionScope | null {
+    const frame = this.host.frame();
+    if (frame === null) return null;
+    return selectionScopeAt(this.host.container, x, y, { left: 0, top: 0, width: frame.width, height: frame.height });
+  }
+
+  // Show `range` as the finished selection and report its text; null, or a
+  // range over nothing selectable, shows and reports nothing. Returns the text.
+  private apply(range: SelectionRange | null): string {
+    this.dragging = false;
+    this.range = range;
+    this.recompute();
+    if (this.cached.length === 0) {
+      this.range = null;
+      return '';
+    }
+    this.host.present();
+    const frame = this.host.frame();
+    const text = frame === null ? '' : selectionText(frame, range!);
+    this.host.onSelect?.(text);
+    return text;
   }
 
   private extend(key: Key): void {

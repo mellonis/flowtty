@@ -5,7 +5,7 @@ import { appendChild, createInstance, createTextInstance, type Container } from 
 import { computeLayout, contentHeight, type Rect } from './layout.js';
 import { paint } from './paint.js';
 import {
-  applySelection, rowSeparator, selectedStyle, selectionRows, selectionSegments, selectionText,
+  applySelection, lineAt, rowSeparator, selectedStyle, selectionRows, selectionSegments, selectionText, wordAt,
   type SelectionRange, type SelectionRow,
 } from './selection.js';
 
@@ -389,4 +389,34 @@ test('a wrapped paragraph painted into a scope selects back as its source', asyn
         .toBe(asPainted(source));
     }
   }
+});
+
+// ─── word and line under a cell ─────────────────────────────────────────────
+
+test('wordAt: the run of non-space cells around the cell, within the scope', () => {
+  const b = bufferOf(['hello world', '           ']);
+  const scope = { clip: { left: 0, top: 0, width: 11, height: 2 }, excluded: [] };
+  expect(wordAt(b, scope, 7, 0)).toEqual(range([6, 0], [10, 0], scope.clip));
+  expect(wordAt(b, scope, 5, 0)).toBeNull(); // a blank cell is no word
+  expect(wordAt(b, scope, 0, 1)).toBeNull(); // an empty row
+  expect(wordAt(b, scope, 3, 2)).toBeNull(); // outside the clip
+});
+
+test('wordAt stops at an excluded region and at the clip', () => {
+  const b = bufferOf(['abcdefgh']);
+  const excluded = [{ left: 5, top: 0, width: 1, height: 1 }];
+  const scope = { clip: { left: 2, top: 0, width: 6, height: 1 }, excluded };
+  expect(wordAt(b, scope, 3, 0)).toEqual(range([2, 0], [4, 0], scope.clip, excluded));
+  expect(wordAt(b, scope, 6, 0)).toEqual(range([6, 0], [7, 0], scope.clip, excluded));
+  expect(wordAt(b, scope, 5, 0)).toBeNull(); // the excluded cell itself
+});
+
+test('lineAt: the row, extended over the rows a soft wrap joins to it', () => {
+  const b = bufferOf(['aaa bbb', 'ccc ddd', 'eee    ']);
+  b.markContinuation({ y: 0, x0: 0, x1: 7, join: ' ' }); // row 0 wraps into row 1
+  const scope = { clip: { left: 0, top: 0, width: 7, height: 3 }, excluded: [] };
+  expect(lineAt(b, scope, 5, 1)).toEqual(range([0, 0], [6, 1], scope.clip));
+  expect(lineAt(b, scope, 1, 2)).toEqual(range([0, 2], [6, 2], scope.clip));
+  expect(selectionText(b, lineAt(b, scope, 5, 1)!)).toBe('aaa bbb ccc ddd');
+  expect(lineAt(b, scope, 1, 3)).toBeNull(); // outside the clip
 });

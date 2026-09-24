@@ -8,7 +8,8 @@ import { AppContext, type AppApi } from '../context/appContext.js';
  * `copy(text)` puts text on the system clipboard, reporting whether it landed
  * (docs/app.md — the clipboard), `suspend(fn)` hands the terminal to another
  * program for the duration of `fn` (docs/app.md — handing the terminal over),
- * and `colorScheme` says whether the terminal is light or dark as of now
+ * `select` / `selectWord` / `selectLine` / `clearSelection` select text the way
+ * a drag or a click would (docs/app.md — selecting from code), and `colorScheme` says whether the terminal is light or dark as of now
  * (docs/app.md — the color scheme; `useColorScheme()` for the value that
  * re-renders).
  */

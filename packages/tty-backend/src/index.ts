@@ -36,3 +36,4 @@ export {
   sgr, cursorTo, cellsEqual, parseColor, takeUnknownColors, detectColorSupport,
   type SgrOptions,
 } from './ansi.js';
+export { createClickCounter, DOUBLE_CLICK_MS, type ClickCounter } from './clickCounter.js';

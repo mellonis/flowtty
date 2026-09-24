@@ -46,7 +46,7 @@ export type { HitBox, UnselectableRegion } from './hitTest.js';
 // Drag-to-select over the committed frame. See docs/input.md (selection).
 export {
   SelectionController, applySelection, clampToRect, rowContinuation, rowSeparator,
-  selectedStyle, selectionRows, selectionScopeAt, selectionSegments, selectionText,
+  selectedStyle, selectionRows, selectionScopeAt, selectionSegments, selectionText, wordAt, lineAt,
 } from './selection.js';
 export type {
   Point, SelectionHost, SelectionRange, SelectionRow, SelectionScope, SelectionSegment,

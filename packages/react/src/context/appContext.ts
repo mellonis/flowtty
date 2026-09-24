@@ -1,5 +1,6 @@
 import { createContext, type Context } from 'react';
 import { UNKNOWN_COLOR_SCHEME, type TerminalColorScheme } from '@flowtty/core';
+import type { Point } from '@flowtty/core/host';
 
 export interface AppApi {
   /** Quit the app: unmount the tree and restore the terminal. `result` is what
@@ -29,6 +30,21 @@ export interface AppApi {
    *  terminal to hand over, `fn` simply runs. See docs/app.md (handing the
    *  terminal over). */
   suspend<T>(fn: () => T | Promise<T>): Promise<T>;
+  /** Select from `anchor` to `head` — frame cells, both inclusive, the
+   *  coordinates `onLayout` rects use — the way a drag between them would:
+   *  the highlight goes on the frame, the text goes out through `onCopy` with
+   *  `source: 'api'` and onto the clipboard unless `copyOnSelect` is off, and
+   *  the anchor's `selectionScope` bounds it. Returns the text, `''` when
+   *  nothing there is selectable and when `selection: false` turned the whole
+   *  thing off. See docs/app.md (selecting from code). */
+  select(anchor: Point, head: Point): string;
+  /** Select the word under a cell — what a double-click selects. */
+  selectWord(x: number, y: number): string;
+  /** Select the line under a cell, a soft-wrapped paragraph as one — what a
+   *  triple-click selects. */
+  selectLine(x: number, y: number): string;
+  /** Drop whatever is selected, as a keystroke would. */
+  clearSelection(): void;
   /** Whether the terminal is light or dark, and its background when known —
    *  the backend's answer as of now. For a value that re-renders on a change,
    *  use `useColorScheme()`. See docs/app.md (the color scheme). */
@@ -43,5 +59,9 @@ export const AppContext: Context<AppApi> = createContext<AppApi>({
   notify: () => {},
   copy: () => false,
   suspend: async (fn) => fn(),
+  select: () => '',
+  selectWord: () => '',
+  selectLine: () => '',
+  clearSelection: () => {},
   colorScheme: UNKNOWN_COLOR_SCHEME,
 });

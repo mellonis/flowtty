@@ -200,6 +200,18 @@ block's gutter and label, a blockquote's bar — the same way, so a drag over a
 document copies the document (see
 [Markdown](components.md#markdown)). All of it is chrome, not text.
 
+**Double- and triple-click.** A double-click selects the word under the pointer:
+the run of non-space cells around it on that row, punctuation included, stopped
+by the scope and by a `selectable={false}` region. A triple-click selects the
+line: the row within the scope, and the rows a soft wrap joins to it, so a
+wrapped paragraph is one line and copies as one. The selection is made on the
+press and the release does nothing; a drag after a double-click does not extend
+it. The TTY backend counts presses — the same button on the same cell within
+500 ms is the second, then the third, then a first again — and puts the count on
+the `mousedown` key as `clicks`; a custom backend that sets nothing gets single
+clicks. The same selections can be made from code — see
+[Selecting from code](app.md#selecting-from-code).
+
 **What clears it.** Any keystroke, and any new press. A resize. And content that
 changes underneath it: the cells a finished selection covers are compared against
 every new frame, so a pane that scrolls or a reply that streams in drops the

@@ -297,6 +297,31 @@ expect(backend.clipboard).toEqual([]);
 expect(onCopy).toHaveBeenCalledWith({ text: 'hello', delivered: false, source: 'selection' });
 ```
 
+## Selecting from code
+
+What a drag or a click selects, an app can select itself — to show what a
+search matched, or to hand a block of text to the clipboard with the highlight
+that says so. Four calls, on `useApp()` and on the render handle, in frame cells
+(the coordinates `onLayout` rects and mouse keys use):
+
+```tsx
+const { select, selectWord, selectLine, clearSelection } = useApp();
+select({ x: 4, y: 2 }, { x: 20, y: 2 });   // anchor and head, both inclusive, as a drag would set them
+selectWord(4, 2);                          // the word under the cell — the double-click rule
+selectLine(4, 2);                          // the line, a wrapped paragraph as one — the triple-click rule
+clearSelection();
+```
+
+Everything else is as for a drag: the highlight goes on the frame without a
+re-render, the anchor's `selectionScope` and every `selectable={false}` region
+bound it, the text goes out through `onCopy` — with `source: 'api'` — and onto
+the clipboard unless `copyOnSelect` is off, and the selection drops when the
+text under it changes, when the frame is resized, and on the next keystroke or
+press. Each call returns the selected text, `''` when nothing there is
+selectable; with `render(…, { selection: false })` every call is a no-op that
+returns `''`. A component knows its own cells from `onLayout`, which is how it
+translates "the third row of this box" into a frame cell.
+
 ## The color scheme
 
 A terminal is light or dark, and on macOS it can switch by itself — Auto

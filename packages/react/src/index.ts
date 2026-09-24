@@ -81,3 +81,4 @@ export { highlightMarkdownSource, type SourceLine } from './components/markdown/
 export { parseMarkdown, parseInline } from './components/markdown/parse.js';
 export type { MdBlock, MdList, MdListItem, MdAlign, InlineSeg } from './components/markdown/parse.js';
 export { HIGHLIGHTED_LANGUAGES, type HighlightedLanguage } from './components/markdown/highlight/index.js';
+export type { Point } from '@flowtty/core/host';

@@ -8,6 +8,7 @@ import { detectColorDepth, type ColorDepth } from './colorDepth.js';
 import { createAttention, type Attention, type NotificationProtocol } from './notification.js';
 import { createClipboard, type Clipboard, type ClipboardProtocol } from './clipboard.js';
 import { createColorSchemeTracker, type ColorSchemeTracker } from './colorScheme.js';
+import { createClickCounter, type ClickCounter } from './clickCounter.js';
 
 export interface TtyBackendOptions {
   /**
@@ -78,7 +79,9 @@ export class TtyBackend implements Backend {
     // What the terminal said back is not input: the tracker acts on it, and
     // no subscriber ever sees it as a key.
     if (reports.length > 0) this.scheme.handle(reports);
-    for (const key of keys) {
+    for (const raw of keys) {
+      // A press is counted first, so a subscriber sees a double-click as one.
+      const key = this.clicks.count(raw);
       // Subscribers first: one that returns true has consumed the key, and
       // the defaults below stand down for it. See docs/input.md (keys and
       // useInput).
@@ -103,6 +106,8 @@ export class TtyBackend implements Backend {
   };
   private inputAttached = false;
   private terminalEntered = false;
+  // Double- and triple-click detection for the selection — see docs/input.md.
+  private readonly clicks: ClickCounter = createClickCounter();
   private readonly resizeSubscribers = new Set<() => void>();
   private readonly resizeNotify = (): void => {
     // Invalidate the diff baseline — the next paint will likely use new dimensions

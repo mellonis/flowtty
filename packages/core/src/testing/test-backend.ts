@@ -85,6 +85,7 @@ export class TestBackend implements Backend {
       ...(key.x !== undefined ? { x: key.x } : {}),
       ...(key.y !== undefined ? { y: key.y } : {}),
       ...(key.button !== undefined ? { button: key.button } : {}),
+      ...(key.clicks !== undefined ? { clicks: key.clicks } : {}),
       sequence: key.sequence ?? '',
       ctrl: key.ctrl ?? false,
       meta: key.meta ?? false,
@@ -150,16 +151,19 @@ export class TestBackend implements Backend {
    * Deliver one mouse button event at cell (x, y) — a press, one step of a drag,
    * or a release. `button` defaults to 'left'; a drag is a run of `'drag'` calls
    * between a `'down'` and an `'up'`, which is how a terminal reports one.
+   * `clicks` on a `'down'` is the press count a TTY backend would have counted:
+   * 2 for a double-click, 3 for a triple. Default 1.
    */
   mouse(
     kind: 'down' | 'drag' | 'up',
     x = 0,
     y = 0,
-    options: { button?: MouseButton; shift?: boolean; meta?: boolean; ctrl?: boolean } = {},
+    options: { button?: MouseButton; shift?: boolean; meta?: boolean; ctrl?: boolean; clicks?: number } = {},
   ): void {
     this.press({
       name: kind === 'down' ? 'mousedown' : kind === 'drag' ? 'mousedrag' : 'mouseup',
       button: options.button ?? 'left',
+      ...(kind === 'down' ? { clicks: options.clicks ?? 1 } : {}),
       x,
       y,
       shift: options.shift ?? false,

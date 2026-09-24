@@ -27,6 +27,16 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
   delivered in subscription order (children before parents on mount). Backend
   `onKey` handlers may return a value; `TestBackend.press()` returns whether
   the key was consumed. See docs/input.md (keys and useInput).
+- Double-click selects the word under the pointer and triple-click the line —
+  a soft-wrapped paragraph as one — through the same copy-on-select path as a
+  drag, bounded by `selectionScope` and `selectable={false}`. The TTY backend
+  counts presses (`createClickCounter`) and puts the count on the `mousedown`
+  key as `Key.clicks`; `TestBackend.mouse()` takes `{ clicks }`. See
+  docs/input.md (selection).
+- Selection from code: `select(anchor, head)`, `selectWord(x, y)`,
+  `selectLine(x, y)` and `clearSelection()` on `useApp()` and on the render
+  handle, in frame cells, with `onCopy` fired as `source: 'api'`. See
+  docs/app.md (selecting from code).
 
 ### Changed
 

@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from 'react';
 import { UNKNOWN_COLOR_SCHEME, type Backend, type Buffer, type Key, type TerminalColorScheme } from '@flowtty/core';
-import { getYoga, computeLayout, contentHeight, paint, SelectionController } from '@flowtty/core/host';
+import { getYoga, computeLayout, contentHeight, paint, SelectionController, type Point } from '@flowtty/core/host';
 import { createRoot, type Root } from './reconciler.js';
 import { InputContext, type InputSource, type KeySubscriber } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
@@ -140,6 +140,16 @@ export interface RenderHandle {
    *  another suspension is in progress. See docs/app.md (handing the terminal
    *  over). */
   suspend<T>(fn: () => T | Promise<T>): Promise<T>;
+  /** Select from `anchor` to `head` (frame cells, both inclusive) from outside
+   *  the tree — the same thing `useApp().select()` does. Returns the text.
+   *  See docs/app.md (selecting from code). */
+  select(anchor: Point, head: Point): string;
+  /** Select the word under a cell — the same thing `useApp().selectWord()` does. */
+  selectWord(x: number, y: number): string;
+  /** Select the line under a cell — the same thing `useApp().selectLine()` does. */
+  selectLine(x: number, y: number): string;
+  /** Drop whatever is selected — the same thing `useApp().clearSelection()` does. */
+  clearSelection(): void;
   /** Whether the terminal is light or dark, as of now — the same answer
    *  `useApp().colorScheme` gives inside the tree. See docs/app.md (the color
    *  scheme). */
@@ -231,12 +241,16 @@ export async function render(
   // `useInput` subscriber, then the app's `onCopy` — so no app callback can
   // stand between a `mouseup` and the code waiting for it.
   let pendingCopy: string | null = null;
+  // Who made the selection being delivered: a drag or click, or the app
+  // through the code API below.
+  let selectSource: 'selection' | 'api' = 'selection';
   const deliverCopy = () => {
     const text = pendingCopy;
     pendingCopy = null;
     if (text === null || unmounted) return;
     const delivered = options.copyOnSelect === false ? false : backend.copy?.(text) ?? false;
-    runCallback(() => options.onCopy?.({ text, delivered, source: 'selection' }));
+    const source = selectSource;
+    runCallback(() => options.onCopy?.({ text, delivered, source }));
   };
 
   const { container, root } = createRoot(Yoga, draw);
@@ -388,6 +402,32 @@ export async function render(
       }
     }
   };
+  // Selection from code: the same controller a drag drives, told the source is
+  // the app. Delivered at once — there is no key dispatch to wait for — and
+  // through the same overlay path (`flushOverlay`), so a call from a key
+  // handler still paints once. Inert with `selection: false` and after unmount.
+  const selectFrom = (make: () => string): string => {
+    if (unmounted || selection === null) return '';
+    selectSource = 'api';
+    try {
+      const text = make();
+      flushOverlay();
+      deliverCopy();
+      return text;
+    } finally {
+      selectSource = 'selection';
+    }
+  };
+  const select = (anchor: Point, head: Point): string => selectFrom(() => selection!.select(anchor, head));
+  const selectWord = (x: number, y: number): string => selectFrom(() => selection!.selectWord(x, y));
+  const selectLine = (x: number, y: number): string => selectFrom(() => selection!.selectLine(x, y));
+  // `clear()` is the resize path and asks for no redraw; here one is wanted.
+  const clearSelection = (): void => {
+    if (unmounted || selection === null) return;
+    const had = selection.segments.length > 0;
+    selection.clear();
+    if (had) { overlayStale = true; flushOverlay(); }
+  };
   // Read through to the backend on every access: the answer changes when the
   // terminal says so, and this object is created once.
   const colorScheme = (): TerminalColorScheme => backend.colorScheme?.() ?? UNKNOWN_COLOR_SCHEME;
@@ -400,6 +440,10 @@ export async function render(
     notify,
     copy,
     suspend,
+    select,
+    selectWord,
+    selectLine,
+    clearSelection,
     get colorScheme() { return colorScheme(); },
   };
   const withApp = createElement(AppContext.Provider, { value: appApi }, withAbort);
@@ -426,6 +470,10 @@ export async function render(
     notify,
     copy,
     suspend,
+    select,
+    selectWord,
+    selectLine,
+    clearSelection,
     get colorScheme() { return colorScheme(); },
     unmount() {
       if (unmounted) return;
