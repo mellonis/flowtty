@@ -9,6 +9,7 @@ import { createAttention, type Attention, type NotificationProtocol } from './no
 import { createClipboard, type Clipboard, type ClipboardProtocol } from './clipboard.js';
 import { createColorSchemeTracker, type ColorSchemeTracker } from './colorScheme.js';
 import { createClickCounter, type ClickCounter } from './clickCounter.js';
+import { captureConsole, type ConsoleCapture, type ConsoleEntry } from './consoleCapture.js';
 
 export interface TtyBackendOptions {
   /**
@@ -55,6 +56,17 @@ export interface TtyBackendOptions {
    *  editor's undo — and leaves suspension to `useApp().suspend()`.
    *  See docs/app.md (handing the terminal over). */
   suspendKey?: boolean;
+  /** Hold back `console.log` / `warn` / `error` while the backend owns the
+   *  screen — a line printed there lands in the alternate screen and stays
+   *  until the next full repaint — and print them once the screen is given
+   *  back. Default: on when the output stream is a terminal, off otherwise
+   *  (stderr redirected to a file keeps working). `suspend()` hands the
+   *  console to the child along with the terminal. See docs/terminal.md
+   *  (console output). */
+  captureConsole?: boolean;
+  /** See each captured console line as it happens — to show it in a log pane.
+   *  With this set, nothing is printed at exit: the lines are the app's. */
+  onConsole?: (entry: ConsoleEntry) => void;
 }
 
 export class TtyBackend implements Backend {
@@ -108,6 +120,11 @@ export class TtyBackend implements Backend {
   private terminalEntered = false;
   // Double- and triple-click detection for the selection — see docs/input.md.
   private readonly clicks: ClickCounter = createClickCounter();
+  // The console, held back while the screen is ours (see `captureConsole`).
+  private readonly capturing: boolean;
+  private capture: ConsoleCapture | null = null;
+  // Lines caught before a suspension, printed at exit with the rest.
+  private held: ConsoleEntry[] = [];
   private readonly resizeSubscribers = new Set<() => void>();
   private readonly resizeNotify = (): void => {
     // Invalidate the diff baseline — the next paint will likely use new dimensions
@@ -158,6 +175,8 @@ export class TtyBackend implements Backend {
     // pre-launch terminal content is restored on dispose.
     this.out.write(ALT_SCREEN_ON + HIDE_CURSOR);
     this.terminalEntered = true;
+    this.capturing = options.captureConsole ?? out.isTTY === true;
+    if (this.capturing) this.capture = captureConsole(options.onConsole);
     this.attention = createAttention((bytes) => this.out.write(bytes), { notifications: options.notifications });
     this.clipboard = createClipboard((bytes) => this.out.write(bytes), {
       ...(options.clipboard === undefined ? {} : { clipboard: options.clipboard }),
@@ -378,6 +397,9 @@ export class TtyBackend implements Backend {
     if (this.disposed || this.suspended) return;
     this.suspended = true;
     this.leaveTerminal();
+    // The child gets the console with the terminal; what we caught waits for exit.
+    this.held.push(...(this.capture?.release() ?? []));
+    this.capture = null;
   }
 
   /**
@@ -392,6 +414,7 @@ export class TtyBackend implements Backend {
     this.suspended = false;
     this.out.write(ALT_SCREEN_ON + HIDE_CURSOR);
     this.terminalEntered = true;
+    if (this.capturing) this.capture = captureConsole(this.options.onConsole);
     if (this.inputAttached) {
       if (this.input.isTTY) this.input.setRawMode(true);
       this.input.on('data', this.inputDataHandler);
@@ -440,7 +463,13 @@ export class TtyBackend implements Backend {
       this.out.removeListener('resize', this.resizeNotify);
       this.resizeAttached = false;
     }
-    // Only now is it safe to print: the alt screen is gone.
+    // Only now is it safe to print: the alt screen is gone. The console comes
+    // back first, then what it was told meanwhile — unless the app took the
+    // lines as they came.
+    this.held.push(...(this.capture?.release() ?? []));
+    this.capture = null;
+    if (this.options.onConsole === undefined) for (const e of this.held) console[e.level](e.line);
+    this.held = [];
     // eslint-disable-next-line no-console
     for (const warning of takeWarnings()) console.warn(warning);
     const unknown = takeUnknownColors();

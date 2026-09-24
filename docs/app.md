@@ -159,6 +159,12 @@ Without this safety net, an unhandled error during render or in a useEffect woul
 leave the terminal in alt-screen mode with raw input still enabled — recovery
 would require killing the shell or running `reset`.
 
+**Warnings on the console.** A `console.error` from React (a state update in
+the wrong place, a missing key) or from anything else would land in the frame
+while a TTY backend owns the screen. The backends hold such lines back and print
+them once the screen is given back — or hand them to `onConsole` for the app to
+show. See [Terminal specifics](terminal.md#console-output).
+
 ## Getting attention
 
 A reminder fires, a long build finishes, a deploy wants a yes — and the person is

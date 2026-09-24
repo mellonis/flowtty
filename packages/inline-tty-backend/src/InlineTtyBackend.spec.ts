@@ -456,3 +456,48 @@ describe('InlineTtyBackend consumed keys', () => {
     }
   });
 });
+
+describe('InlineTtyBackend console capture', () => {
+  test('a console line goes above the live region at once, not to the console', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const out = mockStdout(6);
+      const b = new InlineTtyBackend({ out, in: mockStdin(), liveHeight: 1 });
+      b.draw(newBuffer(6, 1, 'live'));
+      out.writes.length = 0;
+      console.log('built %s', 'x');
+      expect(log).not.toHaveBeenCalled();
+      expect(out.writes).toHaveLength(1);
+      expect(out.writes[0]).toContain('built x\n');
+      expect(out.writes[0]!.endsWith('live')).toBe(false); // the live region is redrawn after the line
+      expect(out.writes[0]).toMatch(/built x\n.*live/s);
+      b.dispose();
+      console.log('after');
+      expect(log).toHaveBeenCalledWith('after');
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  test('onConsole takes the line instead; log-only mode captures nothing', () => {
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+    try {
+      const seen: string[] = [];
+      const out = mockStdout(6);
+      const b = new InlineTtyBackend({ out, in: mockStdin(), liveHeight: 1, onConsole: (e) => seen.push(e.line) });
+      out.writes.length = 0;
+      console.log('one');
+      expect(seen).toEqual(['one']);
+      expect(out.writes).toEqual([]);
+      b.dispose();
+      const piped = mockStdout(6);
+      (piped as { isTTY: boolean }).isTTY = false;
+      const lo = new InlineTtyBackend({ out: piped, in: mockStdin() });
+      console.log('two');
+      expect(log).toHaveBeenCalledWith('two');
+      lo.dispose();
+    } finally {
+      log.mockRestore();
+    }
+  });
+});

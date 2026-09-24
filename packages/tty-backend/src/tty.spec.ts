@@ -1001,3 +1001,74 @@ test('two left presses on the same cell in quick succession arrive as clicks 1 a
   expect(clicks).toEqual([1, 2]);
   b.dispose();
 });
+
+// ─── console capture ─────────────────────────────────────────────────────────
+
+test('console output during a session is held back, and printed once the alt screen is gone', () => {
+  const order: string[] = [];
+  const error = vi.spyOn(console, 'error').mockImplementation((...a: unknown[]) => { order.push(`console:${String(a[0])}`); });
+  try {
+    const { stub, writes } = makeStub();
+    const origWrite = stub.write.bind(stub);
+    stub.write = ((s: string) => { order.push(`write:${s === SHOW_CURSOR + RESET + ALT_SCREEN_OFF ? 'leave' : 'other'}`); return origWrite(s); }) as typeof stub.write;
+    const b = new TtyBackend(stub, makeStdinStub());
+    console.error('boom');
+    expect(error).not.toHaveBeenCalled();
+    expect(writes.some((w) => w.includes('boom'))).toBe(false);
+    b.dispose();
+    expect(error).toHaveBeenCalledWith('boom');
+    expect(order.indexOf('write:leave')).toBeLessThan(order.indexOf('console:boom'));
+    console.error('after');
+    expect(error).toHaveBeenLastCalledWith('after'); // the console is the app's again
+  } finally {
+    error.mockRestore();
+  }
+});
+
+test('onConsole sees each line as it happens, and nothing is printed at exit', () => {
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const seen: string[] = [];
+    const { stub } = makeStub();
+    const b = new TtyBackend(stub, makeStdinStub(), { onConsole: (e) => seen.push(`${e.level}:${e.line}`) });
+    console.log('progress %d%%', 50);
+    expect(seen).toEqual(['log:progress 50%']);
+    b.dispose();
+    expect(log).not.toHaveBeenCalled();
+  } finally {
+    log.mockRestore();
+  }
+});
+
+test('captureConsole: false leaves the console alone', () => {
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const { stub } = makeStub();
+    const b = new TtyBackend(stub, makeStdinStub(), { captureConsole: false });
+    console.log('now');
+    expect(log).toHaveBeenCalledWith('now');
+    b.dispose();
+  } finally {
+    log.mockRestore();
+  }
+});
+
+test('suspend() gives the console back to the child; resume() captures again', () => {
+  const log = vi.spyOn(console, 'log').mockImplementation(() => {});
+  try {
+    const { stub } = makeStub();
+    const b = new TtyBackend(stub, makeStdinStub());
+    console.log('before');
+    b.suspend();
+    console.log('child');
+    expect(log).toHaveBeenCalledTimes(1);
+    expect(log).toHaveBeenCalledWith('child');
+    b.resume();
+    console.log('after');
+    expect(log).toHaveBeenCalledTimes(1);
+    b.dispose();
+    expect(log.mock.calls.map((c) => c[0])).toEqual(['child', 'before', 'after']);
+  } finally {
+    log.mockRestore();
+  }
+});

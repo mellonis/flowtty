@@ -330,6 +330,33 @@ sequences (`BACKGROUND_QUERY`, `COLOR_SCHEME_REPORTS_ON` / `_OFF`) are exported
 from `@flowtty/tty-backend` for custom backends; `colorSchemeOf(rgb)` — the
 brightness rule — from `@flowtty/core`.
 
+## Console output
+
+While a TTY backend owns the screen, a line printed with `console.log`,
+`console.warn` or `console.error` — by the app, by a library, by React's own
+warnings — would land in the alternate screen and stay there until the next full
+repaint, because the frame diff knows nothing of it. So the backends take the
+console over:
+
+- **`TtyBackend`** holds the lines back and prints them through the restored
+  console once the alternate screen is gone — the same moment flowtty's own
+  deferred warnings appear. `suspend()` hands the console to the child along
+  with the terminal, and `resume()` takes it back.
+- **`InlineTtyBackend`** prints each line at once above the live region, where a
+  build tool's logs belong; in log-only mode it takes nothing.
+
+The capture is on when the output stream is a terminal and off otherwise — a
+`2> app.log` keeps working — and `captureConsole: true | false` in the backend
+options overrides that. `onConsole(entry)` hands the app each line as it happens
+(`{ level, line }`, the line as `console` would have printed it) for a log pane
+of its own; with it set, `TtyBackend` prints nothing at exit and
+`InlineTtyBackend` nothing above the region. A `console` method something
+replaces during the session — a logger, a test spy — is left as it is when the
+backend releases the console.
+
+Direct writes to `process.stdout` / `process.stderr` are not covered: they still
+hit the screen. Keep them out of a running app, or write to a file.
+
 ## Still deferred (later milestones)
 
 - Wide-character **rendering**: the grid is still one cell per code point. The

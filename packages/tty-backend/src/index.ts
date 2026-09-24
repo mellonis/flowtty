@@ -37,3 +37,4 @@ export {
   type SgrOptions,
 } from './ansi.js';
 export { createClickCounter, DOUBLE_CLICK_MS, type ClickCounter } from './clickCounter.js';
+export { captureConsole, type ConsoleCapture, type ConsoleEntry, type ConsoleLevel } from './consoleCapture.js';

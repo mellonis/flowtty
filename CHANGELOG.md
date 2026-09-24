@@ -17,6 +17,12 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
   `checkboxFrame` to draw their rows with the same markers, and Markdown's task
   lists draw the same glyphs — one helper, `checkboxMarker`, for all of them.
   See docs/components.md (Checkbox).
+- The TTY backends take the console over while they own the screen, so a
+  `console.log` / `warn` / `error` — React's warnings included — no longer
+  lands in the frame: `TtyBackend` prints the lines once the alternate screen
+  is gone, `InlineTtyBackend` at once above the live region. On when the output
+  is a terminal; `captureConsole` overrides, `onConsole` hands the app each
+  line. See docs/terminal.md (console output).
 
 ## 1.0.0-alpha.24 — 2026-09-24
 

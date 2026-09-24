@@ -14,6 +14,7 @@ import {
   createAttention, type Attention, type NotificationProtocol,
   createClipboard, type Clipboard, type ClipboardProtocol,
   createColorSchemeTracker, type ColorSchemeTracker,
+  captureConsole, type ConsoleCapture, type ConsoleEntry,
 } from '@flowtty/tty-backend';
 
 export interface InlineTtyBackendOptions {
@@ -60,6 +61,14 @@ export interface InlineTtyBackendOptions {
    *  for an app that uses it, and leaves suspension to `useApp().suspend()`.
    *  See docs/app.md (handing the terminal over). */
   suspendKey?: boolean;
+  /** Take `console.log` / `warn` / `error` while the live region is drawn and
+   *  print each line above it at once, where a build tool's logs go, instead
+   *  of letting it land in the region. Default: on when the output stream is
+   *  a terminal; never in log-only mode. See docs/terminal.md (console output). */
+  captureConsole?: boolean;
+  /** See each captured console line instead — to show it in a log pane. With
+   *  this set, nothing is printed above the region. */
+  onConsole?: (entry: ConsoleEntry) => void;
 }
 
 /**
@@ -141,6 +150,9 @@ export class InlineTtyBackend implements Backend {
   private disposed = false;
   // The terminal has been handed to another program (`suspend()`).
   private suspended = false;
+  // The console, taken while the region is drawn (see `captureConsole`).
+  private readonly capturing: boolean;
+  private capture: ConsoleCapture | null = null;
   private readonly attention: Attention;
   private readonly clipboard: Clipboard;
   private readonly scheme: ColorSchemeTracker;
@@ -167,6 +179,8 @@ export class InlineTtyBackend implements Backend {
       ...(options.clipboardLimit === undefined ? {} : { limit: options.clipboardLimit }),
     });
     this.followsScheme = options.colorScheme !== false;
+    this.capturing = !this.logOnly && (options.captureConsole ?? this.out.isTTY === true);
+    if (this.capturing) this.capture = this.startCapture();
     // Its writes stop with stop(), which dispose() calls before the input goes;
     // after that no report can arrive to prompt another.
     this.scheme = createColorSchemeTracker((bytes) => this.out.write(bytes));
@@ -294,6 +308,8 @@ export class InlineTtyBackend implements Backend {
     if (this.logOnly || this.disposed || this.suspended) return;
     this.suspended = true;
     this.leaveTerminal(true);
+    this.capture?.release();
+    this.capture = null;
   }
 
   /**
@@ -305,6 +321,7 @@ export class InlineTtyBackend implements Backend {
   resume(): void {
     if (this.logOnly || this.disposed || !this.suspended) return;
     this.suspended = false;
+    if (this.capturing) this.capture = this.startCapture();
     if (this.inputAttached) {
       if (this.input.isTTY) this.input.setRawMode(true);
       this.input.on('data', this.inputDataHandler);
@@ -343,6 +360,8 @@ export class InlineTtyBackend implements Backend {
   dispose(): void {
     if (this.disposed) return;
     this.disposed = true;
+    this.capture?.release();
+    this.capture = null;
     // Already handed over: the terminal is the shell's, nothing more to write.
     if (!this.suspended) this.leaveTerminal(false);
     if (this.inputAttached) process.removeListener('SIGCONT', this.onContinue);
@@ -357,6 +376,13 @@ export class InlineTtyBackend implements Backend {
   }
 
   // ── Internals ────────────────────────────────────────────────────────────
+
+  // Each console line goes above the live region the moment it is printed —
+  // the scrollback is where a tool's logs belong — unless the app takes it.
+  private startCapture(): ConsoleCapture {
+    const sink = this.options.onConsole;
+    return captureConsole(sink ?? ((entry) => this.printStatic([entry.line])));
+  }
 
   private ensureCursorHidden(): void {
     if (!this.cursorHidden) {
