@@ -295,3 +295,45 @@ test('the default frame is the band, stretched across the column', async () => {
   await flush();
   expect(backend.lastBuffer!.get(10, 0).style.bg).toBe('rgb(211,211,211)');
 });
+
+// ─── in a row ────────────────────────────────────────────────────────────────
+
+test('in a row the band takes the remaining width, and typed text shows', async () => {
+  const backend = new TestBackend(20, 1);
+  function App() {
+    const [v, setV] = useState('');
+    return createElement(Box, { flexDirection: 'row' }, createElement(Text, null, 'Name: '), createElement(TextInput, { value: v, onChange: setV, flexGrow: 1 }));
+  }
+  await render(createElement(App), backend);
+  await flush();
+  expect(backend.lastBuffer!.get(19, 0).style.bg).toBe('rgb(211,211,211)'); // the band reaches the edge
+  backend.type('abc');
+  await flush();
+  expect(backend.lastFrame).toContain('Name: abc');
+});
+
+test('frame="none" in a row grows with its text while typed into', async () => {
+  const backend = new TestBackend(20, 1);
+  function App() {
+    const [v, setV] = useState('');
+    return createElement(Box, { flexDirection: 'row' }, createElement(Text, null, 'Search: '), createElement(TextInput, { value: v, onChange: setV, frame: 'none' }), createElement(Text, null, ' |'));
+  }
+  await render(createElement(App), backend);
+  await flush();
+  backend.type('abc');
+  await flush();
+  expect(backend.lastFrame).toBe('Search: abc  |');   // the caret cell after the text, then the sibling
+});
+
+test('width pins the band, and the text scrolls inside it', async () => {
+  const backend = new TestBackend(20, 1);
+  function App() {
+    const [v, setV] = useState('');
+    return createElement(Box, { flexDirection: 'row' }, createElement(TextInput, { value: v, onChange: setV, width: 6 }), createElement(Text, null, '|'));
+  }
+  await render(createElement(App), backend);
+  await flush();
+  backend.type('abcdefgh');
+  await flush();
+  expect(backend.lastFrame).toBe('defgh |');           // 6 cells: the last five characters and the caret
+});

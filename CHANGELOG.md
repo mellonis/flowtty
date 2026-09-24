@@ -7,6 +7,17 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Fixed
+
+- `TextInput` in a row laid out at the width of its own text and then
+  windowed the text to that width, so nothing typed ever showed; with
+  `frame="none"` it collapsed to nothing. A field sized to its content now
+  grows with its text instead of scrolling; `width`, `flexGrow` and
+  `flexShrink` pass through, so a row can pin it or give it a share. See
+  docs/components.md (TextInput).
+
 ## 1.0.0-alpha.28 — 2026-09-24
 
 ### Added

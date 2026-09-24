@@ -84,6 +84,11 @@ match: `field` (default) is the filled band, stretched across its column;
 (`Search: query_`); `border` is the band inside a bordered box, three rows tall.
 The validation error line goes below whichever frame.
 
+**Width.** In a column the field is as wide as the column. In a row it is as
+wide as its text and grows as the text does — give it `width` to pin it (the
+text then scrolls inside), or `flexGrow={1}` for the row's remaining share;
+`flexShrink` passes through too. `frame="none"` is always sized to its text.
+
 ## Choosing
 
 Four components let the person choose; they share one vocabulary and differ in

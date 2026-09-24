@@ -5,7 +5,7 @@ import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
 import { useClick } from '../hooks/useClick.js';
-import { DEFAULT_BORDER_STYLE, editorReducer as reduce, type EditorState } from '@flowtty/core';
+import { DEFAULT_BORDER_STYLE, editorReducer as reduce, type BoxProps, type EditorState } from '@flowtty/core';
 import { type Rect } from '@flowtty/core/host';
 
 export interface TextInputProps {
@@ -30,6 +30,12 @@ export interface TextInputProps {
    *  inside a bordered box (`border`). The same three `Select` has, so a form's
    *  fields match. See docs/components.md (TextInput). */
   frame?: 'field' | 'none' | 'border';
+  /** The field's width, or its share of a row. Without any of these the field
+   *  is as wide as its column (stretched) or, in a row, as wide as its text —
+   *  and then it grows as the text does instead of scrolling. */
+  width?: BoxProps['width'];
+  flexGrow?: number;
+  flexShrink?: number;
   /** When true, render U+2022 (•) per character instead of the actual value. */
   mask?: boolean;
   /** Override focus state. If unset (default), the component reads from the
@@ -48,7 +54,7 @@ const FIELD_BG = 'rgb(211,211,211)';
 const FIELD_FG = 'black';
 
 export function TextInput(props: TextInputProps): ReactNode {
-  const { onChange, onSubmit, onCancel, validate, mask, isFocused: explicitFocus, showError = true, frame = 'field' } = props;
+  const { onChange, onSubmit, onCancel, validate, mask, isFocused: explicitFocus, showError = true, frame = 'field', width: widthProp, flexGrow, flexShrink } = props;
   const [ownValue, setOwnValue] = useState(props.defaultValue ?? '');
   const value = props.value ?? ownValue;
   const [error, setError] = useState<string | null>(null);
@@ -60,7 +66,12 @@ export function TextInput(props: TextInputProps): ReactNode {
   const safeCursor = Math.max(0, Math.min(value.length, cursor));
   // Allocated cell width of the input's viewport — captured via onLayout. null
   // until the first paint completes (one-frame placeholder).
-  const [width, setWidth] = useState<number | null>(null);
+  // The width the layout gave the band, and whether that is just the width of
+  // its own text: a box sized to its content (in a row, with no width of its
+  // own) must not window the text to its previous size — it grows instead.
+  const [layout, setLayout] = useState<{ width: number; contentSized: boolean } | null>(null);
+  const renderedRef = useRef(0);
+  const width = layout === null || layout.contentSized ? null : layout.width;
 
   useInput((key) => {
     const action = reduce({ value, cursor: safeCursor } as EditorState, key);
@@ -133,8 +144,13 @@ export function TextInput(props: TextInputProps): ReactNode {
 
   const onLayout = (r: Rect) => {
     rectRef.current = r;
-    if (r.width !== width) setWidth(r.width);
+    const contentSized = r.width === renderedRef.current;
+    if (layout === null || layout.width !== r.width || layout.contentSized !== contentSized) {
+      setLayout({ width: r.width, contentSized });
+    }
   };
+  // What this render draws, padding aside: the text and, focused, the caret cell.
+  renderedRef.current = chars.length + (isFocused ? 1 : 0);
 
   // When NOT focused: render the display flat, no cursor cell. Tells the user
   // at a glance which field has focus (only the focused one shows the inverse cursor).
@@ -163,11 +179,12 @@ export function TextInput(props: TextInputProps): ReactNode {
       </Box>
     );
   }
+  const outer = { width: widthProp, flexGrow, flexShrink };
   if (frame === 'none') {
     // In a row of its own, so the field sizes to its text instead of
     // stretching across a column.
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" {...outer}>
         <Box flexDirection="row">{row}</Box>
         {errorLine}
       </Box>
@@ -175,14 +192,14 @@ export function TextInput(props: TextInputProps): ReactNode {
   }
   if (frame === 'border') {
     return (
-      <Box flexDirection="column">
+      <Box flexDirection="column" {...outer}>
         <Box border={DEFAULT_BORDER_STYLE} flexDirection="column">{row}</Box>
         {errorLine}
       </Box>
     );
   }
   return (
-    <Box flexDirection="column">
+    <Box flexDirection="column" {...outer}>
       {row}
       {errorLine}
     </Box>
