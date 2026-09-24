@@ -166,19 +166,20 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
         if (a) { setOpenPath([]); setCursor(0); }
         return !a;
       });
-      return;
+      return true;
     }
     // Idle: ignore everything except F10 (handled above) AND Esc (so the user
     // can quit the app via the same key that disengages a focused menu).
     if (!active) {
-      if (key.name === 'escape' && onExit) onExit();
+      if (key.name === 'escape' && onExit) { onExit(); return true; }
       return;
     }
 
+    // Engaged: a key the menu acts on is consumed — nobody behind it sees it.
     if (depth === 0) {
       // Top bar
       if (activeLen === 0) {
-        if (key.name === 'escape') closeCurrent();
+        if (key.name === 'escape') { closeCurrent(); return true; }
         return;
       }
       if (key.name === 'left' || key.name === 'h' || (key.name === 'tab' && key.shift)) {
@@ -189,23 +190,28 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
         openCurrent();
       } else if (key.name === 'escape') {
         closeCurrent();
-      }
-    } else {
-      // Inside a submenu panel
-      if (activeLen === 0) {
-        if (key.name === 'escape' || key.name === 'left' || key.name === 'h') closeCurrent();
+      } else {
         return;
       }
-      if (key.name === 'up' || key.name === 'k') {
-        setCursor((c) => (c - 1 + activeLen) % activeLen);
-      } else if (key.name === 'down' || key.name === 'j') {
-        setCursor((c) => (c + 1) % activeLen);
-      } else if (key.name === 'return' || key.name === 'right' || key.name === 'l') {
-        openCurrent();
-      } else if (key.name === 'left' || key.name === 'h' || key.name === 'escape') {
-        closeCurrent();
-      }
+      return true;
     }
+    // Inside a submenu panel
+    if (activeLen === 0) {
+      if (key.name === 'escape' || key.name === 'left' || key.name === 'h') { closeCurrent(); return true; }
+      return;
+    }
+    if (key.name === 'up' || key.name === 'k') {
+      setCursor((c) => (c - 1 + activeLen) % activeLen);
+    } else if (key.name === 'down' || key.name === 'j') {
+      setCursor((c) => (c + 1) % activeLen);
+    } else if (key.name === 'return' || key.name === 'right' || key.name === 'l') {
+      openCurrent();
+    } else if (key.name === 'left' || key.name === 'h' || key.name === 'escape') {
+      closeCurrent();
+    } else {
+      return;
+    }
+    return true;
   });
 
   // ── Geometry ─────────────────────────────────────────────────────────────

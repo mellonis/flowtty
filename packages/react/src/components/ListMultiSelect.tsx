@@ -66,7 +66,7 @@ export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
     // Enter on the "+ add new" row adds instead of submitting. Everything else —
     // navigation over that row, Space doing nothing on it — is the reducer's job:
     // it is told the row exists, so no placeholder item has to be invented.
-    if (onAddRow && key.name === 'return') { addNew(); return; }
+    if (onAddRow && key.name === 'return') { addNew(); return true; }
     const action = reduce(items, { cursor }, key, { extraRows: onAddNew !== undefined ? 1 : 0 });
     if (action.kind === 'state') {
       setState(action.state);
@@ -86,8 +86,12 @@ export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
         onSubmit(final);
       }
     } else if (action.kind === 'cancel') {
-      onCancel?.();
+      if (!onCancel) return;
+      onCancel();
+    } else {
+      return;
     }
+    return true; // the key did something here: nobody behind the list sees it
   }, { isActive: isFocused });
 
   // Focus has to be visible: Tab landing on a list that looks exactly as before

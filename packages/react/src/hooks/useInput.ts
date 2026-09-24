@@ -14,8 +14,9 @@ export interface UseInputOptions {
  * see it, and the backend skips its default for it (Ctrl+C / Ctrl+D exit,
  * Ctrl+Z suspend). Delivery order is subscription order — on mount, children
  * before parents, since React runs effects inside-out; a component mounted
- * later comes after. Only a strict `true` counts: an async handler returns a
- * Promise, which does not. See docs/input.md (keys and useInput).
+ * later comes after; `isActive` does not move a handler in that order, it only
+ * mutes it. Only a strict `true` counts: an async handler returns a Promise,
+ * which does not. See docs/input.md (keys and useInput).
  *
  * The handler ref is updated on each render, so closures capture the latest
  * state without re-subscribing — only `isActive` toggles or context changes
@@ -26,9 +27,15 @@ export function useInput(handler: (key: Key) => unknown, opts: UseInputOptions =
   const ref = useRef(handler);
   ref.current = handler;
   const isActive = opts.isActive !== false;
+  const activeRef = useRef(isActive);
+  activeRef.current = isActive;
+  // Subscribed for as long as the component is mounted, whatever `isActive`
+  // says: the subscription's place in the delivery order is its mount order,
+  // and a handler gated on focus — which arrives after the mount — must not
+  // fall behind a parent's handler because it subscribed later. `isActive` is
+  // checked on delivery instead.
   useEffect(() => {
-    if (!isActive) return;
-    const unsubscribe = source.subscribe((key) => ref.current(key));
+    const unsubscribe = source.subscribe((key) => (activeRef.current ? ref.current(key) : undefined));
     return unsubscribe;
-  }, [source, isActive]);
+  }, [source]);
 }

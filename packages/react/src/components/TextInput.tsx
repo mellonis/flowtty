@@ -64,12 +64,20 @@ export function TextInput(props: TextInputProps): ReactNode {
       }
       if (action.state.cursor !== safeCursor) setCursor(action.state.cursor);
     } else if (action.kind === 'submit') {
+      // Enter with nothing to submit to is not the field's: it falls through
+      // to whatever binds it (a form, a dialog's default button).
+      if (!onSubmit && !validate) return;
       const err = validate ? validate(value) : null;
       if (!err) onSubmit?.(value);
       setError(err ?? null);
     } else if (action.kind === 'cancel') {
-      onCancel?.();
+      if (!onCancel) return;
+      onCancel();
+    } else {
+      return;
     }
+    // The key did something here: nobody behind the field sees it.
+    return true;
   }, { isActive: isFocused });
 
   // Everything below works in CHARACTERS (code points), the grid's unit: an emoji

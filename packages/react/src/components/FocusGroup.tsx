@@ -64,7 +64,8 @@ export function FocusGroup({ isActive = true, children }: FocusGroupProps): Reac
   useInput((key) => {
     if (key.name !== 'tab') return;
     const ids = idsRef.current;
-    if (ids.length === 0) return;
+    // Nothing to move to — one focusable, or none — is not the group's Tab.
+    if (ids.length < 2) return;
     setFocusedId((current) => {
       const idx = current ? ids.indexOf(current) : 0;
       const next = key.shift
@@ -72,6 +73,7 @@ export function FocusGroup({ isActive = true, children }: FocusGroupProps): Reac
         : (idx + 1) % ids.length;
       return ids[next] ?? null;
     });
+    return true; // focus moved: nobody behind the group sees the Tab
   }, { isActive });
 
   // Provide two contexts:

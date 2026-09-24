@@ -20,10 +20,9 @@ export function Button({ label, shortcut, onPress }: ButtonProps): ReactNode {
   const { isFocused } = useFocus();
 
   useInput((key) => {
-    if (isFocused && key.name === 'return') {
+    if ((isFocused && key.name === 'return') || (shortcut !== undefined && key.name === shortcut)) {
       onPress();
-    } else if (shortcut && key.name === shortcut) {
-      onPress();
+      return true; // pressed: nobody behind the button sees the key
     }
   });
 

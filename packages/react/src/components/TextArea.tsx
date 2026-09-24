@@ -85,7 +85,7 @@ export function TextArea(props: TextAreaProps): ReactNode {
   const wrapWidth = width ?? Number.MAX_SAFE_INTEGER;
 
   useInput((key) => {
-    if (onKey?.(key) === true) return;
+    if (onKey?.(key) === true) return true;
     const action = reduce({ value, cursor }, key, { multiline: true, width: wrapWidth });
     if (action.kind === 'edit') {
       if (action.state.value !== value) {
@@ -96,8 +96,17 @@ export function TextArea(props: TextAreaProps): ReactNode {
         if (props.cursor === undefined) setOwnCursor(action.state.cursor);
         onCursorChange?.(action.state.cursor);
       }
-    } else if (action.kind === 'submit') onSubmit?.(value);
-    else if (action.kind === 'cancel') onCancel?.();
+    } else if (action.kind === 'submit') {
+      if (!onSubmit) return;
+      onSubmit(value);
+    } else if (action.kind === 'cancel') {
+      if (!onCancel) return;
+      onCancel();
+    } else {
+      return;
+    }
+    // The key did something here: nobody behind the field sees it.
+    return true;
   }, { isActive: isFocused });
 
   const rows = inputRows(value, wrapWidth, isFocused ? cursor : undefined);

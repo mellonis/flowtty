@@ -44,8 +44,12 @@ export function ListSelect<T>(props: ListSelectProps<T>): ReactNode {
     } else if (action.kind === 'submit') {
       onSubmit(items[action.index]!.value);
     } else if (action.kind === 'cancel') {
-      onCancel?.();
+      if (!onCancel) return;
+      onCancel();
+    } else {
+      return;
     }
+    return true; // the key did something here: nobody behind the list sees it
   }, { isActive: isFocused });
 
   const visible = visibleIndices(items, state.filter);

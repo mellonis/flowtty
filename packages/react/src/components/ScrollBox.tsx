@@ -106,13 +106,15 @@ export function ScrollBox({
     if (!m) return;
     const from = pendingTopRef.current ?? m.scrollTop;
     const page = pageStep ?? Math.max(1, m.viewportHeight - 1);
-    if (key.name === 'pageup') goTo(from - page);
-    else if (key.name === 'pagedown') goTo(from + page);
-    else if (key.name === 'wheelup' || key.name === 'wheeldown') {
+    if (key.name === 'pageup') { goTo(from - page); return true; }
+    if (key.name === 'pagedown') { goTo(from + page); return true; }
+    if (key.name === 'wheelup' || key.name === 'wheeldown') {
       const r = rectRef.current;
       const inside = key.x === undefined || key.y === undefined || r === null
         || (key.x >= r.left && key.x < r.left + r.width && key.y >= r.top && key.y < r.top + r.height);
-      if (inside) goTo(from + (key.name === 'wheelup' ? -wheelStep : wheelStep));
+      if (!inside) return;
+      goTo(from + (key.name === 'wheelup' ? -wheelStep : wheelStep));
+      return true; // scrolled: nobody behind the box sees the step
     }
   }, { isActive });
 
