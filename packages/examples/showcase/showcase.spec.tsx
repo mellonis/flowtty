@@ -57,6 +57,8 @@ describe('showcase', () => {
     expect(frame).toContain('✓ mouse');
     expect(frame).toContain('Asia (Tokyo)');       // picked from the dropdown by typing
     expect(frame).toContain('backend, frontend');  // two tags toggled in the multiple one
+    expect(frame).toContain('[-] select all');      // three of four features picked: mixed
+    expect(frame).toContain('☑ notify me');
     expect(frame).toContain('Saved ✓');
     expect(frame).not.toContain('a name is required'); // cleared by typing
     app.unmount();

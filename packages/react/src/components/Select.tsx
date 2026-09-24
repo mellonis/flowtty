@@ -9,6 +9,7 @@ import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
 import { useDialog, useDialogHost } from '../hooks/useDialog.js';
 import { DialogHostPresentContext } from '../context/dialogContext.js';
+import { checkboxMarker, type CheckboxFrame } from './checkboxMarker.js';
 
 export type { SelectItem } from '@flowtty/core';
 
@@ -50,6 +51,9 @@ export interface SelectMultipleProps<T> extends SelectBaseProps<T> {
    *  selects it once it appears in `items` (adding it there is the caller's
    *  job). Return `null` / nothing for a cancelled prompt. */
   onAddNew?: () => void | T | null | Promise<T | null | void>;
+  /** How a popup row's checkbox is drawn: `brackets` (default) is `[x]` /
+   *  `[ ]`, `none` is `☑` / `☐`. See docs/components.md (Checkbox). */
+  checkboxFrame?: CheckboxFrame;
 }
 
 export type SelectProps<T> = SelectSingleProps<T> | SelectMultipleProps<T>;
@@ -139,6 +143,7 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
         filter={filter}
         maxRows={maxRows}
         hasAddRow={props.multiple === true && props.onAddNew !== undefined}
+        checkboxFrame={props.multiple === true ? props.checkboxFrame ?? 'brackets' : 'brackets'}
         onPick={(v) => (propsRef.current as SelectSingleProps<T>).onChange(v)}
         onToggle={(v) => (propsRef.current as SelectMultipleProps<T>).onChange(v)}
         onAddNew={() => (propsRef.current as SelectMultipleProps<T>).onAddNew?.()}
@@ -212,6 +217,7 @@ interface PopupProps<T> {
   filter: boolean;
   maxRows: number;
   hasAddRow: boolean;
+  checkboxFrame: CheckboxFrame;
   onPick: (value: T) => void;
   onToggle: (value: T[]) => void;
   onAddNew: () => void | T | null | Promise<T | null | void>;
@@ -221,7 +227,7 @@ interface PopupProps<T> {
 // typing filters (when on), Enter picks (single) or closes (multiple), Space
 // toggles (multiple), Escape closes; a press on a row picks or toggles it, a
 // press outside the popup closes. Every key it uses is consumed.
-function SelectPopup<T>({ store, multiple, filter, maxRows, hasAddRow, onPick, onToggle, onAddNew }: PopupProps<T>): ReactNode {
+function SelectPopup<T>({ store, multiple, filter, maxRows, hasAddRow, checkboxFrame, onPick, onToggle, onAddNew }: PopupProps<T>): ReactNode {
   const { done, cancel } = useDialog();
   const { items, value } = useSyncExternalStore(store.subscribe, store.get);
   const picked = (multiple ? (value as T[] | undefined) ?? [] : []);
@@ -308,7 +314,7 @@ function SelectPopup<T>({ store, multiple, filter, maxRows, hasAddRow, onPick, o
         const isCursor = rowIndex === at;
         const isAdd = hasAddRow && rowIndex === visible.length;
         const item = isAdd ? null : items[visible[rowIndex]!]!;
-        const label = isAdd ? '+ add new' : `${multiple ? (picked.includes(item!.value) ? '[x] ' : '[ ] ') : ''}${item!.label}`;
+        const label = isAdd ? '+ add new' : `${multiple ? `${checkboxMarker(picked.includes(item!.value), checkboxFrame).text} ` : ''}${item!.label}`;
         return (
           <Box key={isAdd ? '__add__' : visible[rowIndex]!} flexDirection="row">
             <Text color={isCursor ? 'cyan' : undefined} bold={isCursor}>{isCursor ? '▸ ' : '  '}</Text>

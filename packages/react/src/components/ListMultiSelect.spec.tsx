@@ -241,3 +241,18 @@ test('a mouse button key neither toggles nor moves the ListMultiSelect cursor', 
   expect(backend.lastFrame).toBe(before);
   expect(captured[captured.length - 1]).toEqual(['b']);
 });
+
+test('checkboxFrame="none" draws one glyph per row instead of the brackets', async () => {
+  function App() {
+    return createElement(ListMultiSelect<string>, {
+      items: [{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }],
+      value: ['b'],
+      onChange: () => {},
+      onSubmit: () => {},
+      checkboxFrame: 'none',
+    });
+  }
+  const backend = new TestBackend(20, 2);
+  await render(createElement(App), backend);
+  expect(backend.lastFrame).toBe('▸ ☐ a\n  ☑ b');
+});

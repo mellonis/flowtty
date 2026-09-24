@@ -48,6 +48,7 @@ await render(
 - `<Select<T> items value onChange />` — a dropdown field: one line, a popup to choose from (needs a `<DialogHost>`); `multiple` for any number.
 - `<ListSelect<T> items value onChange onSubmit />` — single-pick inline list.
 - `<ListMultiSelect<T> items value onChange onSubmit onAddNew />` — multi-pick inline list with space-toggle and optional "add new".
+- `<Checkbox label checked onChange />` — one yes / no, `checked` also `'mixed'`; Space or a click toggles. `frame="none"` for `☐` / `☑` / `⊟` instead of brackets.
 - `<Confirm>` — yes/no prompt.
 - `<Form>` + `useField()` — form orchestration with per-field validation + global submit.
 - `<Button label shortcut onPress />` — focusable + shortcut-bound.

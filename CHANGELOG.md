@@ -7,6 +7,17 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- `<Checkbox>`: one yes / no with a `mixed` state, focusable; Space or a click
+  toggles (`mixed` goes to `true`), Enter is left to the form. `frame` picks
+  `[ ]` / `[x]` / `[-]` or the glyphs `☐` / `☑` / `⊟`. The multi lists take
+  `checkboxFrame` to draw their rows with the same markers, and Markdown's task
+  lists draw the same glyphs — one helper, `checkboxMarker`, for all of them.
+  See docs/components.md (Checkbox).
+
 ## 1.0.0-alpha.24 — 2026-09-24
 
 ### Added

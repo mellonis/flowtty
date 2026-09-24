@@ -4,6 +4,7 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import { checkboxMarker, type CheckboxFrame } from './checkboxMarker.js';
 import { multiSelectReducer as reduce, type MultiSelectState, type SelectItem } from '@flowtty/core';
 
 export interface ListMultiSelectProps<T> {
@@ -25,10 +26,13 @@ export interface ListMultiSelectProps<T> {
    *  once it shows up in `items` (adding it to `items` is the caller's job).
    *  Return `null` / nothing to leave the selection alone (a cancelled prompt). */
   onAddNew?: () => void | T | null | Promise<T | null | void>;
+  /** How a row's checkbox is drawn: `brackets` (default) is `[x]` / `[ ]`,
+   *  `none` is `☑` / `☐`. See docs/components.md (Checkbox). */
+  checkboxFrame?: CheckboxFrame;
 }
 
 export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
-  const { items, value, onChange, onSubmit, onCancel, onAddNew, isFocused: explicitFocus } = props;
+  const { items, value, onChange, onSubmit, onCancel, onAddNew, isFocused: explicitFocus, checkboxFrame = 'brackets' } = props;
   const { isFocused: ctxFocused } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   const totalRows = items.length + (onAddNew ? 1 : 0);
@@ -98,7 +102,7 @@ export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
   );
   return (
     <Box flexDirection="column">
-      {items.map((it, i) => row(i === cursor, (value.includes(it.value) ? '[x] ' : '[ ] ') + it.label, i))}
+      {items.map((it, i) => row(i === cursor, `${checkboxMarker(value.includes(it.value), checkboxFrame).text} ${it.label}`, i))}
       {onAddNew !== undefined && row(cursor === items.length, '+ add new', '__add__')}
     </Box>
   );

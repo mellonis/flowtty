@@ -5,6 +5,7 @@
 // example) can slice the output by row exactly the way it slices raw text.
 
 import { parseMarkdown, type InlineSeg, type MdList, type MdAlign } from './parse.js';
+import { checkboxMarker } from '../checkboxMarker.js';
 import {
   detectLanguage, highlightBlock, hunkNumbers, resolveLanguage,
   type CodeLine, type CodeLineKind,
@@ -315,7 +316,8 @@ function layoutList(list: MdList, width: number, pad: number, out: StyledLine[])
       // GFM task item: `☑ ` (checked, green) / `☐ ` (unchecked). For an
       // ordered list keep the number, then the box.
       if (num) marker.push({ text: num, color: 'yellow' });
-      marker.push({ text: item.checked ? '☑ ' : '☐ ', color: item.checked ? 'green' : undefined });
+      const box = checkboxMarker(item.checked, 'none');
+      marker.push({ text: `${box.text} `, color: box.color });
     }
     const indent = pad + prefixWidth(marker);
     out.push(...wrapBlock(item.segs, width, {

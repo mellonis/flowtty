@@ -319,6 +319,25 @@ describe('Select multiple', () => {
     unmount();
   });
 
+  test('checkboxFrame="none" draws the popup rows with glyphs', async () => {
+    function Glyphs() {
+      const [value, setValue] = useState<string[]>(['team']);
+      return (
+        <DialogHost>
+          <Box flexDirection="column">
+            <Select multiple items={PLANS} value={value} onChange={setValue} width={20} checkboxFrame="none" />
+          </Box>
+        </DialogHost>
+      );
+    }
+    const { backend, frame, unmount } = await mount(<Glyphs />);
+    backend.press({ name: 'return' });
+    const lines = await frame();
+    expect(row(lines, '☑ Team')).toBeDefined();
+    expect(row(lines, '☐ Hobby')).toBeDefined();
+    unmount();
+  });
+
   test('a narrow field says how many are selected instead of listing them', async () => {
     const { backend, frame, unmount } = await mount(<Multi width={12} />);
     backend.press({ name: 'return' });

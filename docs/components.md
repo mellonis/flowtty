@@ -9,6 +9,7 @@ The building blocks beyond `<Box>` and `<Text>`. Forms, focus and buttons are in
 - [ListSelect](#listselect)
 - [ListMultiSelect](#listmultiselect)
 - [Menu](#menu)
+- [Checkbox](#checkbox)
 - [TextArea](#textarea)
 - [Table](#table)
 - [Markdown](#markdown)
@@ -88,6 +89,7 @@ what they are for.
 | `ListSelect` | Every option on screen, one highlighted; the highlight *is* the value. | A full-screen picker, a dialog whose whole point is the choice. |
 | `ListMultiSelect` | Every option on screen with a checkbox each; any number. | The same, for several — with `onAddNew` for "one that is not here yet". |
 | `Menu` | A bar of commands with cascading panels. | Commands, not values: what the app can do, not what a field holds. |
+| `Checkbox` | One yes / no, with a `mixed` state. | A single flag in a form; *select all* over a list. |
 
 The vocabulary: `items` is a `SelectItem<T>[]` — `{ label, value }`, the label
 shown and the value reported; `value` / `onChange` are controlled, `value` a
@@ -123,7 +125,8 @@ Space (or a click) toggles a row and calls `onChange` at once, Enter closes.
 The field lists the chosen labels, or says `N selected` when they would not fit
 its `width`. `onAddNew` adds a "+ add new" row, as on `ListMultiSelect`: return
 the new item's value — directly or as a promise — and it is selected once it
-appears in `items`.
+appears in `items`. `checkboxFrame="none"` draws the rows' checkboxes as glyphs
+(`☑` / `☐`) instead of `[x]` / `[ ]` — see [Checkbox](#checkbox).
 
 `frame` is the field's look: `field` (default) is the same filled band
 `TextInput` draws, so a form's fields match; `none` is bare `value ▾`, sized to
@@ -162,7 +165,9 @@ toggles, Enter submits, Escape cancels. `onAddNew` adds a
 "+ add new" row; return the new item's value — directly or as a promise, e.g.
 after a sub-prompt in a dialog — and the component selects it and moves the cursor
 onto it once it appears in `items` (adding it to `items` is the caller's job).
-Return `null` for a cancelled prompt.
+Return `null` for a cancelled prompt. `checkboxFrame="none"` draws the
+checkboxes as glyphs (`☑` / `☐`) instead of `[x]` / `[ ]` — see
+[Checkbox](#checkbox).
 
 Both lists show focus: a colored, bold `▸` and a bold cursor row when focused, a
 dim marker when not.
@@ -184,6 +189,41 @@ then disengages. While the menu is engaged the page under it is `inert` — its
 `useInput` handlers do not fire. `Menu` needs a full-screen backend and renders
 nothing (with a one-shot warning) on an inline one. Its items are commands,
 `{ key, label, submenu? }`, not values — see [Choosing](#choosing).
+
+## Checkbox
+
+One yes / no, or a *select all* over a list.
+
+```tsx
+<Checkbox label="notify me" checked={notify} onChange={setNotify} />
+
+const all = picked.length === 0 ? false : picked.length === tags.length ? true : 'mixed';
+<Checkbox label="select all" checked={all} onChange={(on) => setPicked(on ? tags.map((t) => t.value) : [])} />
+<ListMultiSelect items={tags} value={picked} onChange={setPicked} onSubmit={next} />
+```
+
+Controlled: `checked` is `true`, `false` or `'mixed'` — some of what it stands
+for, as the *select all* above while only some tags are picked. Space, or a
+click on the checkbox whether or not it is focused, calls `onChange` with the
+next state: the opposite of `checked`, and `true` from `'mixed'`. Enter is left
+alone — in a form it is the submit, and a `Button` beside the checkbox listens
+for it. It is a focusable: Tab reaches it, and focus shows as a cyan, bold
+marker and a bold label; unfocused, a checked marker is green and an unchecked
+one dim.
+
+`frame` picks the marker: `brackets` (default) is ASCII and reads everywhere,
+`none` is one glyph, the same glyphs Markdown's task lists draw.
+
+| `checked` | `brackets` | `none` |
+|---|---|---|
+| `false` | `[ ]` | `☐` |
+| `true` | `[x]` | `☑` |
+| `'mixed'` | `[-]` | `⊟` |
+
+The multi lists draw their rows with the same markers: `checkboxFrame="none"`
+on `ListMultiSelect` and `Select multiple` switches them to the glyphs. Those
+rows are not checkboxes of their own — the list's cursor, Space and clicks act
+on them — so only the look is shared.
 
 ## TextArea
 

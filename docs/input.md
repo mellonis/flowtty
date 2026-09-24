@@ -317,7 +317,7 @@ the callback — directly or as a promise, e.g. after a sub-prompt in a dialog �
 the component selects it and moves the cursor onto it once it appears in `items`
 (adding it to `items` is the caller's job). Return `null` for a cancelled prompt.
 
-TextInput / ListSelect / ListMultiSelect / Select also plug into the focus system. Their `isFocused` prop becomes optional — if unset, they read from the FocusGroup. If set explicitly, the prop overrides.
+TextInput / ListSelect / ListMultiSelect / Select / Checkbox also plug into the focus system. Their `isFocused` prop becomes optional — if unset, they read from the FocusGroup. If set explicitly, the prop overrides.
 
 Outside a FocusGroup, `useFocus()` returns `{isFocused: true}` (safe default — single component receives input as before).
 
