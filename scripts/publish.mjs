@@ -41,10 +41,21 @@ async function isPublished(name, version) {
   return res.ok;
 }
 
+// The source form of each manifest, and the flipped form this run wrote in its
+// place. `restore` puts the source form back ONLY where the file still holds
+// what this run wrote: a run that sat on a prompt while another one bumped the
+// versions and published must not overwrite that bump when it finally dies.
 const originals = new Map();
+const flipped = new Map();
 const restore = () => {
-  for (const [file, text] of originals) writeFileSync(file, text);
+  for (const [file, text] of originals) {
+    let current;
+    try { current = readFileSync(file, 'utf8'); } catch { continue; }
+    if (current === flipped.get(file)) writeFileSync(file, text);
+    else if (current !== text) console.error(`!! ${file} changed under this run — left as it is`);
+  }
   originals.clear();
+  flipped.clear();
 };
 process.on('SIGINT', () => { restore(); process.exit(130); });
 
@@ -76,7 +87,9 @@ try {
     for (const t of targets(manifest.exports)) {
       if (!existsSync(`${root}packages/${p}/${t}`)) throw new Error(`${manifest.name}: exports target ${t} was not built`);
     }
-    writeFileSync(file, `${JSON.stringify(manifest, null, 2)}\n`);
+    const flippedText = `${JSON.stringify(manifest, null, 2)}\n`;
+    flipped.set(file, flippedText);
+    writeFileSync(file, flippedText);
   }
 
   const published = [];
