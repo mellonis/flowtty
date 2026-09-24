@@ -145,8 +145,8 @@ test('TtyBackend.onKey: Ctrl-C default-handled as dispose + process.exit(130) (r
   expect(exitSpy).toHaveBeenCalledWith(130);
   // dispose ran: raw mode restored before exit
   expect((stdin as unknown as { __rawMode(): boolean }).__rawMode()).toBe(false);
-  // Ctrl-C was NOT delivered to subscribers (default-handled before dispatch)
-  expect(subscriberCalled).toEqual([]);
+  // Ctrl-C reached the subscriber first; it did not consume it, so the default ran
+  expect(subscriberCalled).toEqual(['c']);
 
   exitSpy.mockRestore();
 });
@@ -889,7 +889,7 @@ test('Ctrl+Z suspends the backend and stops the process; SIGCONT resumes it', ()
     writes.length = 0;
 
     stdin.emit('data', '\x1a');
-    expect(keys).toEqual([]); // not delivered
+    expect(keys).toEqual(['z']); // delivered first; nobody consumed it, so the default ran
     expect(writes.at(-1)).toBe(SHOW_CURSOR + RESET + ALT_SCREEN_OFF);
     expect(kill).toHaveBeenCalledWith(process.pid, 'SIGTSTP');
 
@@ -949,4 +949,42 @@ test('dispose() removes the SIGCONT listener', () => {
   expect(process.listenerCount('SIGCONT')).toBe(before + 1);
   b.dispose();
   expect(process.listenerCount('SIGCONT')).toBe(before);
+});
+
+test('a subscriber that consumes Ctrl+C keeps the app alive; Ctrl+C with nobody consuming still exits', () => {
+  const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+    throw new Error(`exit:${code}`);
+  }) as never);
+  try {
+    const { stub } = makeStub();
+    const stdin = makeStdinStub();
+    const b = new TtyBackend(stub, stdin);
+    let cancels = 0;
+    const off = b.onKey((k) => { if (k.ctrl && k.name === 'c') { cancels++; return true; } });
+    stdin.emit('data', '\x03');
+    expect(cancels).toBe(1);
+    expect(exitSpy).not.toHaveBeenCalled();
+    off();
+    b.onKey(() => {});
+    expect(() => stdin.emit('data', '\x03')).toThrow('exit:130');
+  } finally {
+    exitSpy.mockRestore();
+  }
+});
+
+test('a subscriber that consumes Ctrl+Z keeps the terminal: no suspend, no SIGTSTP', () => {
+  const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+  try {
+    const { stub, writes } = makeStub();
+    const stdin = makeStdinStub();
+    const b = new TtyBackend(stub, stdin, { colorScheme: false });
+    b.onKey((k) => k.ctrl && k.name === 'z');
+    writes.length = 0;
+    stdin.emit('data', '\x1a');
+    expect(writes).toEqual([]);
+    expect(kill).not.toHaveBeenCalled();
+    b.dispose();
+  } finally {
+    kill.mockRestore();
+  }
 });

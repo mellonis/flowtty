@@ -40,7 +40,7 @@ export class TestBackend implements Backend {
   /** How many times the app suspended. */
   suspensions: number = 0;
   private buffers: Buffer[] = [];
-  private readonly subscribers = new Set<(key: Key) => void>();
+  private readonly subscribers = new Set<(key: Key) => unknown>();
   private scheme: TerminalColorScheme = UNKNOWN_COLOR_SCHEME;
   private readonly schemeSubscribers = new Set<(scheme: TerminalColorScheme) => void>();
 
@@ -66,17 +66,19 @@ export class TestBackend implements Backend {
     return this.buffers[this.buffers.length - 1] ?? null;
   }
 
-  onKey(handler: (key: Key) => void): () => void {
+  onKey(handler: (key: Key) => unknown): () => void {
     this.subscribers.add(handler);
     return () => { this.subscribers.delete(handler); };
   }
 
   /**
-   * Synchronously deliver one Key to every subscriber. Throws on a name no
-   * terminal can produce (`'space'`, `'enter'`): a test that presses such a key
-   * exercises a branch real input never reaches, and would pass anyway.
+   * Synchronously deliver one Key to every subscriber, and return whether one
+   * of them consumed it (returned `true`) — the same answer a TTY backend acts
+   * on to skip its Ctrl+C / Ctrl+Z default. Throws on a name no terminal can
+   * produce (`'space'`, `'enter'`): a test that presses such a key exercises a
+   * branch real input never reaches, and would pass anyway.
    */
-  press(key: Partial<Key> & { name: string }): void {
+  press(key: Partial<Key> & { name: string }): boolean {
     assertRealKeyName(key.name);
     const k: Key = {
       ...(key.text !== undefined ? { text: key.text } : {}),
@@ -89,7 +91,9 @@ export class TestBackend implements Backend {
       shift: key.shift ?? false,
       name: key.name,
     };
-    for (const h of [...this.subscribers]) h(k);
+    let consumed = false;
+    for (const h of [...this.subscribers]) if (h(k) === true) consumed = true;
+    return consumed;
   }
 
   /** Emit one Key per character; printable chars only. */

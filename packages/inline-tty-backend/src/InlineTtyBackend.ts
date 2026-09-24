@@ -91,7 +91,7 @@ export class InlineTtyBackend implements Backend {
   private readonly input: NodeJS.ReadStream;
   private readonly liveHeight: number;
 
-  private readonly subscribers = new Set<(key: Key) => void>();
+  private readonly subscribers = new Set<(key: Key) => unknown>();
   // Carries an incomplete escape sequence between stdin chunks (see decodeKeys).
   private pendingInput = '';
   private readonly inputDataHandler = (chunk: NodeBuffer | string): void => {
@@ -101,6 +101,11 @@ export class InlineTtyBackend implements Backend {
     // The terminal's replies are not input — see TtyBackend.
     if (reports.length > 0) this.scheme.handle(reports);
     for (const key of keys) {
+      // Subscribers first, defaults only for a key nobody consumed — see
+      // TtyBackend.
+      let consumed = false;
+      for (const h of [...this.subscribers]) if (h(key) === true) consumed = true;
+      if (consumed) continue;
       if (key.ctrl && (key.name === 'c' || key.name === 'd')) {
         this.dispose();
         process.exit(130);
@@ -109,9 +114,7 @@ export class InlineTtyBackend implements Backend {
       if (key.ctrl && key.name === 'z' && this.options.suspendKey !== false) {
         this.suspend();
         process.kill(process.pid, 'SIGTSTP');
-        continue;
       }
-      for (const h of [...this.subscribers]) h(key);
     }
   };
   private inputAttached = false;
@@ -264,7 +267,7 @@ export class InlineTtyBackend implements Backend {
     return () => { this.resizeSubscribers.delete(handler); };
   }
 
-  onKey(handler: (key: Key) => void): () => void {
+  onKey(handler: (key: Key) => unknown): () => void {
     if (this.logOnly) return () => {}; // nobody is typing into a pipe
     if (!this.inputAttached) {
       if (this.input.isTTY) this.input.setRawMode(true);

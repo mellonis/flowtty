@@ -20,10 +20,15 @@ export interface Backend {
   size(): { width: number; height: number };
   draw(buffer: Buffer): void;
   /**
-   * Subscribe to raw key events. Returns an unsubscribe function.
-   * Backends without an input source omit this method.
+   * Subscribe to raw key events. Returns an unsubscribe function. A handler
+   * that returns `true` has consumed the key: a backend then skips its own
+   * default for it (Ctrl+C / Ctrl+D exit, Ctrl+Z suspend). The result is
+   * looked at only for a strict `true` — which is why the type is `unknown`:
+   * a handler may be any expression, and an async one's Promise never
+   * consumes. Backends without an input source omit this method.
+   * See docs/input.md (keys and useInput).
    */
-  onKey?(handler: (key: Key) => void): () => void;
+  onKey?(handler: (key: Key) => unknown): () => void;
   /**
    * Subscribe to terminal-resize events. Returns an unsubscribe function.
    * Handlers are called AFTER `size()` reflects the new dimensions.

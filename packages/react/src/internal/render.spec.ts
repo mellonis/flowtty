@@ -220,3 +220,53 @@ describe('suspend(fn) — handing the terminal over', () => {
     app.unmount();
   });
 });
+
+describe('consumed keys', () => {
+  test('keys go to subscribers in subscription order — children first — and stop at the first true', async () => {
+    const backend = new TestBackend(8, 1);
+    const seen: string[] = [];
+    function Child({ eats }: { eats: boolean }) {
+      useInput((k) => { seen.push(`child:${k.name}`); return eats; });
+      return createElement(Text, null, 'x');
+    }
+    function Parent() {
+      useInput((k) => { seen.push(`parent:${k.name}`); });
+      return createElement(Child, { eats: true });
+    }
+    const app = await render(createElement(Parent), backend);
+    await flushAsync(backend);
+    expect(backend.press({ name: 'a' })).toBe(true);
+    expect(seen).toEqual(['child:a']);
+    app.unmount();
+  });
+
+  test('a handler that returns nothing lets the key go on, and press() reports false', async () => {
+    const backend = new TestBackend(8, 1);
+    const seen: string[] = [];
+    function Child() {
+      useInput((k) => { seen.push(`child:${k.name}`); });
+      return createElement(Text, null, 'x');
+    }
+    function Parent() {
+      useInput((k) => { seen.push(`parent:${k.name}`); });
+      return createElement(Child);
+    }
+    const app = await render(createElement(Parent), backend);
+    await flushAsync(backend);
+    expect(backend.press({ name: 'a' })).toBe(false);
+    expect(seen).toEqual(['child:a', 'parent:a']);
+    app.unmount();
+  });
+
+  test('an async handler does not consume: its Promise is not true', async () => {
+    const backend = new TestBackend(8, 1);
+    function App() {
+      useInput(async () => {});
+      return createElement(Text, null, 'x');
+    }
+    const app = await render(createElement(App), backend);
+    await flushAsync(backend);
+    expect(backend.press({ name: 'a' })).toBe(false);
+    app.unmount();
+  });
+});

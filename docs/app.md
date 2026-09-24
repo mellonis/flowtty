@@ -39,6 +39,9 @@ function Menu() {
 }
 ```
 
+Ctrl+C and Ctrl+D exit by default; a handler that returns `true` for them takes
+that over — see [Keys and useInput](input.md#keys-and-useinput).
+
 ## Rendering to a string
 
 Not every terminal program is an app. A summary at the end of a build, a table a
@@ -379,10 +382,12 @@ flow — see [Testing](testing.md#sending-input).
 
 **Ctrl+Z** does the same for the shell: the TTY backends hand the terminal
 back, stop the process with `SIGTSTP`, and take the terminal again with a full
-repaint when `fg` continues it. An app that uses Ctrl+Z itself — an editor's
-undo — turns that off with `suspendKey: false` in the backend options, and
-Ctrl+Z arrives as `{ name: 'z', ctrl: true }`. A `kill -STOP` / `fg` cycle the
-app never asked for is handled the same way on `SIGCONT`.
+repaint when `fg` continues it. A handler that returns `true` for Ctrl+Z — an
+editor's undo, while the editor is focused — keeps the terminal (see
+[Keys and useInput](input.md#keys-and-useinput)); `suspendKey: false` in the
+backend options turns the default off for the whole run instead. Either way the
+key arrives as `{ name: 'z', ctrl: true }`. A `kill -STOP` / `fg` cycle the app
+never asked for is handled the same way on `SIGCONT`.
 
 ## Root abort signal
 

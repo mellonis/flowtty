@@ -10,11 +10,18 @@ export interface UseInputOptions {
 /**
  * Subscribe to keyboard events from the surrounding InputContext.
  *
+ * Return `true` to consume the key: subscribers later in delivery order do not
+ * see it, and the backend skips its default for it (Ctrl+C / Ctrl+D exit,
+ * Ctrl+Z suspend). Delivery order is subscription order — on mount, children
+ * before parents, since React runs effects inside-out; a component mounted
+ * later comes after. Only a strict `true` counts: an async handler returns a
+ * Promise, which does not. See docs/input.md (keys and useInput).
+ *
  * The handler ref is updated on each render, so closures capture the latest
  * state without re-subscribing — only `isActive` toggles or context changes
  * (un)subscribe. Cleanup runs on unmount.
  */
-export function useInput(handler: (key: Key) => void, opts: UseInputOptions = {}): void {
+export function useInput(handler: (key: Key) => unknown, opts: UseInputOptions = {}): void {
   const source = useContext(InputContext);
   const ref = useRef(handler);
   ref.current = handler;

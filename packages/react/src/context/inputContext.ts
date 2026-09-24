@@ -1,7 +1,11 @@
 import { createContext, type Context } from 'react';
 import type { Key } from '@flowtty/core';
 
-export type KeySubscriber = (key: Key) => void;
+/** A `useInput` handler. Returning `true` consumes the key: no later
+ *  subscriber sees it, and no backend default runs for it. Only a strict
+ *  `true` counts, hence `unknown`: a handler may be any expression, and an
+ *  async handler's Promise never consumes. */
+export type KeySubscriber = (key: Key) => unknown;
 
 export interface InputSource {
   subscribe(handler: KeySubscriber): () => void;

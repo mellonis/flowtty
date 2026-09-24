@@ -403,7 +403,7 @@ describe('InlineTtyBackend suspend / resume', () => {
       out.writes.length = 0;
 
       input.emit('data', '\x1a');
-      expect(keys).toEqual([]);
+      expect(keys).toEqual(['z']); // delivered first; nobody consumed it, so the default ran
       expect(out.writes.at(-1)).toBe('\r\x1b[1A\x1b[J' + SHOW + RESET);
       expect(kill).toHaveBeenCalledWith(process.pid, 'SIGTSTP');
 
@@ -419,12 +419,40 @@ describe('InlineTtyBackend suspend / resume', () => {
       kill.mockClear();
       plain.onKey((k) => keys.push(k.name));
       input.emit('data', '\x1a');
-      expect(keys).toEqual(['z']);
+      expect(keys).toEqual(['z', 'z']);
       expect(kill).not.toHaveBeenCalled();
       plain.dispose();
     } finally {
       kill.mockRestore();
       on.mockRestore();
+    }
+  });
+});
+
+describe('InlineTtyBackend consumed keys', () => {
+  test('a subscriber that consumes Ctrl+C keeps the app alive; Ctrl+Z consumed does not suspend', () => {
+    const exitSpy = vi.spyOn(process, 'exit').mockImplementation(((code?: number) => {
+      throw new Error(`exit:${code}`);
+    }) as never);
+    const kill = vi.spyOn(process, 'kill').mockImplementation(() => true);
+    try {
+      const out = mockStdout(4);
+      const input = mockStdin();
+      const b = new InlineTtyBackend({ out, in: input, liveHeight: 2, colorScheme: false });
+      let taken = 0;
+      b.onKey((k) => { if (k.ctrl && (k.name === 'c' || k.name === 'z')) { taken++; return true; } });
+      b.draw(newBuffer(4, 2, 'a'));
+      out.writes.length = 0;
+      input.emit('data', '\x03');
+      input.emit('data', '\x1a');
+      expect(taken).toBe(2);
+      expect(exitSpy).not.toHaveBeenCalled();
+      expect(kill).not.toHaveBeenCalled();
+      expect(out.writes).toEqual([]);
+      b.dispose();
+    } finally {
+      exitSpy.mockRestore();
+      kill.mockRestore();
     }
   });
 });

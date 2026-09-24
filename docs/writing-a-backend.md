@@ -17,7 +17,7 @@ interface Backend {
   size(): { width: number; height: number };   // required — in cells
   draw(buffer: Buffer): void;                    // required — the whole frame, every time
 
-  onKey?(handler: (key: Key) => void): () => void;   // returns an unsubscribe
+  onKey?(handler: (key: Key) => unknown): () => void;  // returns an unsubscribe; true from the handler = consumed
   onResize?(handler: () => void): () => void;        // call it when size() would change
   dispose?(): void;                                  // undo whatever the constructor did
   printStatic?(lines: string[]): void;               // permanent lines above a live region
@@ -42,7 +42,10 @@ Only `size` and `draw` are required; everything else is feature-detected.
   names one (see docs/input.md, the mouse). Without it the app is a passive
   view and `useInput` handlers never fire. `decodeKeys` from
   `@flowtty/tty-backend` turns raw stdin bytes into keys, if your source is a
-  byte stream.
+  byte stream. A handler that returns `true` has consumed the key: deliver to
+  the subscribers first and apply any default of yours — the TTY backends exit
+  on Ctrl+C / Ctrl+D and suspend on Ctrl+Z — only when none did; see
+  [Keys and useInput](input.md#keys-and-useinput).
 - **`dispose`** is where a terminal is put back the way it was found. `render()`
   calls it on unmount, on an unhandled error, and on `SIGTERM` / `SIGHUP` /
   `SIGINT`. Make it idempotent.

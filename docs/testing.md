@@ -101,7 +101,9 @@ backend.mouse('drag', 9, 2);           // …drag across to (9, 2)…
 backend.mouse('up', 9, 2);             // …and release
 ```
 
-`press()` throws on a name no terminal produces — `'space'`, `'enter'`, `'esc'` —
+`press()` returns whether a `useInput` handler consumed the key (returned
+`true`) — the answer a TTY backend acts on to skip its Ctrl+C / Ctrl+Z default;
+see [Keys and useInput](input.md#keys-and-useinput). It throws on a name no terminal produces — `'space'`, `'enter'`, `'esc'` —
 and says what to use instead (`' '`, `'return'`, `'escape'`). A printable key is
 named by its character; the rest come from `NAMED_KEYS`. A test that presses an
 impossible name exercises a branch real input never reaches, and would pass.

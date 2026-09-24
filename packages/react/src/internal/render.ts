@@ -2,7 +2,7 @@ import { createElement, type ReactNode } from 'react';
 import { UNKNOWN_COLOR_SCHEME, type Backend, type Buffer, type Key, type TerminalColorScheme } from '@flowtty/core';
 import { getYoga, computeLayout, contentHeight, paint, SelectionController } from '@flowtty/core/host';
 import { createRoot, type Root } from './reconciler.js';
-import { InputContext, type InputSource } from '../context/inputContext.js';
+import { InputContext, type InputSource, type KeySubscriber } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
 import { AbortContext } from '../context/abortContext.js';
 import { AppContext, type AppApi } from '../context/appContext.js';
@@ -33,17 +33,24 @@ function makeKeySource(
   beforeDispatch?: (key: Key) => void,
   afterDispatch?: () => void,
 ): InputSource {
-  const subscribers = new Set<(key: Key) => void>();
+  const subscribers = new Set<KeySubscriber>();
   let detachBackend: (() => void) | undefined;
   return {
     subscribe(handler) {
       if (subscribers.size === 0) {
         detachBackend = backend.onKey((key) => {
           beforeDispatch?.(key);
+          let consumed = false;
           root.flushSync(() => {
-            for (const s of [...subscribers]) s(key);
+            // Subscription order, stopping at the first handler that consumes:
+            // a child subscribes before its parent (effects run inside-out), so
+            // the innermost handler gets the key first.
+            for (const s of [...subscribers]) {
+              if (s(key) === true) { consumed = true; break; }
+            }
           });
           afterDispatch?.();
+          return consumed;
         });
       }
       subscribers.add(handler);

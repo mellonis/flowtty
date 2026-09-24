@@ -154,3 +154,15 @@ test('suspend() and resume() are recorded, so an app can test its editor flow', 
   expect(b.suspended).toBe(false);
   expect(b.suspensions).toBe(1);
 });
+
+test('press() reports whether a subscriber consumed the key: only a strict true counts', () => {
+  const b = new TestBackend(4, 1);
+  expect(b.press({ name: 'a' })).toBe(false); // nobody listening
+  b.onKey(() => undefined);
+  expect(b.press({ name: 'a' })).toBe(false);
+  b.onKey((k) => k.name === 'z' && k.ctrl); // false for anything else
+  expect(b.press({ name: 'a' })).toBe(false);
+  expect(b.press({ name: 'z', ctrl: true })).toBe(true);
+  b.onKey(async () => {}); // a Promise is not `true`
+  expect(b.press({ name: 'a' })).toBe(false);
+});

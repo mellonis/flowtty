@@ -2,11 +2,56 @@
 
 How keys reach a component, how focus moves, and how forms validate.
 
+- [Keys and useInput](#keys-and-useinput)
 - [Paste and the mouse](#paste-and-the-mouse)
 - [Selection](#selection)
 - [Focus + Button](#focus--button)
 - [Form](#form)
 - [Usage with Zod](#usage-with-zod)
+
+## Keys and useInput
+
+`useInput(handler)` subscribes a component to the keys of its input scope:
+
+```tsx
+useInput((key) => {
+  if (key.name === 'q') exit();
+});
+```
+
+`key` is `{ name, sequence, ctrl, meta, shift }`, plus `text` for a paste and
+`x` / `y` / `button` for the mouse (next section). Every subscriber in the scope
+receives every key, in **subscription order**: on mount, children before parents
+— React runs effects inside-out — and a component mounted later comes after the
+ones already there. A `<DialogHost>` mutes the scopes under its top dialog, and
+`<Box inert>` mutes a subtree, so "the innermost live handler first" is what an
+app sees in practice.
+
+**Return `true` to consume the key.** Subscribers later in the order do not see
+it, and the backend skips its own default for it. There are three such
+defaults in the TTY backends: Ctrl+C and Ctrl+D exit the app (raw mode swallows
+`SIGINT`, so the key is all there is), and Ctrl+Z suspends it (see
+[Handing the terminal over](app.md#handing-the-terminal-over)). A field that
+undoes on Ctrl+Z returns `true` while focused, and the app still suspends
+everywhere else; an app that cancels a running request on Ctrl+C returns `true`
+while one is running, and exits on its own the second time:
+
+```tsx
+useInput((key) => {
+  if (key.ctrl && key.name === 'c' && running) { cancel(); return true; }
+});
+```
+
+An app that consumes Ctrl+C owns its exit: nothing else quits it from the
+keyboard (`kill -INT` and `SIGTERM` still restore the terminal). Only a strict
+`true` consumes — the handler's type is `(key) => unknown`, so `(key) =>
+seen.push(key)` still type-checks, and an `async` handler returns a Promise,
+which never consumes: no handler swallows keys by accident. Handlers that
+return nothing behave as before. `TestBackend.press()` returns whether the key
+was consumed, so a test can assert it.
+
+The built-in components (`TextInput`, `Select`, …) consume nothing yet; a
+global shortcut still fires while a field is focused.
 
 ## Paste and the mouse
 

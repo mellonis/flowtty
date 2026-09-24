@@ -21,6 +21,17 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
   with `SIGTSTP`, and take it again on `fg`. `suspendKey: false` delivers Ctrl+Z
   as a key instead. A `SIGCONT` after a stop the app never asked for repaints
   too.
+- A `useInput` handler that returns `true` consumes the key: later subscribers
+  do not see it, and the backend skips its default for it — Ctrl+C / Ctrl+D no
+  longer exit and Ctrl+Z no longer suspends when a handler took them. Keys are
+  delivered in subscription order (children before parents on mount). Backend
+  `onKey` handlers may return a value; `TestBackend.press()` returns whether
+  the key was consumed. See docs/input.md (keys and useInput).
+
+### Changed
+
+- Ctrl+C, Ctrl+D and Ctrl+Z now reach `useInput` handlers before the backend
+  acts on them; a handler that returns nothing changes nothing.
 
 ## 1.0.0-alpha.22 — 2026-09-23
 

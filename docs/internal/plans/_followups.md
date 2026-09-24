@@ -156,3 +156,7 @@ Hardcoded cursor glyph (`█` block) in `text-input.ts`. No blink (would need ti
 ### `bumpKey` is not needed — `setStatusMessage` triggers re-render + fresh disk read
 
 After `setDraftForFolder` resolves, calling `setStatusMessage('published: <id>')` causes React to re-render; `ListView` calls `listFolders()` + `statusOf()` fresh from disk on every render, so the updated draft state appears automatically. No extra counter state required.
+
+### Built-in components consuming keys
+
+`TextInput`, `TextArea`, `Select`, `MultiSelect`, `Menu` and `Button` return nothing from their `useInput` handlers, so a global shortcut fires while a field is focused, and `Button shortcut` fires from inside a field. Now that a `true` return consumes a key (docs/input.md, keys and useInput), decide per component which keys it should consume when focused — a focused field: every printable key and its editing keys; a menu: its navigation keys. A behaviour change for apps that rely on the fall-through; an alpha note when it lands.
