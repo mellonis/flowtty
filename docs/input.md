@@ -50,7 +50,7 @@ which never consumes: no handler swallows keys by accident. Handlers that
 return nothing behave as before. `TestBackend.press()` returns whether the key
 was consumed, so a test can assert it.
 
-The built-in components (`TextInput`, `Select`, …) consume nothing yet; a
+The built-in components (`TextInput`, `ListSelect`, …) consume nothing yet; a
 global shortcut still fires while a field is focused.
 
 ## Paste and the mouse
@@ -121,7 +121,7 @@ a test from blessing a branch real input never reaches.
 
 A handler that matches on names it knows is unaffected by the mouse keys: their
 names are multi-character, so they are never mistaken for a printable character.
-`<TextInput>`, `<TextArea>`, `<Select>` and `<MultiSelect>` ignore them.
+`<TextInput>`, `<TextArea>`, `<ListSelect>` and `<ListMultiSelect>` ignore them.
 
 ## Selection
 
@@ -312,12 +312,12 @@ Components inside a `<FocusGroup>` can call `useFocus()` to know if they're the 
 - `shortcut` key (anywhere in the input scope) → `onPress()` even when not focused
 - Focused state: bold + inverse-video label
 
-`<MultiSelect onAddNew>` adds a "+ add new" row. Return the new item's value from
+`<ListMultiSelect onAddNew>` adds a "+ add new" row. Return the new item's value from
 the callback — directly or as a promise, e.g. after a sub-prompt in a dialog — and
 the component selects it and moves the cursor onto it once it appears in `items`
 (adding it to `items` is the caller's job). Return `null` for a cancelled prompt.
 
-TextInput / Select / MultiSelect also plug into the focus system. Their `isFocused` prop becomes optional — if unset, they read from the FocusGroup. If set explicitly, the prop overrides.
+TextInput / ListSelect / ListMultiSelect / Select also plug into the focus system. Their `isFocused` prop becomes optional — if unset, they read from the FocusGroup. If set explicitly, the prop overrides.
 
 Outside a FocusGroup, `useFocus()` returns `{isFocused: true}` (safe default — single component receives input as before).
 

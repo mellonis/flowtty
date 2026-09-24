@@ -449,3 +449,46 @@ test('stacked dialogs: the lower dialog is dimmed by the one above it, the host 
   const y = frame.findIndex((l) => l.includes('second'));
   expect(two.lastBuffer!.get(frame[y]!.indexOf('second'), y).style.dim).toBeFalsy();
 });
+
+// ─── anchored placement ───────────────────────────────────────────────────────
+
+async function anchored(anchor: { left: number; top: number; width: number; height: number }, height = 3) {
+  const backend = new TestBackend(20, 8);
+  let open!: (el: ReactNode, o: object) => Promise<unknown>;
+  function Host() {
+    open = useDialogHost().openDialog;
+    return createElement('flowtty-box', { width: 20, height: 8 });
+  }
+  const handle = await render(createElement(DialogHost, {}, createElement(Host)), backend);
+  await flushAsync(backend);
+  void open(createElement(Text, null, 'opt'), { floating: true, anchor, height });
+  await flushAsync(backend);
+  const frame = backend.lastFrame.split('\n');
+  const y = frame.findIndex((l) => l.includes('opt'));
+  const x = frame[y]!.indexOf('opt');
+  const boxLeft = frame[y]!.search(/\S/);
+  handle.unmount();
+  return { y, x, boxLeft, frame };
+}
+
+test('an anchored floating dialog sits under the anchor, flush with its left edge, at least as wide', async () => {
+  const { y, x, boxLeft, frame } = await anchored({ left: 2, top: 1, width: 8, height: 1 });
+  expect(y).toBe(3);                          // anchor row 1, popup rows 2..4, text on row 3
+  expect(boxLeft).toBe(2);                    // the border starts at the anchor's left edge
+  expect(x).toBe(3);
+  expect(frame[2]!.trimEnd()).toHaveLength(10); // 8 wide: the anchor's width, not the text's
+  expect(frame[2]![2]).not.toBe(' ');         // a border row above…
+  expect(frame[4]![2]).not.toBe(' ');         // …and below
+});
+
+test('an anchored dialog flips above the anchor when there is no room below', async () => {
+  const { y, boxLeft } = await anchored({ left: 2, top: 7, width: 8, height: 1 });
+  expect(y).toBe(5);                          // popup rows 4..6, just above row 7
+  expect(boxLeft).toBe(2);
+});
+
+test('an anchored dialog is shifted left to stay inside the screen', async () => {
+  const { y, boxLeft } = await anchored({ left: 15, top: 1, width: 8, height: 1 });
+  expect(y).toBe(3);
+  expect(boxLeft).toBe(12);                   // 12 + 8 = 20, the right edge
+});

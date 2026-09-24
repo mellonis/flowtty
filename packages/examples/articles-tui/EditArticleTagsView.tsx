@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 import { useState } from 'react';
-import { Box, MultiSelect, useDialogHost } from '@flowtty/react';
+import { Box, ListMultiSelect, useDialogHost } from '@flowtty/react';
 import type { SelectItem } from '@flowtty/react';
 import { loadRegisteredTags, readFrontmatter, writeArticleTags } from './helpers.js';
 import { AddTagDialog, ADD_TAG_DIALOG_TITLE } from './AddTagDialog.js';
@@ -39,7 +39,7 @@ export function EditArticleTagsView({ id, onDone }: EditArticleTagsViewProps) {
   return (
     <Box flexDirection="column">
       <Box>{`tags for ${id} (Space toggle, Enter confirm, Esc cancel):`}</Box>
-      <MultiSelect<string>
+      <ListMultiSelect<string>
         items={tagItems}
         value={selectedTags}
         onChange={(v) => setSelectedTags(v)}

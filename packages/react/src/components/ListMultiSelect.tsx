@@ -6,7 +6,7 @@ import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
 import { multiSelectReducer as reduce, type MultiSelectState, type SelectItem } from '@flowtty/core';
 
-export interface MultiSelectProps<T> {
+export interface ListMultiSelectProps<T> {
   items: SelectItem<T>[];
   /** Currently-selected values (controlled). */
   value: T[];
@@ -27,7 +27,7 @@ export interface MultiSelectProps<T> {
   onAddNew?: () => void | T | null | Promise<T | null | void>;
 }
 
-export function MultiSelect<T>(props: MultiSelectProps<T>): ReactNode {
+export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
   const { items, value, onChange, onSubmit, onCancel, onAddNew, isFocused: explicitFocus } = props;
   const { isFocused: ctxFocused } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;

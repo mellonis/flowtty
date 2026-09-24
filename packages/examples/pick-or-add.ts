@@ -2,7 +2,7 @@ import { createElement, useState } from 'react';
 import {
   render, Box, Text,
   DialogHost, useDialogHost, useDialog,
-  MultiSelect, TextInput,
+  ListMultiSelect, TextInput,
 } from '@flowtty/react';
 import { TtyBackend } from '@flowtty/tty-backend';
 
@@ -36,7 +36,7 @@ function App() {
   }
   return createElement(Box, { flexDirection: 'column' },
     createElement(Text, null, 'Space toggle · ↑↓ navigate · Enter on "+ add new" to add · Enter on item to submit · Esc/Ctrl-C exit'),
-    createElement(MultiSelect<string>, {
+    createElement(ListMultiSelect<string>, {
       items, value: selected,
       onChange: setSelected,
       onSubmit: (final) => setDone(final),

@@ -43,7 +43,7 @@ export function reduce<T>(items: SelectItem<T>[], state: SelectState, key: Key):
   }
 
   // Arrows only. This list filters as you type, so every printable character —
-  // `j` and `k` included — belongs to the filter; MultiSelect, which has no
+  // `j` and `k` included — belongs to the filter; ListMultiSelect, which has no
   // filter, keeps the vim-style pair.
   if (key.name === 'down') {
     if (n === 0) return { kind: 'noop' };

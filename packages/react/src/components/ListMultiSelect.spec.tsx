@@ -3,11 +3,11 @@ import { expect, test } from 'vitest';
 import { createElement, useState } from 'react';
 import { render } from '../index.js';
 import { TestBackend, flush, flushAsync } from '@flowtty/core/testing';
-import { MultiSelect } from './MultiSelect.js';
+import { ListMultiSelect } from './ListMultiSelect.js';
 
 test('renders all items with [ ] or [x] + cursor marker', async () => {
   function App() {
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items: [
         { label: 'a', value: 'a' },
         { label: 'b', value: 'b' },
@@ -28,7 +28,7 @@ test('space toggles cursor item (onChange fires with updated array, original-ite
   function App() {
     const [v, setV] = useState<string[]>([]);
     captured.push(v);
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items: [{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }],
       value: v, onChange: setV, onSubmit: () => {},
     });
@@ -54,7 +54,7 @@ test('enter submits the current value array in original item order', async () =>
   const submitted: string[][] = [];
   function App() {
     const [v, setV] = useState<string[]>(['b']);
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items: [{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }, { label: 'c', value: 'c' }],
       value: v, onChange: setV, onSubmit: (arr: string[]) => submitted.push(arr),
     });
@@ -70,7 +70,7 @@ test('enter submits the current value array in original item order', async () =>
 
 test('onAddNew prop adds a "+ add new" row at the bottom (after items)', async () => {
   function App() {
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items: [{ label: 'a', value: 'a' }],
       value: [], onChange: () => {}, onSubmit: () => {},
       onAddNew: () => {},
@@ -85,7 +85,7 @@ test('Enter on "+ add new" row calls onAddNew (NOT onSubmit)', async () => {
   let addCalled = false;
   const submits: string[][] = [];
   function App() {
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items: [{ label: 'a', value: 'a' }],
       value: [], onChange: () => {}, onSubmit: (v) => submits.push(v),
       onAddNew: () => { addCalled = true; },
@@ -104,7 +104,7 @@ test('Enter on "+ add new" row calls onAddNew (NOT onSubmit)', async () => {
 test('Space on "+ add new" row is a noop (no onChange)', async () => {
   let toggled = false;
   function App() {
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items: [{ label: 'a', value: 'a' }],
       value: [], onChange: (v: string[]) => { toggled = v.length > 0; }, onSubmit: () => {},
       onAddNew: () => {},
@@ -121,7 +121,7 @@ test('Space on "+ add new" row is a noop (no onChange)', async () => {
 
 test('without onAddNew, no "+ add new" row (back-compat)', async () => {
   function App() {
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items: [{ label: 'a', value: 'a' }],
       value: [], onChange: () => {}, onSubmit: () => {},
     });
@@ -140,7 +140,7 @@ test('onAddNew resolving with a value selects the new item and moves the cursor 
     const [items, setItems] = useState([{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }]);
     const [value, setValue] = useState<string[]>(['b']);
     selected = value;
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items, value, onChange: setValue, onSubmit: () => {},
       onAddNew: () => new Promise<string | null>((resolve) => {
         resolveAdd = (v) => { if (v) setItems((cur) => [...cur, { label: v, value: v }]); resolve(v); };
@@ -162,7 +162,7 @@ test('onAddNew resolving with a value selects the new item and moves the cursor 
 test('onAddNew resolving with null (the sub-prompt was cancelled) changes nothing', async () => {
   const changes: string[][] = [];
   function App() {
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items: [{ label: 'a', value: 'a' }], value: [], onChange: (v: string[]) => changes.push(v), onSubmit: () => {},
       onAddNew: async () => null,
     });
@@ -183,7 +183,7 @@ test('onAddNew may also return the value synchronously', async () => {
     const [items, setItems] = useState([{ label: 'a', value: 'a' }]);
     const [value, setValue] = useState<string[]>([]);
     selected = value;
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items, value, onChange: setValue, onSubmit: () => {},
       onAddNew: () => { setItems((cur) => [...cur, { label: 'z', value: 'z' }]); return 'z'; },
     });
@@ -203,7 +203,7 @@ test('onAddNew may also return the value synchronously', async () => {
 test('focused: the cursor marker is colored + bold and the cursor row is bold; unfocused: the marker is dim', async () => {
   const props = { items: [{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }], value: [] as string[], onChange: () => {}, onSubmit: () => {} };
   const focused = new TestBackend(20, 2);
-  await render(createElement(MultiSelect<string>, { ...props, isFocused: true }), focused);
+  await render(createElement(ListMultiSelect<string>, { ...props, isFocused: true }), focused);
   const f = focused.lastBuffer!;
   expect(f.get(0, 0).char).toBe('▸');
   expect(f.get(0, 0).style).toMatchObject({ fg: 'cyan', bold: true });
@@ -211,7 +211,7 @@ test('focused: the cursor marker is colored + bold and the cursor row is bold; u
   expect(f.get(6, 1).style.bold).toBeFalsy();       // other rows stay plain
 
   const blurred = new TestBackend(20, 2);
-  await render(createElement(MultiSelect<string>, { ...props, isFocused: false }), blurred);
+  await render(createElement(ListMultiSelect<string>, { ...props, isFocused: false }), blurred);
   const b = blurred.lastBuffer!;
   expect(b.get(0, 0).char).toBe('▸');               // still marks the row…
   expect(b.get(0, 0).style.dim).toBe(true);         // …but quietly
@@ -220,12 +220,12 @@ test('focused: the cursor marker is colored + bold and the cursor row is bold; u
   expect(focused.lastFrame).toBe(blurred.lastFrame); // same text either way
 });
 
-test('a mouse button key neither toggles nor moves the MultiSelect cursor', async () => {
+test('a mouse button key neither toggles nor moves the ListMultiSelect cursor', async () => {
   const captured: string[][] = [];
   function App() {
     const [v, setV] = useState<string[]>(['b']);
     captured.push(v);
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items: [{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }],
       value: v, onChange: setV, onSubmit: () => { throw new Error('submitted'); },
       onCancel: () => { throw new Error('cancelled'); },

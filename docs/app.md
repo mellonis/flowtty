@@ -541,3 +541,13 @@ dialog. It is built on a `<Box backdrop="dim">` prop, which restyles the cells
 already painted under the box instead of covering them (characters and colors
 stay, `bold` is dropped). `dim` is a flag on a cell, not an opacity, so a stack of
 dialogs never darkens anything twice.
+
+**Anchored.** `openDialog(el, { floating: true, anchor, height })` pins a
+floating dialog to a rect instead of centring it — a popup for a field. `anchor`
+is a rect in frame cells (what `onLayout` hands a component), `height` the rows
+the dialog wants, border included. The dialog sits under the anchor, flush with
+its left edge and at least as wide (`minWidth` defaults to the anchor's width),
+or above it when `height` rows do not fit below and there is more room above;
+it is shifted left to stay on screen and may grow only into the room on its
+side. `<Select>` opens its popup this way. Everything else is as for any
+floating dialog: the host is muted, `done` / `cancel` close it.

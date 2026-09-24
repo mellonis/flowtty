@@ -47,6 +47,15 @@ export interface OpenDialogOptions {
    *  for `floating` dialogs — a full-screen one already covers what is behind.
    *  Stacked backdrops never darken twice: dim is a flag on a cell. */
   backdrop?: boolean;
+  /** Pin a floating dialog to a rect (frame cells — an `onLayout` rect): under
+   *  it, flush with its left edge, or above it when `height` rows do not fit
+   *  below; shifted left to stay on screen. `minWidth` defaults to the rect's
+   *  width. The rest of the screen is still the host's — a popup for a field.
+   *  See docs/app.md (DialogHost). */
+  anchor?: { left: number; top: number; width: number; height: number };
+  /** With `anchor`: the rows the dialog wants, border included, which decides
+   *  below or above. Default 3. */
+  height?: number;
 }
 
 /** Dialog-side API: the dialog's own components call these to resolve. */
@@ -69,3 +78,7 @@ export const DialogResultContext: Context<DialogResultApi> = createContext<Dialo
  *  Outside a DialogHost the default is true (so standalone dialog components
  *  outside a stack render in their "active" style). */
 export const DialogIsTopContext: Context<boolean> = createContext<boolean>(true);
+
+/** True under a `<DialogHost>`: a component that needs one to open a popup
+ *  (`<Select>`) reads it to warn instead of silently doing nothing. */
+export const DialogHostPresentContext: Context<boolean> = createContext<boolean>(false);

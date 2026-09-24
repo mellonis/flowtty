@@ -160,3 +160,8 @@ After `setDraftForFolder` resolves, calling `setStatusMessage('published: <id>')
 ### Built-in components consuming keys
 
 `TextInput`, `TextArea`, `Select`, `MultiSelect`, `Menu` and `Button` return nothing from their `useInput` handlers, so a global shortcut fires while a field is focused, and `Button shortcut` fires from inside a field. Now that a `true` return consumes a key (docs/input.md, keys and useInput), decide per component which keys it should consume when focused — a focused field: every printable key and its editing keys; a menu: its navigation keys. A behaviour change for apps that rely on the fall-through; an alpha note when it lands.
+
+### Fields to bring in line with `Select`
+
+- `TextInput` has no `frame`: next to a `Select` band it is the same band, but there is no `none` / `border` form, so a filter bar mixing the two looks uneven. A `frame` prop on `TextInput` (same values) would close that.
+- No field takes focus on a mouse click: `FocusGroup` has no `focus(id)`. `Select` opens on a click regardless of focus (the popup is a dialog, so focus does not matter while it is open), but `TextInput` / `Button` ignore clicks. Focus by click needs the group API first.

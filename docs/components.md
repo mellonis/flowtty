@@ -4,8 +4,11 @@ The building blocks beyond `<Box>` and `<Text>`. Forms, focus and buttons are in
 
 - [Text and Span](#text-and-span)
 - [TextInput](#textinput)
+- [Choosing](#choosing)
 - [Select](#select)
-- [MultiSelect](#multiselect)
+- [ListSelect](#listselect)
+- [ListMultiSelect](#listmultiselect)
+- [Menu](#menu)
 - [TextArea](#textarea)
 - [Table](#table)
 - [Markdown](#markdown)
@@ -74,27 +77,83 @@ word forward, Ctrl+K / Ctrl+U kill to the end / start. A paste is inserted at th
 caret with its line breaks turned into spaces. An emoji is one character. For
 several lines use [`<TextArea>`](#textarea).
 
+## Choosing
+
+Four components let the person choose; they share one vocabulary and differ in
+what they are for.
+
+| Component | What it is | Reach for it when |
+|---|---|---|
+| `Select` | A one-line field showing the chosen value and `▾`; opens a popup to choose from. Single, or `multiple`. | A field among other fields, a filter bar — the options must not take room until wanted. Needs a `<DialogHost>`. |
+| `ListSelect` | Every option on screen, one highlighted; the highlight *is* the value. | A full-screen picker, a dialog whose whole point is the choice. |
+| `ListMultiSelect` | Every option on screen with a checkbox each; any number. | The same, for several — with `onAddNew` for "one that is not here yet". |
+| `Menu` | A bar of commands with cascading panels. | Commands, not values: what the app can do, not what a field holds. |
+
+The vocabulary: `items` is a `SelectItem<T>[]` — `{ label, value }`, the label
+shown and the value reported; `value` / `onChange` are controlled, `value` a
+single `T` (or `undefined` for none) or a `T[]` always in the order of `items`;
+`onSubmit` fires on Enter where a list is a step of its own (the lists — the
+dropdown closes instead); `onCancel` on Escape; `onAddNew` on the multi
+variants; typing filters where the list can be long (`Select`, `ListSelect`);
+`isFocused` overrides the `FocusGroup`. `Menu` has its own `MenuItem` —
+`{ key, label, submenu? }` — because a command is not a value.
+
 ## Select
+
+A dropdown: the field shows what is chosen, the popup shows what can be.
+
+```tsx
+<Select items={regions} value={region} onChange={setRegion} width={24} placeholder="pick a region" />
+<Select multiple items={tags} value={tags} onChange={setTags} width={24} />
+```
+
+The field is a focusable: Tab reaches it, Enter, Space, ↓ or a click on it opens
+the popup — a floating dialog anchored under the field, or above it when there is
+no room below, at least as wide as the field, showing at most `maxRows` rows
+(default 8) and scrolling to keep the cursor in view. So a `<DialogHost>` above
+the field is required: while the popup is open everything else is muted, as for
+any dialog; without a host the field warns once and cannot open. In the popup
+↑/↓ and the wheel move, typing narrows the list to labels containing what was
+typed (`filter={false}` turns that off; the filter shows as a row above the
+options while non-empty), Backspace widens, Enter picks and closes, Escape closes
+with nothing changed; a click on a row picks it, a click outside closes.
+
+With `multiple`, `value` is the array of chosen values in the order of `items`;
+Space (or a click) toggles a row and calls `onChange` at once, Enter closes.
+The field lists the chosen labels, or says `N selected` when they would not fit
+its `width`. `onAddNew` adds a "+ add new" row, as on `ListMultiSelect`: return
+the new item's value — directly or as a promise — and it is selected once it
+appears in `items`.
+
+`frame` is the field's look: `field` (default) is the same filled band
+`TextInput` draws, so a form's fields match; `none` is bare `value ▾`, sized to
+its text, for a filter bar (`Sprint: current ▾  Tags: 2 ▾`); `border` is a
+bordered box. `placeholder` (default `—`) shows when nothing is chosen. Focus is
+shown as on the other fields: a bold value and a cyan arrow; while the popup is
+open the arrow turns `▴` and the field is inverse. `width`, `minWidth`,
+`maxWidth`, `flexGrow` and `flexShrink` pass through to the box.
+
+## ListSelect
 
 Pick one of a list. The highlighted item *is* the value.
 
 ```tsx
-<Select items={[{ label: 'Hobby', value: 'hobby' }, { label: 'Team', value: 'team' }]}
+<ListSelect items={[{ label: 'Hobby', value: 'hobby' }, { label: 'Team', value: 'team' }]}
   value={plan} onChange={setPlan} onSubmit={confirm} />
 ```
 
 ↑/↓ move and wrap around; typing narrows the list to labels containing what was
 typed (case-insensitive), Backspace widens it again; Enter calls `onSubmit`, Escape
 `onCancel`. Every printable key goes to the filter. The generic parameter is the value type —
-`<Select<Plan> …>` in JSX keeps it, `createElement` loses it.
+`<ListSelect<Plan> …>` in JSX keeps it, `createElement` loses it.
 
-## MultiSelect
+## ListMultiSelect
 
 Pick any number. `value` is the array of selected values, always in the order of
 `items`.
 
 ```tsx
-<MultiSelect items={tags} value={picked} onChange={setPicked} onSubmit={next}
+<ListMultiSelect items={tags} value={picked} onChange={setPicked} onSubmit={next}
   onAddNew={async () => (await askForTag()) ?? null} />
 ```
 
@@ -107,6 +166,24 @@ Return `null` for a cancelled prompt.
 
 Both lists show focus: a colored, bold `▸` and a bold cursor row when focused, a
 dim marker when not.
+
+## Menu
+
+A bar of commands across the top of a full-screen app, with cascading panels.
+
+```tsx
+<Menu items={[{ key: 'file', label: 'File', submenu: [{ key: 'open', label: 'Open…' }, { key: 'quit', label: 'Quit' }] }]}
+  onExit={exit}>
+  <Page />
+</Menu>
+```
+
+F10 engages the bar; ←/→ move along it, ↓/Enter open a panel, ↑/↓ move in it,
+→ opens a submenu, Enter picks (the item's `onSelect`), Escape closes a panel and
+then disengages. While the menu is engaged the page under it is `inert` — its
+`useInput` handlers do not fire. `Menu` needs a full-screen backend and renders
+nothing (with a one-shot warning) on an inline one. Its items are commands,
+`{ key, label, submenu? }`, not values — see [Choosing](#choosing).
 
 ## TextArea
 

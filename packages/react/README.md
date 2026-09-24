@@ -45,8 +45,9 @@ await render(
 
 ### Widgets
 - `<TextInput value onChange onSubmit validate />` — single-line input with cursor, validation, mask mode.
-- `<Select<T> items value onChange onSubmit />` — single-pick list.
-- `<MultiSelect<T> items value onChange onSubmit onAddNew />` — multi-pick with space-toggle and optional "add new".
+- `<Select<T> items value onChange />` — a dropdown field: one line, a popup to choose from (needs a `<DialogHost>`); `multiple` for any number.
+- `<ListSelect<T> items value onChange onSubmit />` — single-pick inline list.
+- `<ListMultiSelect<T> items value onChange onSubmit onAddNew />` — multi-pick inline list with space-toggle and optional "add new".
 - `<Confirm>` — yes/no prompt.
 - `<Form>` + `useField()` — form orchestration with per-field validation + global submit.
 - `<Button label shortcut onPress />` — focusable + shortcut-bound.

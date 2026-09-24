@@ -1,5 +1,5 @@
 import { createElement, useState } from 'react';
-import { render, Box, Text, Select } from '@flowtty/react';
+import { render, Box, Text, ListSelect } from '@flowtty/react';
 import { TtyBackend } from '@flowtty/tty-backend';
 
 function App() {
@@ -9,7 +9,7 @@ function App() {
   }
   return createElement(Box, null,
     createElement(Text, null, 'pick a fruit (type to filter, ↑↓ to navigate, Enter to pick, Esc/Ctrl-C to exit):'),
-    createElement(Select<string>, {
+    createElement(ListSelect<string>, {
       items: [
         { label: 'apple', value: 'apple' },
         { label: 'banana', value: 'banana' },

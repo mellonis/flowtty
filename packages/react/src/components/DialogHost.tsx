@@ -6,6 +6,7 @@ import { InputContext, type InputSource } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
 import {
   DialogHostContext,
+  DialogHostPresentContext,
   DialogIsTopContext,
   DialogResultContext,
   type DialogHostApi,
@@ -14,6 +15,7 @@ import {
   type OpenDialogOptions,
 } from '../context/dialogContext.js';
 import { FocusGroup } from './FocusGroup.js';
+import { useTerminalSize } from '../hooks/useTerminalSize.js';
 
 interface PendingDialog {
   /** Stable identity for this stack entry, so its resolve/cancel targets THIS
@@ -31,8 +33,28 @@ export interface DialogHostProps {
   backdrop?: boolean;
 }
 
+// Where an anchored dialog goes: under the anchor when `wanted` rows fit there
+// (or there is at least as much room below as above), else above it; flush
+// with the anchor's left edge, shifted left to stay inside the host. The
+// clamps are what the wrapper may grow to on that side.
+export function placeAnchored(
+  a: { left: number; top: number; width: number; height: number },
+  wanted: number,
+  host: { width: number; height: number },
+): { top: number; left: number; maxHeight: number; maxWidth: number } {
+  const below = host.height - (a.top + a.height);
+  const above = a.top;
+  const goesBelow = wanted <= below || below >= above;
+  const top = goesBelow ? a.top + a.height : Math.max(0, a.top - wanted);
+  const left = Math.max(0, Math.min(a.left, host.width - a.width));
+  return { top, left, maxHeight: goesBelow ? below : above, maxWidth: host.width - left };
+}
+
 export function DialogHost(props: DialogHostProps): ReactNode {
   const outerSource = useContext(InputContext);
+  // Anchors are frame cells; the host is assumed to sit at the frame's origin
+  // (the usual place for it), and the terminal is what bounds a popup.
+  const terminal = useTerminalSize();
   const [stack, setStack] = useState<PendingDialog[]>([]);
   const nextId = useRef(0);
   // Per-entry result API, memoized by dialog id so a dialog's { done, cancel }
@@ -114,6 +136,7 @@ export function DialogHost(props: DialogHostProps): ReactNode {
 
   return (
     <DialogHostContext.Provider value={hostApi}>
+    <DialogHostPresentContext.Provider value={true}>
       {/* Host content: muted when ANY dialog is open. */}
       <InputContext.Provider value={hasOpenDialog ? mutedSource : outerSource}>
         <FocusGroup isActive={!hasOpenDialog}>{props.children}</FocusGroup>
@@ -131,6 +154,9 @@ export function DialogHost(props: DialogHostProps): ReactNode {
       //     the overlay's alignItems/justifyContent centers it.
       const o = d.options;
       let content: ReactNode = d.element;
+      // An anchored dialog is placed, not centred: the wrapper is pinned to the
+      // anchor and bounded by the room on that side of it.
+      const placed = o?.floating && o.anchor ? placeAnchored(o.anchor, o.height ?? 3, terminal) : null;
       if (o?.title != null || o?.floating) {
         const wrapperProps: Record<string, unknown> = {
           border: DEFAULT_BORDER_STYLE,
@@ -142,7 +168,15 @@ export function DialogHost(props: DialogHostProps): ReactNode {
           selectionScope: true,
         };
         if (o.title != null) wrapperProps.borderTitle = o.title;
-        if (o.floating) {
+        if (placed !== null && o.anchor) {
+          wrapperProps.position = 'absolute';
+          wrapperProps.top = placed.top;
+          wrapperProps.left = placed.left;
+          wrapperProps.minWidth = o.minWidth ?? o.anchor.width;
+          wrapperProps.maxWidth = o.maxWidth ?? placed.maxWidth;
+          wrapperProps.maxHeight = o.maxHeight ?? placed.maxHeight;
+          wrapperProps.backgroundColor = 'default';
+        } else if (o.floating) {
           wrapperProps.maxWidth = o.maxWidth ?? '80%';
           wrapperProps.maxHeight = o.maxHeight ?? '80%';
           if (o.minWidth !== undefined) wrapperProps.minWidth = o.minWidth;
@@ -167,7 +201,8 @@ export function DialogHost(props: DialogHostProps): ReactNode {
           position="absolute"
           top={0} left={0}
           width="100%" height="100%"
-          justifyContent="center" alignItems="center"
+          justifyContent={placed === null ? 'center' : undefined}
+          alignItems={placed === null ? 'center' : undefined}
           // Backdrop: opaque ('default') for full-screen dialogs to mask
           // everything underneath; transparent (undefined) for floating
           // dialogs so the wrapper is the only opaque region and lower stack
@@ -195,6 +230,7 @@ export function DialogHost(props: DialogHostProps): ReactNode {
         </Box>
       );
       })}
+    </DialogHostPresentContext.Provider>
     </DialogHostContext.Provider>
   );
 }

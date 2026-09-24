@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 import { useState } from 'react';
-import { Select, useDialog } from '@flowtty/react';
+import { ListSelect, useDialog } from '@flowtty/react';
 import type { SelectItem } from '@flowtty/react';
 
 // ─── LangDialog ──────────────────────────────────────────────────────────────
@@ -22,7 +22,7 @@ export function LangDialog({ initialValue = 'en' }: LangDialogProps) {
   const { done, cancel } = useDialog();
   const [value, setValue] = useState<'en' | 'ru'>(initialValue);
   return (
-    <Select<'en' | 'ru'>
+    <ListSelect<'en' | 'ru'>
       items={langItems}
       value={value}
       onChange={(v) => setValue(v)}

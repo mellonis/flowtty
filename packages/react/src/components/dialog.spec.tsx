@@ -10,7 +10,7 @@ import { useInput } from '../hooks/useInput.js';
 import { DialogHost } from './DialogHost.js';
 import { useDialog, useDialogHost } from '../hooks/useDialog.js';
 import type { DialogResult } from '../context/dialogContext.js';
-import { MultiSelect } from './MultiSelect.js';
+import { ListMultiSelect } from './ListMultiSelect.js';
 
 function NamePromptDialog() {
   const { done, cancel } = useDialog();
@@ -112,7 +112,7 @@ test('after dialog closes, host resumes receiving keys', async () => {
   expect(hostKeys).toEqual(['o', 'a', 'b']);
 });
 
-test('M1c.4 acceptance: MultiSelect+add-new opens dialog, dialog submit appends and selects', async () => {
+test('M1c.4 acceptance: ListMultiSelect+add-new opens dialog, dialog submit appends and selects', async () => {
   function App() {
     const host = useDialogHost();
     const [items, setItems] = useState<{ label: string; value: string }[]>([
@@ -120,7 +120,7 @@ test('M1c.4 acceptance: MultiSelect+add-new opens dialog, dialog submit appends 
       { label: 'banana', value: 'banana' },
     ]);
     const [selected, setSelected] = useState<string[]>([]);
-    return createElement(MultiSelect<string>, {
+    return createElement(ListMultiSelect<string>, {
       items,
       value: selected,
       onChange: setSelected,
@@ -155,7 +155,7 @@ test('M1c.4 acceptance: MultiSelect+add-new opens dialog, dialog submit appends 
   backend.press({ name: 'return' });  // dialog calls done('cherry')
   await flushAsync(backend);
 
-  // Dialog closes; MultiSelect re-renders with appended 'cherry' selected.
+  // Dialog closes; ListMultiSelect re-renders with appended 'cherry' selected.
   expect(backend.lastFrame).toContain('[x] cherry');
   expect(backend.lastFrame).toContain('+ add new');
 });

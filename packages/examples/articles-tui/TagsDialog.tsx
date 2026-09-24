@@ -1,6 +1,6 @@
 /** @jsxImportSource react */
 import { useState } from 'react';
-import { Box, MultiSelect, useDialog, useDialogHost } from '@flowtty/react';
+import { Box, ListMultiSelect, useDialog, useDialogHost } from '@flowtty/react';
 import type { SelectItem } from '@flowtty/react';
 import { AddTagDialog, ADD_TAG_DIALOG_TITLE } from './AddTagDialog.js';
 
@@ -25,7 +25,7 @@ export function TagsDialog({ knownTags: initialKnownTags, preSelected }: TagsDia
   return (
     <>
       <Box dim>{'Space toggle · Enter confirm · + add new'}</Box>
-      <MultiSelect<string>
+      <ListMultiSelect<string>
         items={tagItems}
         value={selected}
         onChange={(v) => setSelected(v)}

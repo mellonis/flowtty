@@ -17,6 +17,10 @@ export const SCRIPT: Record<string, Step[]> = {
     press('tab'), wait(350),
     press(' '), wait(250), press('down', {}, 2), press(' '), wait(250),
     press('down'), wait(300), press('return'), wait(700), // "+ add new" → a new item, selected
+    press('tab'), wait(350), press('return'), wait(600),  // region: the dropdown opens under the field
+    type('tok'), wait(500), press('return'), wait(500),   // typing filters; Enter picks Asia (Tokyo)
+    press('tab'), wait(350), press('return'), wait(600),  // tags: a multiple dropdown
+    press(' '), wait(300), press('down'), wait(200), press(' '), wait(300), press('return'), wait(500),
     press('tab'), wait(300), press('return'),
     waitFor('Saved ✓'), wait(1400),
   ],

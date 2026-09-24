@@ -7,6 +7,29 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- `<Select>`: a dropdown. A one-line field showing the chosen value and `▾`
+  that opens a popup under it (or above, when there is no room) to choose
+  from — typing filters, ↑/↓ and the wheel move, Enter picks, Escape closes;
+  `multiple` for any number with Space toggling and `onAddNew`; `frame` picks
+  the field's look (`field`, `none`, `border`). The popup is a floating dialog,
+  so a `<DialogHost>` is required. See docs/components.md (Select, Choosing).
+- `openDialog(el, { floating: true, anchor, height })` pins a floating dialog
+  to a rect — under it, or above when it does not fit — instead of centring
+  it. See docs/app.md (DialogHost).
+- docs/components.md (Choosing): which of `Select`, `ListSelect`,
+  `ListMultiSelect` and `Menu` to reach for, and the vocabulary they share;
+  `Menu` has a section of its own now.
+
+### Changed
+
+- The inline lists are `ListSelect` and `ListMultiSelect`; `Select` is the
+  dropdown. No aliases: an app using the old `Select` / `MultiSelect` renames
+  its imports.
+
 ## 1.0.0-alpha.23 — 2026-09-24
 
 ### Added
