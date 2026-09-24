@@ -61,6 +61,16 @@ not quit an app whose root handler binds `q`, and pressing `q` on a button
 does. `isActive` mutes a handler without moving it in the delivery order: a
 field's handler, gated on focus, keeps the place its mount gave it.
 
+**The order is the mount order, and it stays.** A subtree mounted later — a
+plugin's component — comes after everything mounted before it, whatever its
+place in the tree. Opening or closing a dialog, or flipping `<Box inert>`,
+mutes and unmutes a subtree without moving anyone: the muting is a check at
+delivery, not a new subscription. A handler that must hear first whatever was
+mounted when takes the capture phase: `useInput(handler, { capture: true })`
+hears every key before the ordinary handlers — an app's own chords, a host's
+command layer — can consume it, and is muted with its subtree like the rest.
+Capture handlers hear a key in mount order among themselves.
+
 ## Paste and the mouse
 
 Paste and mouse events arrive through `useInput` as ordinary keys with a payload:

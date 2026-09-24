@@ -7,8 +7,28 @@ import type { Key } from '@flowtty/core';
  *  async handler's Promise never consumes. */
 export type KeySubscriber = (key: Key) => unknown;
 
+export interface SubscribeOptions {
+  /** Hear a key before every ordinary subscriber — the capture phase. Capture
+   *  handlers hear it in mount order among themselves, and can consume it. */
+  capture?: boolean;
+}
+
 export interface InputSource {
-  subscribe(handler: KeySubscriber): () => void;
+  subscribe(handler: KeySubscriber, options?: SubscribeOptions): () => void;
+}
+
+/**
+ * A source that mutes a subtree without moving anyone in the delivery order:
+ * it registers each handler with the outer source once, wrapped in a check of
+ * `isMuted` at delivery. Swapping the context value instead would make every
+ * `useInput` under it resubscribe — at the end of the queue, behind handlers
+ * that did not — each time the mute flipped. Create one per subtree and keep
+ * it for the subtree's life. See docs/input.md (keys and useInput).
+ */
+export function createMutedSource(outer: InputSource, isMuted: () => boolean): InputSource {
+  return {
+    subscribe: (handler, options) => outer.subscribe((key) => (isMuted() ? undefined : handler(key)), options),
+  };
 }
 
 // No-op default: a tree rendered without an InputContext.Provider receives no

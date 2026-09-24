@@ -2,7 +2,7 @@ import React from 'react';
 import { useCallback, useContext, useMemo, useRef, useState, type ReactNode } from 'react';
 import { DEFAULT_BORDER_STYLE } from '@flowtty/core';
 import { Box } from './base/Box.js';
-import { InputContext, type InputSource } from '../context/inputContext.js';
+import { InputContext, createMutedSource, type InputSource } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
 import {
   DialogHostContext,
@@ -62,10 +62,23 @@ export function DialogHost(props: DialogHostProps): ReactNode {
   // content on every stack change via DialogResultContext).
   const apiCache = useRef(new Map<number, DialogResultApi>());
 
-  const mutedSource = useMemo<InputSource>(
-    () => ({ subscribe: () => () => {} }),
-    [],
+  // Muting never swaps a subtree's source — that would resubscribe every
+  // handler under it, behind the handlers above the host — so the host's
+  // source and each dialog's are stable objects that read the stack at delivery.
+  const stackRef = useRef<PendingDialog[]>([]);
+  const hostSource = useMemo<InputSource>(
+    () => createMutedSource(outerSource, () => stackRef.current.length > 0),
+    [outerSource],
   );
+  const entrySources = useRef(new Map<number, InputSource>());
+  const sourceForEntry = (id: number): InputSource => {
+    let source = entrySources.current.get(id);
+    if (!source) {
+      source = createMutedSource(outerSource, () => stackRef.current.at(-1)?.id !== id);
+      entrySources.current.set(id, source);
+    }
+    return source;
+  };
 
   // Resolve a SPECIFIC dialog (by id) and remove it from the stack — not
   // necessarily the top. A dialog may resolve asynchronously (timer, awaited
@@ -79,6 +92,7 @@ export function DialogHost(props: DialogHostProps): ReactNode {
       return [...s.slice(0, idx), ...s.slice(idx + 1)];
     });
     apiCache.current.delete(id);
+    entrySources.current.delete(id);
   }, []);
 
   // Stable per-entry { done, cancel }, bound to that entry's id.
@@ -133,12 +147,13 @@ export function DialogHost(props: DialogHostProps): ReactNode {
   const hostApi = useMemo<DialogHostApi>(() => ({ openDialog }), [openDialog]);
 
   const hasOpenDialog = stack.length > 0;
+  stackRef.current = stack;
 
   return (
     <DialogHostContext.Provider value={hostApi}>
     <DialogHostPresentContext.Provider value={true}>
       {/* Host content: muted when ANY dialog is open. */}
-      <InputContext.Provider value={hasOpenDialog ? mutedSource : outerSource}>
+      <InputContext.Provider value={hostSource}>
         <FocusGroup isActive={!hasOpenDialog}>{props.children}</FocusGroup>
       </InputContext.Provider>
       {/* Stack: render each dialog as a full-screen absolute overlay in stack
@@ -220,7 +235,7 @@ export function DialogHost(props: DialogHostProps): ReactNode {
           {/* Each dialog gets a result API bound to its OWN stack entry, so an
               async done()/cancel() from a lower (input-muted) dialog resolves
               that dialog rather than whatever is currently on top. */}
-          <InputContext.Provider value={isTop ? outerSource : mutedSource}>
+          <InputContext.Provider value={sourceForEntry(d.id)}>
             <DialogResultContext.Provider value={apiForEntry(d.id)}>
               <DialogIsTopContext.Provider value={isTop}>
                 <FocusGroup isActive={isTop}>{content}</FocusGroup>

@@ -33,19 +33,21 @@ function makeKeySource(
   beforeDispatch?: (key: Key) => void,
   afterDispatch?: () => void,
 ): InputSource {
-  const subscribers = new Set<KeySubscriber>();
+  // Two phases: the capture handlers first, then the ordinary ones — each in
+  // subscription order, which is mount order (a child subscribes before its
+  // parent, since effects run inside-out), stopping at the first that consumes.
+  const capture = new Set<KeySubscriber>();
+  const bubble = new Set<KeySubscriber>();
+  const count = () => capture.size + bubble.size;
   let detachBackend: (() => void) | undefined;
   return {
-    subscribe(handler) {
-      if (subscribers.size === 0) {
+    subscribe(handler, options) {
+      if (count() === 0) {
         detachBackend = backend.onKey((key) => {
           beforeDispatch?.(key);
           let consumed = false;
           root.flushSync(() => {
-            // Subscription order, stopping at the first handler that consumes:
-            // a child subscribes before its parent (effects run inside-out), so
-            // the innermost handler gets the key first.
-            for (const s of [...subscribers]) {
+            for (const s of [...capture, ...bubble]) {
               if (s(key) === true) { consumed = true; break; }
             }
           });
@@ -53,10 +55,11 @@ function makeKeySource(
           return consumed;
         });
       }
-      subscribers.add(handler);
+      const phase = options?.capture ? capture : bubble;
+      phase.add(handler);
       return () => {
-        subscribers.delete(handler);
-        if (subscribers.size === 0) {
+        phase.delete(handler);
+        if (count() === 0) {
           detachBackend?.();
           detachBackend = undefined;
         }

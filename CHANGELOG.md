@@ -7,6 +7,24 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- `useInput(handler, { capture: true })`: the capture phase — a handler that
+  hears every key before the ordinary ones, whatever was mounted when, and can
+  consume it; muted with its subtree like the rest. For an app's own chords.
+  See docs/input.md (keys and useInput).
+
+### Fixed
+
+- The delivery order did not survive a dialog or an `inert` box: `DialogHost`
+  and `<Box inert>` muted a subtree by swapping its input source, which made
+  every handler under it resubscribe at the end of the queue, behind the
+  handlers above — after the first dialog a root handler heard every key
+  before every field. Muting is now a check at delivery on a source that lives
+  as long as the subtree; nobody moves.
+
 ## 1.0.0-alpha.27 — 2026-09-24
 
 ### Fixed

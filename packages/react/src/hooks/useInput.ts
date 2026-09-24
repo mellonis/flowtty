@@ -5,6 +5,10 @@ import type { Key } from '@flowtty/core';
 export interface UseInputOptions {
   /** When false, the subscription is paused (handler is not called). Default true. */
   isActive?: boolean;
+  /** Hear every key before the ordinary handlers — the capture phase, for an
+   *  app's own chords. Capture handlers hear a key in mount order among
+   *  themselves and can consume it; a muted subtree mutes them too. */
+  capture?: boolean;
 }
 
 /**
@@ -34,8 +38,9 @@ export function useInput(handler: (key: Key) => unknown, opts: UseInputOptions =
   // and a handler gated on focus — which arrives after the mount — must not
   // fall behind a parent's handler because it subscribed later. `isActive` is
   // checked on delivery instead.
+  const capture = opts.capture === true;
   useEffect(() => {
-    const unsubscribe = source.subscribe((key) => (activeRef.current ? ref.current(key) : undefined));
+    const unsubscribe = source.subscribe((key) => (activeRef.current ? ref.current(key) : undefined), { capture });
     return unsubscribe;
-  }, [source]);
+  }, [source, capture]);
 }
