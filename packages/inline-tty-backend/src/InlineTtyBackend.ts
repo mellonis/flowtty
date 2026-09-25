@@ -1,5 +1,5 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
-import { takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme } from '@flowtty/core';
+import { takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme, setWidthPolicy, type WidthPolicy } from '@flowtty/core';
 import {
   decodeKeys,
   detectHyperlinkSupport,
@@ -15,9 +15,20 @@ import {
   createClipboard, type Clipboard, type ClipboardProtocol,
   createColorSchemeTracker, type ColorSchemeTracker,
   captureConsole, type ConsoleCapture, type ConsoleEntry,
+  detectWidthPolicy,
 } from '@flowtty/tty-backend';
 
 export interface InlineTtyBackendOptions {
+  /**
+   * How the grid cuts text into cells: `'cluster'` (a grapheme cluster per
+   * cell, what most terminals draw) or `'codepoint'` (a code point per cell,
+   * what macOS Terminal.app advances by). `'auto'`, the default, detects it
+   * from the environment (`env`, default `process.env`). See docs/terminal.md
+   * (display width).
+   */
+  widths?: WidthPolicy | 'auto';
+  /** The environment `widths: 'auto'` detects from. Default `process.env`. */
+  env?: NodeJS.ProcessEnv;
   /** Height in rows of the live region. Default 10. */
   liveHeight?: number;
   /**
@@ -169,6 +180,7 @@ export class InlineTtyBackend implements Backend {
 
   constructor(private readonly options: InlineTtyBackendOptions = {}) {
     this.sgrOptions = { color: options.color ?? detectColorSupport(), depth: options.colorDepth ?? detectColorDepth() };
+    setWidthPolicy(options.widths === undefined || options.widths === 'auto' ? detectWidthPolicy(options.env) : options.widths);
     this.out = options.out ?? process.stdout;
     this.logOnly = !isInteractive(this.out);
     this.input = options.in ?? process.stdin;

@@ -1,5 +1,6 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
-import { takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme } from '@flowtty/core';
+import { takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme, setWidthPolicy, type WidthPolicy } from '@flowtty/core';
+import { detectWidthPolicy } from './widthPolicy.js';
 import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, takeUnknownColors } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
@@ -12,6 +13,16 @@ import { createClickCounter, type ClickCounter } from './clickCounter.js';
 import { captureConsole, type ConsoleCapture, type ConsoleEntry } from './consoleCapture.js';
 
 export interface TtyBackendOptions {
+  /**
+   * How the grid cuts text into cells: `'cluster'` (a grapheme cluster per
+   * cell, what most terminals draw) or `'codepoint'` (a code point per cell,
+   * what macOS Terminal.app advances by). `'auto'`, the default, detects it
+   * from the environment (`env`, default `process.env`). See docs/terminal.md
+   * (display width).
+   */
+  widths?: WidthPolicy | 'auto';
+  /** The environment `widths: 'auto'` detects from. Default `process.env`. */
+  env?: NodeJS.ProcessEnv;
   /**
    * Report the mouse wheel as 'wheelup' / 'wheeldown' keys. Off by default:
    * while mouse reporting is on, the terminal hands drag-to-select to the app,
@@ -170,6 +181,7 @@ export class TtyBackend implements Backend {
     // never fills with control sequences. (`isInteractive` lets an app branch first.)
     if (!isInteractive(out)) throw new NotInteractiveError(out);
     this.sgrOptions = { color: options.color ?? detectColorSupport(), depth: options.colorDepth ?? detectColorDepth() };
+    setWidthPolicy(options.widths === undefined || options.widths === 'auto' ? detectWidthPolicy(options.env) : options.widths);
     // Enter the alternate screen buffer + hide cursor, atomic write.
     // Alt-screen ensures full-frame redraws happen in place and the user's
     // pre-launch terminal content is restored on dispose.

@@ -1,5 +1,5 @@
-import { describe, expect, test } from 'vitest';
-import { clusterWidth, fitClusters, graphemes, nextGrapheme, prevGrapheme, stringWidth } from './graphemes.js';
+import { afterEach, beforeEach, describe, expect, test } from 'vitest';
+import { clusterWidth, fitClusters, graphemes, nextGrapheme, prevGrapheme, setWidthPolicy, stringWidth, widthPolicy } from './graphemes.js';
 
 describe('graphemes', () => {
   test('plain text splits per character (fast path)', () => {
@@ -117,3 +117,56 @@ describe('prevGrapheme / nextGrapheme', () => {
   });
 });
 
+// ─── width policy ────────────────────────────────────────────────────────────
+// A terminal that measures per code point (macOS Terminal.app) advances four
+// columns for a skin-tone or ZWJ emoji and one for a VS16 sequence. Under the
+// 'codepoint' policy the grid does the same: a cell is one code point, with
+// the zero-width code points after it (a combining mark, ZWJ, VS16) glued on.
+
+describe("width policy 'codepoint'", () => {
+  beforeEach(() => setWidthPolicy('codepoint'));
+  afterEach(() => setWidthPolicy('cluster'));
+
+  test('is reported', () => {
+    expect(widthPolicy()).toBe('codepoint');
+  });
+  test('a skin-tone emoji is two cells of two columns', () => {
+    expect(graphemes('👍🏽')).toEqual(['👍', '🏽']);
+    expect(stringWidth('👍🏽')).toBe(4);
+  });
+  test('a ZWJ family is three cells: the joiner takes a column of its own there', () => {
+    expect(graphemes('👩‍👧')).toEqual(['👩', '‍', '👧']);
+    expect(stringWidth('👩‍👧')).toBe(5);
+    expect(clusterWidth('‍')).toBe(1);
+  });
+  test('a flag is two cells of one column', () => {
+    expect(graphemes('🇯🇵')).toEqual(['🇯', '🇵']);
+    expect(stringWidth('🇯🇵')).toBe(2);
+  });
+  test('a combining mark and a VS16 glue to their base and add nothing', () => {
+    expect(graphemes('café')).toEqual(['c', 'a', 'f', 'é']);
+    expect(stringWidth('é')).toBe(1);
+    expect(graphemes('☑️')).toEqual(['☑️']);
+    expect(stringWidth('☑️')).toBe(1);
+  });
+  test('a keycap is two cells: the base with its VS16, and the enclosing keycap as a column of its own', () => {
+    expect(graphemes('1️⃣')).toEqual(['1️', '⃣']);
+    expect(stringWidth('1️⃣')).toBe(2);
+  });
+  test('CJK and plain text are unchanged', () => {
+    expect(stringWidth('日本語')).toBe(6);
+    expect(graphemes('héllo')).toEqual(['h', 'é', 'l', 'l', 'o']);
+  });
+  test('the caret steps per cell', () => {
+    expect(nextGrapheme('a👍🏽b', 1)).toBe(3);
+    expect(nextGrapheme('a👍🏽b', 3)).toBe(5);
+    expect(prevGrapheme('a👍🏽b', 5)).toBe(3);
+    expect(nextGrapheme('éx', 0)).toBe(2);
+    expect(prevGrapheme('👩‍👧x', 5)).toBe(3);
+    expect(prevGrapheme('👩‍👧x', 3)).toBe(2);
+  });
+  test('fitClusters follows the cells', () => {
+    expect(fitClusters(graphemes('👍🏽'), 2)).toBe(1);
+    expect(fitClusters(graphemes('👍🏽'), 4)).toBe(2);
+  });
+});

@@ -77,6 +77,25 @@ a ZWJ sequence draws it wider than 2, and a code point newer than the tables
 may be drawn wide where flowtty counts 1. Such a row drifts by a column on
 that terminal. flowtty measures by its tables and does not probe the terminal.
 
+**The width policy.** macOS Terminal.app measures per code point: a skin-tone
+or ZWJ emoji advances four columns, a VS16 sequence one. Laid out by cluster,
+such a row is wider than the terminal thinks, wraps, and pushes the screen
+down. So the grid has two policies, `setWidthPolicy('cluster' | 'codepoint')`
+(`widthPolicy()` reads it): `'cluster'` is the default described above;
+`'codepoint'` makes a cell one code point with its combining marks and
+variation selectors glued on, while a format character (ZWJ) or an enclosing
+mark (the keycap's U+20E3) is a one-column cell of its own, as that terminal
+draws it — `👍🏽` two cells of two columns, `👩‍👧` five columns, `☑️` one,
+`1️⃣` two. The TTY
+backends set the policy for the terminal they drive: `widths: 'auto'` (the
+default) picks `'codepoint'` for `TERM_PROGRAM=Apple_Terminal` outside a
+multiplexer (tmux, screen, zellij and herdr measure clusters themselves, and
+are recognised by their own variables even when they pass the host's
+`TERM_PROGRAM` through) and `'cluster'`
+otherwise; `widths: 'cluster' | 'codepoint'` overrides, `env` says what to
+detect from. `detectWidthPolicy(env)` from `@flowtty/tty-backend` is the rule
+on its own. The policy is process-wide: one terminal, one grid.
+
 ## Environment
 
 **Not a terminal** — stdout is piped or redirected, the app runs in CI, or

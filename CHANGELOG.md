@@ -31,6 +31,14 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
 
 - `graphemes`, `clusterWidth`, `fitClusters`, `prevGrapheme`, `nextGrapheme`
   from `@flowtty/core` and `@flowtty/react`.
+- A width policy, `setWidthPolicy` / `widthPolicy` (`'cluster'` or
+  `'codepoint'`): macOS Terminal.app measures per code point, so on it a
+  skin-tone emoji is two cells of two columns, a ZWJ one more for the joiner,
+  and a VS16 sequence one column, instead of a row that wraps. `TtyBackend` and `InlineTtyBackend`
+  detect it (`widths: 'auto'`, `TERM_PROGRAM=Apple_Terminal` outside tmux /
+  herdr) and take `widths` / `env` options to override;
+  `detectWidthPolicy(env)` is exported from `@flowtty/tty-backend`. See
+  docs/terminal.md (display width).
 
 ## 1.0.0-alpha.30 — 2026-09-24
 
