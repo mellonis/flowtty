@@ -92,8 +92,9 @@ screen capture are involved.
 Alpha — `1.0.0-alpha.x` on npm. APIs can still change between alphas; each
 release's notes list what breaks. Runs on Node and Bun.
 
-Not there yet: hit-testing a mouse key against the laid-out tree (the keys
-themselves carry the cell), the Kitty keyboard protocol — see
+Not there yet: an `onClick` prop on a box (today a component takes clicks
+through `useClick` and its own rect), a click that picks a list row, the Kitty
+keyboard protocol — see
 [what is deferred](docs/terminal.md#still-deferred-later-milestones).
 
 ## License
