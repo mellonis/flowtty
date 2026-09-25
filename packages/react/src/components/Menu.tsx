@@ -25,7 +25,7 @@ import React from "react";
  */
 
 import { useState, type ReactNode } from 'react';
-import { DEFAULT_BORDER_STYLE } from '@flowtty/core';
+import { DEFAULT_BORDER_STYLE, stringWidth } from '@flowtty/core';
 import { Box } from './base/Box.js';
 import { useInput } from '../hooks/useInput.js';
 import { useDialog, useDialogHost } from '../hooks/useDialog.js';
@@ -69,18 +69,17 @@ const SUBMENU_MARK = '▸';
 const OPEN_MARK = '▾';
 
 function topItemWidth(item: MenuItem): number {
-  return TOP_PAD + [...item.label].length + TOP_PAD;
+  return TOP_PAD + stringWidth(item.label) + TOP_PAD;
 }
 function panelItemText(item: MenuItem, hasAnySubmenu: boolean, isOpen: boolean): string {
   const mark = 'submenu' in item ? (isOpen ? OPEN_MARK : SUBMENU_MARK) : ' ';
   // Right-pad to make room for the marker column when any item in the panel has a submenu.
-  const labelArea = [...item.label].length;
   const markCol = hasAnySubmenu ? 1 : 0;
   return ' '.repeat(PANEL_PAD) + item.label + ' '.repeat(Math.max(1, 1)) + (markCol ? mark : '') + ' '.repeat(PANEL_PAD);
 }
 function panelWidth(items: MenuItem[]): number {
   const hasSub = items.some((it) => 'submenu' in it);
-  const maxLabel = items.reduce((m, it) => Math.max(m, [...it.label].length), 0);
+  const maxLabel = items.reduce((m, it) => Math.max(m, stringWidth(it.label)), 0);
   // " label  ▸ " — PANEL_PAD + label + space + (hasSub?1:0) + PANEL_PAD
   return PANEL_PAD + maxLabel + 1 + (hasSub ? 1 : 0) + PANEL_PAD;
 }
@@ -219,7 +218,7 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
   // not on a separate row. It contributes its rendered width to the offsets
   // of all menu items so dropdowns line up correctly.
   const titleText = title != null ? ` ${String(title)} ` : '';
-  const titleWidth = titleText.length;
+  const titleWidth = stringWidth(titleText);
   // Top item left positions: x-cell of the start of item i in the top bar.
   const topX: number[] = [];
   {
@@ -301,7 +300,7 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
     const isDeepest = panelIdx === depth - 1;
     const focusedIdx = isDeepest ? cursorClamped : (p.openIdx ?? -1);
     const hasAnySubmenu = p.items.some((it) => 'submenu' in it);
-    const maxLabel = p.items.reduce((m, it) => Math.max(m, [...it.label].length), 0);
+    const maxLabel = p.items.reduce((m, it) => Math.max(m, stringWidth(it.label)), 0);
 
     return (
       <Box
@@ -319,7 +318,7 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
           const focused = i === focusedIdx;
           const opened = !isDeepest && p.openIdx === i;
           const marker = 'submenu' in it ? (opened ? OPEN_MARK : SUBMENU_MARK) : ' ';
-          const padded = it.label.padEnd(maxLabel, ' ');
+          const padded = it.label + ' '.repeat(Math.max(0, maxLabel - stringWidth(it.label))); // by column, not UTF-16 unit
           const text = hasAnySubmenu ? `${padded}  ${marker}` : padded;
           return (
             <Box key={it.key} bold={focused || opened} inverse={focused}>

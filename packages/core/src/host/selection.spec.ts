@@ -1,5 +1,7 @@
 import { expect, test } from 'vitest';
 import { Buffer } from '../cells.js';
+import { clusterWidth, graphemes, stringWidth } from '../graphemes.js';
+import { takeWarnings } from '../warnings.js';
 import { getYoga } from './yoga.js';
 import { appendChild, createInstance, createTextInstance, type Container } from './host.js';
 import { computeLayout, contentHeight, type Rect } from './layout.js';
@@ -20,10 +22,14 @@ function range(
   return { anchor: { x: anchor[0], y: anchor[1] }, head: { x: head[0], y: head[1] }, clip, excluded };
 }
 
-function bufferOf(lines: string[]): Buffer {
-  const width = lines.reduce((m, l) => Math.max(m, [...l].length), 0);
+// A frame from rows of text, clusters placed by display column (a wide glyph
+// takes two cells, as paint would leave it).
+function bufferOf(lines: string[], width = lines.reduce((m, l) => Math.max(m, stringWidth(l)), 0)): Buffer {
   const b = new Buffer(width, lines.length);
-  lines.forEach((line, y) => [...line].forEach((ch, x) => b.set(x, y, ch)));
+  lines.forEach((line, y) => {
+    let x = 0;
+    for (const g of graphemes(line)) { b.set(x, y, g); x += clusterWidth(g); }
+  });
   return b;
 }
 
@@ -419,4 +425,32 @@ test('lineAt: the row, extended over the rows a soft wrap joins to it', () => {
   expect(lineAt(b, scope, 1, 2)).toEqual(range([0, 2], [6, 2], scope.clip));
   expect(selectionText(b, lineAt(b, scope, 5, 1)!)).toBe('aaa bbb ccc ddd');
   expect(lineAt(b, scope, 1, 3)).toBeNull(); // outside the clip
+});
+
+// ─── wide glyphs ─────────────────────────────────────────────────────────────
+// A wide glyph is a lead cell and a continuation cell (`''`); a selection that
+// touches either half has the whole glyph.
+
+test('applySelection restyles both cells of a wide glyph and never writes an empty char', () => {
+  const b = bufferOf(['日x'], 4);
+  const out = applySelection(b, [{ y: 0, x0: 0, x1: 3 }]);
+  expect(out.get(0, 0).char).toBe('日');
+  expect(out.get(1, 0)).toEqual({ char: '', style: out.get(0, 0).style });
+  expect(out.get(0, 0).style).toEqual(selectedStyle({}));
+  expect(takeWarnings()).toEqual([]);
+});
+
+test('a segment starting on a continuation cell covers the glyph from its lead', () => {
+  const b = bufferOf(['日x'], 4);
+  const out = applySelection(b, [{ y: 0, x0: 1, x1: 3 }]);
+  expect(out.get(0, 0).style).toEqual(selectedStyle({}));
+  expect(selectionText(b, range([1, 0], [2, 0], { left: 0, top: 0, width: 4, height: 1 }))).toBe('日x');
+});
+
+test('a double-click inside 日本語 selects the whole word', () => {
+  const b = bufferOf(['ab 日本語 cd'], 12);
+  const scope = { clip: { left: 0, top: 0, width: 12, height: 1 }, excluded: [] };
+  const r = wordAt(b, scope, 4, 0)!; // the right half of 日
+  expect([r.anchor.x, r.head.x]).toEqual([3, 8]);
+  expect(selectionText(b, r)).toBe('日本語');
 });

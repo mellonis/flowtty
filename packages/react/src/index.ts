@@ -65,7 +65,7 @@ export { Button } from './components/Button.js';
 export type { ButtonProps } from './components/Button.js';
 export { windowAround } from '@flowtty/core';
 export { splitVisualLines, type VisualLine } from '@flowtty/core';
-export { charWidth, stringWidth } from '@flowtty/core';
+export { charWidth, graphemes, clusterWidth, stringWidth, fitClusters, prevGrapheme, nextGrapheme } from '@flowtty/core';
 export { Title } from './components/Title.js';
 export { HRule } from './components/HRule.js';
 export { HelpBar } from './components/HelpBar.js';

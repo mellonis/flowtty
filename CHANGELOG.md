@@ -7,6 +7,31 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Changed
+
+- **Wide glyphs occupy two grid cells.** A CJK ideograph or an emoji takes the
+  two columns it takes on screen: paint reserves the second cell, the backends
+  no longer back the cursor up over it, and nothing overlaps its right half.
+  Every width in the library — layout, `wrapText`, `<TextInput>` /
+  `<TextArea>`, `<Table>`, markdown tables and code blocks, `<Menu>` — is
+  measured in display columns. See docs/terminal.md (display width).
+- **`Cell.char` is a grapheme cluster, or `''` for the second column of a wide
+  one.** A backend writes the lead and skips the `''` cell. Backends built on
+  the old one-cell-per-code-point grid must adopt this (docs/writing-a-backend.md).
+- **`stringWidth` measures grapheme clusters**: a flag, an emoji with a skin
+  tone and a ZWJ sequence are 2, not the sum of their parts; a control
+  character counts the column paint gives it (1).
+- The editor (`<TextInput>`, `<TextArea>`) moves and deletes by grapheme
+  cluster, so a caret never lands inside a flag or a decomposed accent.
+- DEL and C1 control characters in text are painted as a space, like C0.
+
+### Added
+
+- `graphemes`, `clusterWidth`, `fitClusters`, `prevGrapheme`, `nextGrapheme`
+  from `@flowtty/core` and `@flowtty/react`.
+
 ## 1.0.0-alpha.30 — 2026-09-24
 
 ### Added

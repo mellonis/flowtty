@@ -5,7 +5,7 @@ import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
 import { useClick } from '../hooks/useClick.js';
-import { DEFAULT_BORDER_STYLE, editorReducer as reduce, type BoxProps, type EditorState } from '@flowtty/core';
+import { DEFAULT_BORDER_STYLE, clusterWidth, editorReducer as reduce, graphemes, stringWidth, type BoxProps, type EditorState } from '@flowtty/core';
 import { type Rect } from '@flowtty/core/host';
 
 export interface TextInputProps {
@@ -99,16 +99,24 @@ export function TextInput(props: TextInputProps): ReactNode {
     return true;
   }, { isActive: isFocused });
 
-  // Everything below works in CHARACTERS (code points), the grid's unit: an emoji
-  // is two UTF-16 units but one cell, so slicing the string by `cursor` directly
-  // would tear it. `cursor` itself stays a UTF-16 index (see EditorState).
-  const chars = [...(mask ? '•'.repeat([...value].length) : value)];
-  const caretAt = [...value.slice(0, safeCursor)].length;
+  // Everything below works in display COLUMNS, the grid's unit: an emoji is two
+  // UTF-16 units, one cluster and two columns, so neither slicing the string by
+  // `cursor` nor counting characters would place the caret. `cursor` itself
+  // stays a UTF-16 index (see EditorState).
+  const clusters = graphemes(mask ? '•'.repeat(graphemes(value).length) : value);
+  const widths = clusters.map(clusterWidth);
+  // cols[i] is the column cluster i starts at; cols[clusters.length] the total width.
+  const cols: number[] = [0];
+  for (const w of widths) cols.push(cols[cols.length - 1]! + w);
+  const total = cols[clusters.length]!;
+  const caretIdx = graphemes(value.slice(0, safeCursor)).length;
+  const caretCol = cols[caretIdx]!;
+  const caretWidth = caretIdx < clusters.length ? widths[caretIdx]! : 1;
 
   // Always render exactly `width` cells (or the natural value+cursor when width
   // is unknown — one-frame placeholder until onLayout fires).
   // Scroll-offset rules:
-  //   1. Keep cursor in viewport: clamp when cursor leaves [off, off+w).
+  //   1. Keep the caret cell in the viewport: clamp when it leaves [off, off+w).
   //   2. Slide LEFT when content shrinks: don't leave trailing empty space at
   //      the right while leading content is still scrolled off-screen. Gives
   //      q[qqqqqqqq#] → [qqqqqqqq#] → [qqqqqqq# ] as user deletes.
@@ -117,30 +125,45 @@ export function TextInput(props: TextInputProps): ReactNode {
   let windowEnd: number;
   if (width === null) {
     off = 0;
-    windowEnd = chars.length;
+    windowEnd = total + caretWidth;
   } else {
     const w = width;
-    if (caretAt < scrollOffsetRef.current) scrollOffsetRef.current = caretAt;
-    if (caretAt >= scrollOffsetRef.current + w) scrollOffsetRef.current = caretAt - w + 1;
+    if (caretCol < scrollOffsetRef.current) scrollOffsetRef.current = caretCol;
+    if (caretCol + caretWidth > scrollOffsetRef.current + w) scrollOffsetRef.current = caretCol + caretWidth - w;
     // Slide-left-on-shrink: scroll offset must not exceed what's needed to fit
     // content+cursor. Beyond that, leading content can come into view.
-    const maxUseful = Math.max(0, chars.length + 1 - w);
+    const maxUseful = Math.max(0, total + 1 - w);
     if (scrollOffsetRef.current > maxUseful) scrollOffsetRef.current = maxUseful;
     off = scrollOffsetRef.current;
     windowEnd = off + w;
   }
 
-  // Split the visible display around the cursor. The cursor consumes one cell:
-  // either the char at the caret (rendered with inverse) or CURSOR_AT_END
-  // (space + inverse = solid filled cell) when the caret is past end-of-value.
-  const before = chars.slice(off, caretAt).join('');
-  const cursorChar = caretAt < chars.length ? chars[caretAt]! : CURSOR_AT_END;
+  // The text in columns [from, to): clusters fully inside, and a blank for
+  // each column of a cluster the edge cuts — never half a glyph.
+  const columnsOf = (from: number, to: number): string => {
+    let out = '';
+    for (let i = 0; i < clusters.length; i++) {
+      const a = cols[i]!;
+      const b = cols[i + 1]!;
+      if (b <= from || a >= to) continue;
+      out += a >= from && b <= to ? clusters[i]! : ' '.repeat(Math.min(b, to) - Math.max(a, from));
+    }
+    return out;
+  };
+
+  // Split the visible display around the cursor. The cursor consumes one cell
+  // (two for a wide cluster): either the cluster at the caret (rendered with
+  // inverse) or CURSOR_AT_END (space + inverse = solid filled cell) when the
+  // caret is past end-of-value.
+  const before = columnsOf(off, caretCol);
+  const cursorChar = caretIdx < clusters.length ? clusters[caretIdx]! : CURSOR_AT_END;
   // Pad "after" with trailing spaces to fill the viewport — these become visible
   // blank cells (with the lightgray bg) instead of leaving previous content behind.
-  const afterChars = chars.slice(caretAt + 1, windowEnd);
-  const afterLen = Math.max(0, windowEnd - caretAt - 1);
-  const after = afterChars.join('') + (width === null ? '' : ' '.repeat(Math.max(0, afterLen - afterChars.length)));
-  const display = chars.join('');
+  const afterText = columnsOf(caretCol + caretWidth, windowEnd);
+  const afterLen = Math.max(0, windowEnd - caretCol - caretWidth);
+  const after = afterText + (width === null ? '' : ' '.repeat(Math.max(0, afterLen - stringWidth(afterText))));
+  const display = clusters.join('');
+ 
 
   const onLayout = (r: Rect) => {
     rectRef.current = r;
@@ -150,7 +173,7 @@ export function TextInput(props: TextInputProps): ReactNode {
     }
   };
   // What this render draws, padding aside: the text and, focused, the caret cell.
-  renderedRef.current = chars.length + (isFocused ? 1 : 0);
+  renderedRef.current = total + (isFocused ? 1 : 0);
 
   // When NOT focused: render the display flat, no cursor cell. Tells the user
   // at a glance which field has focus (only the focused one shows the inverse cursor).
@@ -164,7 +187,7 @@ export function TextInput(props: TextInputProps): ReactNode {
   const bg = band ? FIELD_BG : undefined;
   let row: ReactNode;
   if (!isFocused) {
-    const flat = width === null || !band ? display : display + ' '.repeat(Math.max(0, width - chars.length));
+    const flat = width === null || !band ? display : display + ' '.repeat(Math.max(0, width - total));
     row = (
       <Box flexDirection="row" backgroundColor={bg} onLayout={onLayout}>
         <Text color={fg}>{flat}</Text>

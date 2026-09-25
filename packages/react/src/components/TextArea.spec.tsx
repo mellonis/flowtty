@@ -181,16 +181,32 @@ describe('TextArea', () => {
     unmount();
   });
 
-  test('an emoji is one character: the caret lands on it whole and rows never split it', async () => {
+  test('an emoji is one character of two columns: the caret lands on it whole and rows never split it', async () => {
     const { backend, seen, frame, caret, unmount } = await mount('', {}, 4);
     backend.type('😀😀😀😀😀');
-    expect(await frame()).toEqual(['😀😀😀😀', '😀']);
+    expect(await frame()).toEqual(['😀😀', '😀😀', '😀']);
     backend.press({ name: 'left' });
-    expect(await caret()).toEqual({ x: 0, y: 1 });
-    expect(backend.lastBuffer!.get(0, 1).char).toBe('😀');
+    expect(await caret()).toEqual({ x: 0, y: 2 });
+    expect(backend.lastBuffer!.get(0, 2).char).toBe('😀');
+    expect(backend.lastBuffer!.get(1, 2).style.inverse).toBe(true); // the continuation cell is inverse with its lead
     backend.press({ name: 'backspace' });
     await frame();
     expect(seen.value).toBe('😀😀😀😀');
+    unmount();
+  });
+
+  test('the caret column is a display column: stepping over 日 lands on 本, two cells on', async () => {
+    const { backend, frame, caret, unmount } = await mount('日本語日本語', {}, 6, 3);
+    // Twelve columns in a width of six: two rows of three ideographs (the caret's own row after them is blank).
+    expect(await frame()).toEqual(['日本語', '日本語']);
+    backend.press({ name: 'home' });
+    expect(await caret()).toEqual({ x: 0, y: 0 });
+    backend.press({ name: 'right' });
+    expect(await caret()).toEqual({ x: 2, y: 0 });
+    const buf = backend.lastBuffer!;
+    expect(buf.get(2, 0).char).toBe('本');
+    expect(buf.get(3, 0).style.inverse).toBe(true);
+    expect(buf.get(0, 0).style.inverse).toBeUndefined();
     unmount();
   });
 

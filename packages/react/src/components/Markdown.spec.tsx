@@ -120,21 +120,32 @@ describe('Markdown', () => {
     r.unmount();
   });
 
-  // The grid is one cell per code point (a wide glyph still takes one column —
-  // see README "Still deferred"), so table columns must line up in *grid*
-  // columns, not in display cells.
-  test('table columns line up in the painted grid when a row has wide glyphs', async () => {
+  // Table columns line up in display columns: a wide glyph takes two cells.
+  test('table columns line up when a row has wide glyphs', async () => {
     const backend = new TestBackend(40, 8);
-    const md = '| Status | Qty |\n| :-- | --: |\n| ✅ Done | 11 |\n| 日本語 | 3 |\n| plain | 7 |';
+    const md = '| Status | Qty |\n| :-- | --: |\n| ✅ Done | 11 |\n| 日本語 | 3 |\n| 🇯🇵 flag | 5 |\n| plain | 7 |';
     const r = await render(<Markdown width={40}>{md}</Markdown>, backend);
     await flushAsync(backend);
 
     const buf = backend.lastBuffer!;
-    const row = (y: number) => Array.from({ length: buf.width }, (_, x) => buf.get(x, y).char).join('');
-    // Right-aligned last column: every row's last non-space char shares one x.
-    const lastX = (y: number) => row(y).trimEnd().length - 1;
-    const ys = [0, 1, 2, 3, 4];
+    const lastX = (y: number) => {
+      let x = buf.width - 1;
+      while (x >= 0 && buf.get(x, y).char === ' ') x--;
+      return x;
+    };
+    const ys = [0, 1, 2, 3, 4, 5];
     expect(ys.map(lastX)).toEqual(ys.map(() => lastX(0)));
+    r.unmount();
+  });
+
+  test('a fenced code line with wide glyphs hard-wraps by column, never through a glyph', async () => {
+    // The default `bar` fence costs two columns, so a width of six leaves four for the code.
+    const backend = new TestBackend(6, 4);
+    const r = await render(<Markdown width={6} codeWrap="wrap">{'```\na日本\n```'}</Markdown>, backend);
+    await flushAsync(backend);
+    const rows = backend.lastFrame.split('\n');
+    expect(rows.some((l) => l.includes('a日'))).toBe(true);
+    expect(rows.some((l) => l.includes('本'))).toBe(true);
     r.unmount();
   });
 });

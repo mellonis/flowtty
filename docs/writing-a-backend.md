@@ -37,6 +37,11 @@ Only `size` and `draw` are required; everything else is feature-detected.
   `toString()` for plain text. It always receives the whole frame; diffing against
   the previous one is the backend's business (`TtyBackend` does, and writes only
   what changed).
+  A cell's `char` is one grapheme cluster, or `''` for the second column of a
+  wide cluster (CJK, emoji) in the cell to its left: write the lead and skip
+  the `''` cell — the terminal advanced two columns when it drew the lead. A
+  backend that diffs frames must remember that: after a wide cluster at `x`,
+  the cell at `x + 2` is the adjacent one. See docs/terminal.md (display width).
 - **`onKey`** delivers `Key` objects: `{ name, sequence, ctrl, meta, shift }`, plus
   `text` for a paste, `x` / `y` for the mouse and `button` for a mouse key that
   names one (see docs/input.md, the mouse). Without it the app is a passive

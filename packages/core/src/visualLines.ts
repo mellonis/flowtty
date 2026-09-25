@@ -1,3 +1,5 @@
+import { fitClusters, graphemes, stringWidth } from './graphemes.js';
+
 /**
  * Split a multi-line source text into visual lines for paginated rendering
  * with an optional line-number gutter.
@@ -9,8 +11,7 @@
  *   stays blank for them and only the first visual line shows the source line
  *   number.
  *
- * Width is in cells (counted via `[...line]` for grapheme-naive codepoint
- * iteration — matches flowtty's paint-side width assumptions).
+ * Width is in display columns (`stringWidth`); a wide cluster is never split.
  *
  * Typical use:
  * ```ts
@@ -38,17 +39,17 @@ export function splitVisualLines(
   const out: VisualLine[] = [];
   for (let i = 0; i < sources.length; i++) {
     const line = sources[i]!;
-    const chars = [...line];
-    if (chars.length <= width) {
+    if (stringWidth(line) <= width) {
       out.push({ text: line, lineNum: i + 1 });
       continue;
     }
+    const clusters = graphemes(line);
     let first = true;
-    for (let j = 0; j < chars.length; j += width) {
-      out.push({
-        text: chars.slice(j, j + width).join(''),
-        lineNum: first ? i + 1 : null,
-      });
+    let at = 0;
+    while (at < clusters.length) {
+      const take = Math.max(1, fitClusters(clusters, width, at));
+      out.push({ text: clusters.slice(at, at + take).join(''), lineNum: first ? i + 1 : null });
+      at += take;
       first = false;
     }
   }

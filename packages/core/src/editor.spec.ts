@@ -252,10 +252,10 @@ test('a paste normalizes CRLF and lone CR to LF (multiline) — no CR ever enter
   expect(edit(reduce(s('', 0), key({ name: 'paste', text: 'x\r\ny' })))).toEqual({ value: 'x y', cursor: 3 });
 });
 
-test('multiline: up / down keep the column counted in characters across rows with astral characters', () => {
-  const v = '😀😀😀x\nabcdef'; // col 3 on row 0 is before "x" (unit index 6)
-  expect(edit(reduce(s(v, 6), key({ name: 'down' }), ml)).cursor).toBe(11);  // "abc|def"
-  expect(edit(reduce(s(v, 11), key({ name: 'up' }), ml)).cursor).toBe(6);
+test('multiline: up / down keep the column counted in display columns across rows with emoji', () => {
+  const v = '😀😀😀x\nabcdef'; // col 6 on row 0 is before "x" (unit index 6): three emoji of two columns
+  expect(edit(reduce(s(v, 6), key({ name: 'down' }), ml)).cursor).toBe(14);  // "abcdef|"
+  expect(edit(reduce(s(v, 14), key({ name: 'up' }), ml)).cursor).toBe(6);
 });
 
 // A host layers its own keys on top of the editor by handling them first and
@@ -281,4 +281,25 @@ test('contract: a key the editor does not handle is a noop, never an edit', () =
 test('a control character is not typed into the field: noop, so the app still sees its chord', () => {
   expect(reduce(s('ab', 2), key({ name: '\x1d' }))).toEqual({ kind: 'noop' });
   expect(reduce(s('ab', 2), key({ name: ']', ctrl: true }))).toEqual({ kind: 'noop' });
+});
+
+// ─── grapheme clusters ───────────────────────────────────────────────────────
+// The caret steps over a cluster (a flag, an emoji with its modifiers, a base
+// with its combining marks) as one character, and never rests inside one.
+
+test('left and right step over a flag and a decomposed accent as one character', () => {
+  expect(reduce(s('a🇯🇵b', 5), key({ name: 'left' }))).toEqual({ kind: 'edit', state: s('a🇯🇵b', 1) });
+  expect(reduce(s('a🇯🇵b', 1), key({ name: 'right' }))).toEqual({ kind: 'edit', state: s('a🇯🇵b', 5) });
+  expect(reduce(s('éx', 2), key({ name: 'left' }))).toEqual({ kind: 'edit', state: s('éx', 0) });
+});
+
+test('backspace and delete remove a whole cluster', () => {
+  expect(reduce(s('a🇯🇵b', 5), key({ name: 'backspace' }))).toEqual({ kind: 'edit', state: s('ab', 1) });
+  expect(reduce(s('a🇯🇵b', 1), key({ name: 'delete' }))).toEqual({ kind: 'edit', state: s('ab', 1) });
+  expect(reduce(s('café', 5), key({ name: 'backspace' }))).toEqual({ kind: 'edit', state: s('caf', 3) });
+});
+
+test('a cursor handed inside a cluster snaps to its start before anything else', () => {
+  expect(reduce(s('a🇯🇵b', 3), key({ name: 'right' }))).toEqual({ kind: 'edit', state: s('a🇯🇵b', 5) });
+  expect(reduce(s('a🇯🇵b', 3), key({ name: 'x' }))).toEqual({ kind: 'edit', state: s('ax🇯🇵b', 2) });
 });

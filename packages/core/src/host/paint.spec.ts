@@ -121,3 +121,58 @@ test('wrapContinues on a box with no content rect marks nothing', async () => {
   ));
   expect(marksOf(container, 10, 3)).toEqual([]);
 });
+
+// ─── wide glyphs ─────────────────────────────────────────────────────────────
+// A wide cluster (CJK, emoji) takes two cells: paint advances by its width and
+// never leaves half of one at an edge — the buffer's, the content rect's or a
+// clip's. See docs/terminal.md (display width).
+
+function frameOf(container: Container, width: number, height: number) {
+  computeLayout(container, width, height);
+  return paint(container, width, height);
+}
+
+test('a wide glyph takes two cells: the next character lands two columns on', async () => {
+  const container = await tree(box({}, '日x'));
+  const b = frameOf(container, 5, 1);
+  expect([0, 1, 2].map((x) => b.get(x, 0).char)).toEqual(['日', '', 'x']);
+});
+
+test('a wide glyph in a box\'s last content column is blanked, not torn', async () => {
+  const container = await tree(box({ width: 3 }, 'ab日'));
+  const b = frameOf(container, 6, 1);
+  expect([0, 1, 2, 3].map((x) => b.get(x, 0).char)).toEqual(['a', 'b', ' ', ' ']);
+});
+
+test('a wide glyph cut by a clip (overflow hidden) is blanked, not torn', async () => {
+  const container = await tree(box({ width: 3, overflow: 'hidden' }, box({ width: 6 }, 'ab日x')));
+  const b = frameOf(container, 6, 1);
+  expect([0, 1, 2, 3].map((x) => b.get(x, 0).char)).toEqual(['a', 'b', ' ', ' ']);
+});
+
+test('run styles follow clusters, not code points', async () => {
+  const container = await tree(box({ runs: [{ text: '🇯🇵' }, { text: 'x', bold: true }] }));
+  const b = frameOf(container, 4, 1);
+  expect(b.get(0, 0)).toEqual({ char: '🇯🇵', style: {} });
+  expect(b.get(2, 0)).toEqual({ char: 'x', style: { bold: true } });
+});
+
+test('a lone combining mark has no cell; DEL and C1 controls paint as a space', async () => {
+  const container = await tree(box({}, '́a\x7fb\x9bc'));
+  const b = frameOf(container, 6, 1);
+  expect([0, 1, 2, 3, 4].map((x) => b.get(x, 0).char)).toEqual(['a', ' ', 'b', ' ', 'c']);
+});
+
+test('a continuation mark spans the columns wide text painted', async () => {
+  const container = await tree(box({ width: 4, wrap: 'wrap' }, '日本 語'));
+  expect(marksOf(container, 4, 2)).toEqual([{ y: 0, x0: 0, x1: 4, join: ' ' }]);
+});
+
+test('a border title with wide glyphs is drawn whole, and truncates by cluster', async () => {
+  const whole = frameOf(await tree(box({ border: 'single', borderTitle: '日本語', width: 12, height: 3 })), 12, 3);
+  expect(whole.toString().split('\n')[0]).toContain('─ 日本語 ─');
+  // avail = 9 − 4 = 5 columns for " 日本語 " (8): " 日" then the ellipsis, never half of 本.
+  const cut = frameOf(await tree(box({ border: 'single', borderTitle: '日本語', width: 9, height: 3 })), 9, 3);
+  expect(cut.toString().split('\n')[0]).toContain(' 日…');
+  expect(cut.toString().split('\n')[0]).not.toContain('本');
+});

@@ -4,6 +4,7 @@ import { render } from '../internal/render.js';
 import { Box } from './base/Box.js';
 import { Table, type TableColumn } from './Table.js';
 import { TestBackend, flushAsync } from '@flowtty/core/testing';
+import { stringWidth } from '@flowtty/core';
 
 interface Person { name: string; age: number; }
 
@@ -235,6 +236,35 @@ describe('Table', () => {
     expect(lines.some((l) => l.startsWith('╰'))).toBe(true);
     // …and the footer below the table is the last visible line, not pushed off.
     expect(lines[11]).toContain('FOOT');
+    r.unmount();
+  });
+  // ─── display width ─────────────────────────────────────────────────────────
+
+  test('rows with CJK and emoji keep the rules aligned', async () => {
+    const backend = new TestBackend(30, 8);
+    const columns: TableColumn<{ name: string; qty: number }>[] = [
+      { accessor: 'name', header: 'Name' },
+      { accessor: 'qty', header: 'Qty', align: 'right' },
+    ];
+    const data = [{ name: '日本語', qty: 3 }, { name: '🇯🇵 flag', qty: 12 }, { name: 'plain', qty: 7 }];
+    const r = await render(<Table data={data} columns={columns} width={30} />, backend);
+    await flushAsync(backend);
+    const buf = backend.lastBuffer!;
+    const row = (y: number) => Array.from({ length: buf.width }, (_, x) => buf.get(x, y).char).join('');
+    // Every row's rightmost border sits in the same column.
+    const rightBar = (y: number) => stringWidth(row(y).trimEnd()) - 1;
+    const ys = [0, 1, 2, 3, 4, 5];
+    expect(ys.map(rightBar)).toEqual(ys.map(() => rightBar(0)));
+    expect(backend.lastFrame).toContain('│ 日本語  │');
+    r.unmount();
+  });
+
+  test('a cell truncates by cluster, never leaving half a glyph before the ellipsis', async () => {
+    const backend = new TestBackend(20, 4);
+    const columns: TableColumn<{ name: string }>[] = [{ accessor: 'name', header: 'N', width: 4 }];
+    const r = await render(<Table data={[{ name: '日本語' }]} columns={columns} width={20} border="none" />, backend);
+    await flushAsync(backend);
+    expect(backend.lastFrame).toContain('日…');
     r.unmount();
   });
 });

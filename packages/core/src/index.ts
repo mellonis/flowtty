@@ -32,7 +32,8 @@ export type { VisualLine } from './visualLines.js';
 export { wrapText, wrapTextLines } from './wrap.js';
 export { splitVisualLines } from './visualLines.js';
 export { windowAround } from './windowAround.js';
-export { charWidth, stringWidth } from './displayWidth.js';
+export { charWidth } from './displayWidth.js';
+export { graphemes, clusterWidth, stringWidth, fitClusters, prevGrapheme, nextGrapheme } from './graphemes.js';
 export { NAMED_COLORS } from './colors.js';
 export type { NamedColor, Color } from './colors.js';
 

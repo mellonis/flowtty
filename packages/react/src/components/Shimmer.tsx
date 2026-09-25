@@ -3,7 +3,7 @@ import type { ReactNode } from 'react';
 import { Text } from './base/Text.js';
 import { Span } from './base/Span.js';
 import { useTicker } from '../hooks/useTicker.js';
-import type { Color } from '@flowtty/core';
+import { graphemes, type Color } from '@flowtty/core';
 
 export interface ShimmerProps {
   /**
@@ -33,8 +33,8 @@ export interface ShimmerProps {
    */
   running?: boolean;
   /**
-   * The character limit: at most this many characters (code points, counted
-   * from the start) are ever under the band. Characters past it stay in the
+   * The character limit: at most this many characters (grapheme clusters,
+   * counted from the start) are ever under the band. Characters past it stay in the
    * base colour and the band never travels over them, so the number of runs a
    * frame produces is bounded whatever the length of the text. Default 64.
    */
@@ -74,8 +74,9 @@ function coalesce(chars: readonly string[], colorAt: (i: number) => Color | unde
  *
  * The band enters from before the first character, crosses the animated part
  * of the text and leaves past its end before it comes round again; `direction`
- * mirrors the travel. Characters are code points, one cell each — the grid's
- * own rule. The animation rides on useTicker, so it stops on unmount and on
+ * mirrors the travel. Characters are grapheme clusters: a wide glyph is one
+ * character and the band walks over it as one step of two columns. The
+ * animation rides on useTicker, so it stops on unmount and on
  * whole-app teardown. See docs/components.md (Shimmer).
  */
 export function Shimmer({
@@ -88,7 +89,7 @@ export function Shimmer({
   running = true,
   limit = DEFAULT_LIMIT,
 }: ShimmerProps): ReactNode {
-  const chars = [...children];
+  const chars = graphemes(children);
   const bandWidth = Math.max(1, Math.floor(width));
   const animated = Math.min(chars.length, Math.max(0, Math.floor(limit)));
   const active = running && animated > 0;

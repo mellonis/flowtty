@@ -97,3 +97,8 @@ test('back-compat: a box without new props lays out exactly as before (auto size
   expect(child.yogaNode.getComputedWidth()).toBe(5);
   expect(child.yogaNode.getComputedHeight()).toBe(2);
 });
+
+test('measureText measures in display columns', () => {
+  expect(measureText('日本語')).toEqual({ width: 6, height: 1 });
+  expect(measureText('ab\n🇯🇵')).toEqual({ width: 2, height: 2 });
+});

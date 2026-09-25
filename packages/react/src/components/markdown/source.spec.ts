@@ -74,4 +74,10 @@ describe('highlightMarkdownSource', () => {
     expect(lines.map((l) => l.lineNum)).toEqual([1, 2, 3]);
     expect(lines.map(text)).toEqual(['alpha', 'beta', 'gamma']);
   });
+  test('hard-wrap counts display columns and never splits a cluster', () => {
+    // Three ZWJ families are six columns: one row at width six, not a row per two code points.
+    expect(highlightMarkdownSource('👩‍👧👩‍👧👩‍👧', 6, true).map(text)).toEqual(['👩‍👧👩‍👧👩‍👧']);
+    // Four ideographs are eight columns: a width of five holds two, never half of the third.
+    expect(highlightMarkdownSource('日本語文', 5, true).map(text)).toEqual(['日本', '語文']);
+  });
 });

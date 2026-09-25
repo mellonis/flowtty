@@ -159,17 +159,16 @@ describe('InlineTtyBackend', () => {
     b.dispose();
   });
 
-  test('serializeBuffer backs cursor one column after a wide glyph, not after ASCII', () => {
+  test('serializeBuffer writes a wide glyph once and nothing for its continuation cell', () => {
     const out = mockStdout(10);
     const b = new InlineTtyBackend({ out, in: mockStdin(), liveHeight: 1 });
-    const buf = new Buffer(3, 1);
-    buf.set(0, 0, '日', {}); // East Asian Wide → stringWidth 2
-    buf.set(1, 0, 'x', {});
-    buf.set(2, 0, 'y', {});
+    const buf = new Buffer(4, 1);
+    buf.set(0, 0, '日', {});
+    buf.set(2, 0, 'x', {});
     b.draw(buf);
     const text = out.captured();
-    expect(text).toContain('日\b');
-    expect(text).not.toContain('x\b');
+    expect(text).not.toContain('\b');
+    expect(text.replace(/\x1b\[[0-9;]*m/g, '')).toContain('日x');
     b.dispose();
   });
 

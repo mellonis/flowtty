@@ -10,6 +10,7 @@ import {
   detectLanguage, highlightBlock, hunkNumbers, resolveLanguage,
   type CodeLine, type CodeLineKind,
 } from './highlight/index.js';
+import { clusterWidth, graphemes, stringWidth } from '@flowtty/core';
 import type { Color, WrapContinuation } from '@flowtty/core';
 
 /** How a fenced block is framed. `'bar'` (the default) draws a dim label row
@@ -132,18 +133,16 @@ function segsToChars(segs: InlineSeg[], base: SpanStyle = {}): StyledChar[] {
   const out: StyledChar[] = [];
   for (const s of segs) {
     const style = { ...base, ...styleForSeg(s) };
-    for (const ch of [...s.text]) out.push({ ch, style });
+    for (const ch of graphemes(s.text)) out.push({ ch, style });
   }
   return out;
 }
 
-// The unit every measurement here uses: GRID columns. flowtty's grid is one cell
-// per code point — paint puts a double-width glyph (emoji, CJK) in a single cell
-// and the backends keep it to one screen column — so padding computed in display
-// cells would leave rows with wide glyphs a column short per glyph. `<Table>`
-// measures the same way. When paint learns to reserve a glyph's second cell,
-// this is the one place to switch to `charWidth`.
-const cellWidth = (_c: StyledChar): number => 1;
+// The unit every measurement here uses: display columns. `StyledChar.ch` is a
+// grapheme cluster and takes the columns `clusterWidth` says (an ideograph or
+// an emoji two, a base with its combining marks one). `<Table>` measures the
+// same way. See docs/terminal.md (display width).
+const cellWidth = (c: StyledChar): number => clusterWidth(c.ch);
 
 function charsWidth(chars: StyledChar[]): number {
   let n = 0;
@@ -151,7 +150,7 @@ function charsWidth(chars: StyledChar[]): number {
   return n;
 }
 
-const textWidth = (text: string): number => [...text].length;
+const textWidth = stringWidth;
 
 // Greedy word-wrap over styled chars, measured in grid columns (see cellWidth).
 // Words are non-space runs; a single space separates them. Over-long words
@@ -455,11 +454,29 @@ function sourceLineNumbers(lines: string[], code: readonly CodeLine[], diff: boo
 function splitCodeChars(chars: StyledChar[], width: number, mode: MarkdownCodeWrap): StyledChar[][] {
   if (charsWidth(chars) <= width) return [chars];
   if (mode === 'truncate') {
-    const at = Math.max(0, width - 1);
-    return [[...chars.slice(0, at), { ch: '…', style: chars[at]!.style }]];
+    // Keep what fits in width − 1 columns; the ellipsis wears the style of the
+    // first cluster it replaced. A wide cluster that would cross the edge is dropped.
+    const keep: StyledChar[] = [];
+    let w = 0;
+    for (const c of chars) {
+      const cw = cellWidth(c);
+      if (w + cw > Math.max(0, width - 1)) break;
+      keep.push(c);
+      w += cw;
+    }
+    return [[...keep, { ch: '…', style: chars[keep.length]!.style }]];
   }
   const rows: StyledChar[][] = [];
-  for (let at = 0; at < chars.length; at += width) rows.push(chars.slice(at, at + width));
+  let row: StyledChar[] = [];
+  let w = 0;
+  for (const c of chars) {
+    const cw = cellWidth(c);
+    // A row takes at least one cluster, so a glyph wider than the row still moves.
+    if (row.length > 0 && w + cw > width) { rows.push(row); row = []; w = 0; }
+    row.push(c);
+    w += cw;
+  }
+  if (row.length > 0) rows.push(row);
   return rows;
 }
 
@@ -527,7 +544,7 @@ function layoutCode(b: CodeBlockSrc, width: number, opts: MarkdownOptions, out: 
   b.lines.forEach((_cl, si) => {
     const hl = code[si]!;
     const background = bands ? rowBackground(hl.kind) : undefined;
-    const chars: StyledChar[] = hl.segs.flatMap((cs) => [...cs.text].map((ch) => ({
+    const chars: StyledChar[] = hl.segs.flatMap((cs) => graphemes(cs.text).map((ch) => ({
       ch,
       style: { color: cs.color, dim: cs.dim, bold: cs.bold, background },
     })));

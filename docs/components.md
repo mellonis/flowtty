@@ -276,10 +276,11 @@ The pure parts are exported for custom fields: the editor reducer takes
 **Units.** `cursor` (and `InputRow.start`) is a UTF-16 index into the value, so
 `value.slice(0, cursor)` is the text before the caret — but it only ever rests on
 a character boundary: an emoji is two UTF-16 units and the editor steps over,
-deletes and wraps it as ONE character. Widths and `caretPosition().col` count
-characters (code points), the grid's unit; `rowIndexAt(row, col)` converts a
-column back to an index. Grapheme clusters (ZWJ emoji, combining marks) are not
-merged — code point is the floor. A paste's `\r\n` / `\r` become `\n` in the
+deletes and wraps it as ONE character. Widths and `caretPosition().col` are
+display columns, the grid's unit (an emoji is two); `rowIndexAt(row, col)`
+converts a column back to an index. The editor steps over a grapheme cluster (a
+flag, an emoji with its modifiers, a base with its combining marks) as one
+character. A paste's `\r\n` / `\r` become `\n` in the
 reducer itself, so a host that builds its own `paste` key is covered too.
 
 ## Table
@@ -323,10 +324,9 @@ beside the table. What comes out is the rows exactly as they are painted — rul
 and padding included, as in the terminal's own selection. See
 [Selection](input.md#selection).
 
-> Column widths are measured in **code points**, matching flowtty's one-cell-
-> per-code-point grid, so rules stay aligned. Double-width CJK/emoji cells carry
-> the same visual overlap as the rest of flowtty until paint reserves the second
-> cell (see [Display width](terminal.md#display-width) and [Still deferred](terminal.md#still-deferred-later-milestones)).
+> Column widths are **display columns** (`stringWidth`): a CJK ideograph or an
+> emoji takes two, so rules stay aligned on any row (see
+> [Display width](terminal.md#display-width)).
 
 ## Markdown
 
@@ -370,10 +370,9 @@ Style mapping (the terminal cell model has no italic):
 | ` ```lang ` fences  | a dim label row over a dim `│ ` gutter, with per-language token colors — see [Fenced code blocks](#fenced-code-blocks) |
 | `---`               | a dim horizontal rule                        |
 
-> Wrapping and table columns are measured in **code points**, matching flowtty's
-> one-cell-per-code-point grid (same as `<Table>`), so columns stay aligned on
-> rows with CJK/emoji. Those glyphs carry the usual visual overlap until paint
-> reserves the second cell (see [Still deferred](terminal.md#still-deferred-later-milestones)).
+> Wrapping and table columns are measured in **display columns**, the same as
+> `<Table>`, so columns stay aligned on rows with CJK / emoji (see
+> [Display width](terminal.md#display-width)).
 
 Emphasis is **asterisk-only** on purpose: `_` is left alone so `snake_case`
 identifiers in prose aren't mangled.
@@ -745,16 +744,16 @@ Props:
   still frame in its base colour: one `<Text>`, no spans, no repaints. Flipping
   it back resumes.
 - `limit` — the character limit, default 64: at most this many characters
-  (code points, from the start) are ever under the band. Characters past it stay
+  (grapheme clusters, from the start) are ever under the band. Characters past it stay
   in the base colour and the band never travels over them, so the number of runs
   a frame produces is bounded whatever the length of the text.
 
 The band enters from before the first character, crosses the text and leaves
 past its end before it comes round again. Each frame is folded into a few
 `<Span>` runs — the text before the band, the band's cells, the text after —
-never one span per character. Characters are code points, one cell each, the
-grid's own rule: a wide glyph is one character and the band walks over it as
-one cell. The animation rides on `useTicker`, so it stops on unmount and on
+never one span per character. Characters are grapheme clusters: a wide glyph
+is one character and the band walks over it as one step of two columns. The
+animation rides on `useTicker`, so it stops on unmount and on
 whole-app teardown.
 
 ## ProgressBar

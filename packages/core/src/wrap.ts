@@ -1,3 +1,5 @@
+import { fitClusters, graphemes, stringWidth } from './graphemes.js';
+
 export type WrapMode = 'wrap' | 'truncate' | 'none';
 
 const ELLIPSIS = '…';
@@ -28,7 +30,7 @@ export interface WrappedLine {
 
 /**
  * Lay out `text` into display lines fitting within `width` cells.
- * Assumes 1 code point = 1 cell (no CJK/emoji width awareness in M1d).
+ * Widths are display columns (`stringWidth`); a wide cluster is never split at a break.
  *
  *  - 'wrap'     — word-wrap at spaces; any single word longer than width is char-wrapped.
  *  - 'truncate' — each source line truncated to width, with `…` in the last cell when truncated.
@@ -77,13 +79,15 @@ export function wrapTextLines(text: string, width: number, mode: WrapMode): Wrap
 
 function truncateLine(line: string, width: number): string {
   if (width <= 0) return '';
-  const chars = [...line];
-  if (chars.length <= width) return line;
+  if (stringWidth(line) <= width) return line;
   // Content was cut — always signal it with the ellipsis in the last cell, even
   // when the cut lands on a word boundary (a space). Otherwise the truncation is
   // invisible (e.g. "hello world"/5 would silently render as "hello").
   if (width === 1) return ELLIPSIS;
-  return chars.slice(0, width - 1).join('') + ELLIPSIS;
+  const clusters = graphemes(line);
+  // A wide cluster that would not fit before the ellipsis is dropped: the line
+  // comes out a column short rather than torn.
+  return clusters.slice(0, fitClusters(clusters, width - 1)).join('') + ELLIPSIS;
 }
 
 /**
@@ -121,25 +125,35 @@ function wrapLine(line: string, width: number, out: WrappedLine[]): void {
   const push = (text: string, continues: string): void => { out.push({ text, continues }); };
 
   let current = '';
+  let currentWidth = 0;
   for (const word of line.split(' ')) {
-    const candidate = current ? current + ' ' + word : word;
-    if ([...candidate].length <= width) {
-      current = candidate;
+    const wordWidth = stringWidth(word);
+    const candidateWidth = current ? currentWidth + 1 + wordWidth : wordWidth;
+    if (candidateWidth <= width) {
+      current = current ? current + ' ' + word : word;
+      currentWidth = candidateWidth;
       continue;
     }
     // The line ends here and `word` starts the next one: the space between them
     // is what the wrap dropped.
-    if (current) { push(current, ' '); current = ''; }
-    if ([...word].length > width) {
-      let remainder = [...word];
-      while (remainder.length > width) {
+    if (current) { push(current, ' '); current = ''; currentWidth = 0; }
+    if (wordWidth > width) {
+      const clusters = graphemes(word);
+      let at = 0;
+      while (at < clusters.length) {
+        // As many clusters as fit, but at least one: a cluster wider than the
+        // whole line still has to move. A wide cluster that does not fit
+        // starts the next piece whole.
+        const take = Math.max(1, fitClusters(clusters, width, at));
+        const piece = clusters.slice(at, at + take).join('');
+        at += take;
         // A cut through the middle of a word — nothing was dropped at all.
-        push(remainder.slice(0, width).join(''), '');
-        remainder = remainder.slice(width);
+        if (at < clusters.length) push(piece, '');
+        else { current = piece; currentWidth = stringWidth(piece); }
       }
-      current = remainder.join('');
     } else {
       current = word;
+      currentWidth = wordWidth;
     }
   }
   if (current) out.push({ text: current });

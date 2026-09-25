@@ -41,3 +41,8 @@ describe('splitVisualLines', () => {
     expect(lines).toEqual([{ text: '', lineNum: 1 }]);
   });
 });
+
+test('wrap measures in columns and never splits a wide cluster', () => {
+  expect(splitVisualLines('a日本', 'wrap', 4).map((l) => l.text)).toEqual(['a日', '本']);
+  expect(splitVisualLines('日本語', 'wrap', 4).map((l) => [l.text, l.lineNum])).toEqual([['日本', 1], ['語', null]]);
+});

@@ -270,3 +270,19 @@ describe('consumed keys', () => {
     app.unmount();
   });
 });
+
+test('wide glyphs keep a row layout column-aligned end to end', async () => {
+  const backend = new TestBackend(12, 2);
+  const handle = await render(
+    createElement(Box, { flexDirection: 'column' },
+      createElement(Box, { flexDirection: 'row' }, createElement(Text, null, '日本語'), createElement(Text, null, '|')),
+      createElement(Box, { flexDirection: 'row' }, createElement(Text, null, 'abcdef'), createElement(Text, null, '|')),
+    ),
+    backend,
+  );
+  await flushAsync(backend);
+  expect(backend.lastFrame).toBe('日本語|\nabcdef|');
+  expect(backend.lastBuffer!.get(6, 0).char).toBe('|');
+  expect(backend.lastBuffer!.get(6, 1).char).toBe('|');
+  handle.unmount();
+});

@@ -119,18 +119,34 @@ describe('Shimmer', () => {
     r.unmount();
   });
 
-  test('a wide glyph is one character and one cell; the band walks cell by cell over it', async () => {
+  test('a wide glyph is one character of two cells; the band walks over it as one step', async () => {
     const backend = new TestBackend(12, 1);
     const r = await render(<Shimmer highlight="cyan" width={2} interval={80}>a🍕bc</Shimmer>, backend);
     await flushAsync(backend);
-    expect([0, 1, 2, 3].map((x) => backend.lastBuffer!.get(x, 0).char)).toEqual(['a', '🍕', 'b', 'c']);
+    expect([0, 1, 2, 3].map((x) => backend.lastBuffer!.get(x, 0).char)).toEqual(['a', '🍕', '', 'b']);
+    expect(cellsIn(backend, 5, 'cyan')).toEqual([0]);
+
+    await step(backend, 80);
+    expect(cellsIn(backend, 5, 'cyan')).toEqual([0, 1, 2]); // 'a' and the pizza with its continuation cell
+
+    await step(backend, 80);
+    expect(cellsIn(backend, 5, 'cyan')).toEqual([1, 2, 3]);
+    r.unmount();
+  });
+
+  test('a ZWJ family is one step of two columns, and the period counts it once', async () => {
+    const backend = new TestBackend(10, 1);
+    const r = await render(<Shimmer highlight="cyan" width={1} interval={100}>a👩‍👧b</Shimmer>, backend);
+    await flushAsync(backend);
     expect(cellsIn(backend, 4, 'cyan')).toEqual([0]);
-
-    await step(backend, 80);
-    expect(cellsIn(backend, 4, 'cyan')).toEqual([0, 1]);
-
-    await step(backend, 80);
+    await step(backend, 100);
     expect(cellsIn(backend, 4, 'cyan')).toEqual([1, 2]);
+    await step(backend, 100);
+    expect(cellsIn(backend, 4, 'cyan')).toEqual([3]);
+    await step(backend, 100);
+    expect(cellsIn(backend, 4, 'cyan')).toEqual([]); // the band has left
+    await step(backend, 100);
+    expect(cellsIn(backend, 4, 'cyan')).toEqual([0]); // three characters + one band width: it comes round
     r.unmount();
   });
 

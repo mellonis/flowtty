@@ -165,3 +165,41 @@ After `setDraftForFolder` resolves, calling `setStatusMessage('published: <id>')
 
 - `TextInput` has no `frame`: next to a `Select` band it is the same band, but there is no `none` / `border` form, so a filter bar mixing the two looks uneven. A `frame` prop on `TextInput` (same values) would close that.
 - No field takes focus on a mouse click: `FocusGroup` has no `focus(id)`. `Select` opens on a click regardless of focus (the popup is a dialog, so focus does not matter while it is open), but `TextInput` / `Button` ignore clicks. Focus by click needs the group API first.
+
+## Wide glyphs (2026-09)
+
+### Probe the terminal for its emoji width
+
+flowtty measures by its tables; a terminal that does not join ZWJ sequences, or
+draws a code point newer than the tables wide, drifts by a column on such rows.
+The fix would be a one-time probe at startup (write a glyph, query the cursor
+position with CSI 6n) and a per-backend width override. Not done: the drift is
+cosmetic and the probe costs a round trip on every start.
+
+**Action:** revisit if a real terminal in use shows the drift on common content.
+
+Checked on 2026-09-25 with the bare probes in
+`packages/examples/wide-glyphs/probe.mjs`:
+
+- **Under herdr (a tmux-style multiplexer) in Terminal.app**: herdr measures
+  clusters like flowtty (every probe bar aligned), but its redraw into
+  Terminal.app paints a multi-code-point emoji four columns wide and leaves
+  the spill until the two cells after it are rewritten with DIFFERENT bytes
+  (an explicit SGR 49 works; the same bytes do not). A `drawDiff` repaint with
+  SGR 49 fixed that and was removed again: it targets the multiplexer's redraw
+  heuristics, not a terminal.
+- **Bare Terminal.app**: measures per code point — `👍🏽` advances 4, `👩‍👧` 4
+  (drawn as a silhouette), `☑️` 1, `1️⃣` 2 — so rows laid out to the width
+  wrap and shift the whole screen; a second run showed `👩‍👧` at 5 (the ZWJ
+  itself takes a column). Done as the `'codepoint'` width policy, detected
+  from `TERM_PROGRAM` (docs/terminal.md). The list of zero-width code points
+  that take a column there (ZWSP..RLM, WJ.., enclosing marks) rests on those
+  two observations; other format characters are untested.
+
+### Menu panels clip the submenu marker
+
+`panelWidth` counts `PAD + label + 1 + marker + PAD`, but the row text is
+`label + two spaces + marker`, one column more, so the `▸` / `▾` is clipped off
+in every panel (found while testing CJK labels; the same on Latin ones).
+
+**Action:** widen `panelWidth` by one and pin the marker column in `Menu.spec`.

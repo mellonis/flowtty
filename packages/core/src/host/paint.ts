@@ -1,5 +1,6 @@
 import { Buffer, type Style } from '../cells.js';
-import { wrapTextLines, type WrapMode, type WrappedLine } from '../wrap.js';
+import { clusterWidth, graphemes, stringWidth } from '../graphemes.js';
+import { wrapText, wrapTextLines, type WrapMode, type WrappedLine } from '../wrap.js';
 import { BORDER_CHARS } from './borders.js';
 import { layoutOf, type Rect } from './layout.js';
 import { contentRectOf, intersectRects, isScrollViewport, paddingRectOf, scrollStateOf } from './geometry.js';
@@ -27,7 +28,7 @@ function textStyleOf(inst: Instance): Style {
   return style;
 }
 
-// One Style per character of the joined runs: the box's text style, with whatever
+// One Style per cluster of the joined runs: the box's text style, with whatever
 // the run sets laid over it.
 function runStyles(runs: readonly TextRun[], base: Style): Style[] {
   const out: Style[] = [];
@@ -41,7 +42,7 @@ function runStyles(runs: readonly TextRun[], base: Style): Style[] {
     if (run.inverse !== undefined) style.inverse = run.inverse;
     if (run.strikethrough !== undefined) style.strikethrough = run.strikethrough;
     if (run.link !== undefined) style.link = run.link;
-    for (const _ch of run.text) out.push(style);
+    for (const _cluster of graphemes(run.text)) out.push(style);
   }
   return out;
 }
@@ -54,9 +55,12 @@ function fgOf(color: string | undefined): string | undefined {
 }
 
 // Gate a buffer write on a clip rect. If clip is null, write unconditionally.
+// A wide cluster whose second column is outside the clip would be torn: the
+// first column gets a blank instead (the buffer's own edge is Buffer.set's job).
 function setClipped(buffer: Buffer, x: number, y: number, char: string, style: Style, clip: Rect | null): void {
   if (clip !== null) {
     if (x < clip.left || y < clip.top || x >= clip.left + clip.width || y >= clip.top + clip.height) return;
+    if (x + 1 >= clip.left + clip.width && clusterWidth(char) === 2) char = ' ';
   }
   buffer.set(x, y, char, style);
 }
@@ -147,12 +151,14 @@ function paintBorder(inst: Instance, buffer: Buffer, box: Rect, clip: Rect | nul
   if (title && title !== '') {
     const avail = box.width - 4;
     if (avail >= 1) {
-      const raw = ` ${title} `;
-      const titleChars = [...raw];
-      const drawN = Math.min(titleChars.length, avail);
-      for (let i = 0; i < drawN; i++) {
-        const ch = i === drawN - 1 && titleChars.length > avail ? '…' : titleChars[i]!;
-        setClipped(buffer, x0 + 2 + i, y0, ch, cellStyle, clip);
+      // Measured in columns, cut by cluster with the ellipsis rule text uses.
+      const text = wrapText(` ${title} `, avail, 'truncate')[0]!;
+      let x = x0 + 2;
+      for (const ch of graphemes(text)) {
+        const w = clusterWidth(ch);
+        if (w === 0) continue;
+        setClipped(buffer, x, y0, ch, cellStyle, clip);
+        x += w;
       }
     }
   }
@@ -242,10 +248,11 @@ function paintInstance(
     }
     // With runs, every character has its own style: the run's on top of the box's.
     const styles = inst.props.runs !== undefined ? runStyles(inst.props.runs, textStyle) : null;
-    const source = styles ? [...text] : null;
-    let at = 0; // position in `source` of the next character to be painted
+    const source = styles ? graphemes(text) : null;
+    let at = 0; // position in `source` of the next cluster to be painted
     for (let row = 0; row < lines.length; row++) {
-      const chars = [...(lines[row]?.text ?? '')];
+      const lineText = lines[row]?.text ?? '';
+      const clusters = graphemes(lineText);
       // A line the WRAP ended (not a newline in the source) carries on at the
       // start of the next row: mark the span it painted, so a selection over
       // the two rows copies them as the one line they were written as. Only
@@ -253,30 +260,37 @@ function paintInstance(
       // height has nothing below it.
       const continues = lines[row]?.continues;
       if (continues !== undefined && row + 1 < Math.min(lines.length, content.height)) {
-        const span = Math.min(chars.length, content.width);
+        const span = Math.min(stringWidth(lineText), content.width);
         markContinuation(buffer, content.top + row, content.left, content.left + span, continues, clip);
       }
-      for (let col = 0; col < chars.length; col++) {
-        const ch = chars[col]!;
+      let col = 0;
+      for (const ch of clusters) {
         let style = textStyle;
         if (styles && source) {
-          // Wrapping only ever DROPS characters (the space or line break it
+          // Wrapping only ever DROPS clusters (the space or line break it
           // breaks at) or adds the truncation ellipsis — so walk the source
-          // forward to this character. One that isn't there (the ellipsis)
+          // forward to this cluster. One that isn't there (the ellipsis)
           // takes the style of the text it cuts.
           let found = at;
           while (found < source.length && source[found] !== ch) found++;
           if (found < source.length) { style = styles[found]!; at = found + 1; }
           else style = styles[Math.min(at, styles.length - 1)] ?? textStyle;
         }
-        if (row >= content.height || col >= content.width) continue;
-        // Sanitize C0 control bytes (NUL..US): emitting them to a TTY moves /
-        // resets the cursor (e.g. \r → col 0, \b → back) and corrupts subsequent
-        // cells in the diff-emitted stream. Substitute a space so the cell is
-        // still occupied but inert. Tab/newline included — splitting is handled
-        // upstream by wrapText.
-        const safe = ch.charCodeAt(0) < 0x20 ? ' ' : ch;
-        setClipped(buffer, content.left + col, content.top + row, safe, style, clip);
+        const width = clusterWidth(ch);
+        if (width === 0) continue; // a lone zero-width mark has no cell
+        if (row < content.height && col < content.width) {
+          // Sanitize controls (C0, DEL, C1): emitting them to a TTY moves /
+          // resets the cursor (\r → col 0, \b → back, U+009B is CSI) and
+          // corrupts subsequent cells in the diff-emitted stream. Substitute a
+          // space so the cell is still occupied but inert. Tab/newline
+          // included — splitting is handled upstream by wrapText.
+          const cp = ch.codePointAt(0)!;
+          let safe = cp < 0x20 || (cp >= 0x7f && cp < 0xa0) ? ' ' : ch;
+          // A wide cluster in the content rect's last column would be torn.
+          if (width === 2 && col + 1 >= content.width) safe = ' ';
+          setClipped(buffer, content.left + col, content.top + row, safe, style, clip);
+        }
+        col += width;
       }
     }
   }

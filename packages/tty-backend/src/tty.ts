@@ -1,5 +1,5 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
-import { stringWidth, takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme } from '@flowtty/core';
+import { takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme } from '@flowtty/core';
 import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, takeUnknownColors } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
@@ -218,6 +218,9 @@ export class TtyBackend implements Backend {
       let lineLink: string | undefined;
       for (let x = 0; x < buffer.width; x++) {
         const cell = buffer.get(x, y);
+        // The continuation of the wide glyph just written: the terminal
+        // advanced over that column when it drew the lead.
+        if (cell.char === '') continue;
         if (JSON.stringify(cell.style) !== JSON.stringify(last)) {
           if (lineLink !== undefined && lineLink !== cell.style.link) line += OSC8_CLOSE;
           line += RESET + sgr(cell.style, this.sgrOptions);
@@ -226,12 +229,6 @@ export class TtyBackend implements Backend {
           lineLink = cell.style.link;
         }
         line += cell.char;
-        // Interim wide-char handling: the grid is one cell per code point, but
-        // the terminal advances TWO columns for an East Asian Wide/emoji glyph.
-        // Back the cursor up one so the next cell overwrites the glyph's second
-        // column instead of the whole row shifting right. Accepts visual overlap
-        // (the glyph's right half gets clobbered) to keep column alignment.
-        if (stringWidth(cell.char) === 2) line += '\b';
       }
       if (lineLink !== undefined) line += OSC8_CLOSE;
       outStr += line + RESET + (y < buffer.height - 1 ? '\n' : '');
@@ -262,6 +259,9 @@ export class TtyBackend implements Backend {
         const a = prev.get(x, y);
         const b = next.get(x, y);
         if (cellsEqual(a, b)) continue;
+        // A continuation cell is never emitted: the lead before it moved the
+        // cursor past it (and the pair always changes together).
+        if (b.char === '') continue;
 
         // Cursor move iff this cell isn't immediately right of the prior emitted one.
         if (!(y === lastY && x === lastX + 1)) {
@@ -276,11 +276,9 @@ export class TtyBackend implements Backend {
           penLink = b.style.link;
         }
         out += b.char;
-        // See drawFull: back the cursor up one after a wide glyph. lastX stays
-        // `x` because \b leaves the cursor at physical x+1, so the adjacency
-        // check still skips cursor positioning for a changed cell at x+1.
-        if (stringWidth(b.char) === 2) out += '\b';
-        lastX = x;
+        // A wide glyph moved the cursor two columns: the cell after its
+        // continuation is the adjacent one.
+        lastX = x + 1 < next.width && next.get(x + 1, y).char === '' ? x + 1 : x;
         lastY = y;
       }
     }

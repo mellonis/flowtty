@@ -111,6 +111,12 @@ function rowParts(scope: SelectionScope, y: number): SelectionSegment[] {
   return row === undefined ? [] : [...row.parts];
 }
 
+// The cell to act on for a press at column `x`: the right half of a wide
+// glyph belongs to the glyph, so it resolves to the lead on its left.
+function leadOf(buffer: Buffer, x: number, y: number): number {
+  return x > 0 && buffer.get(x, y).char === '' ? x - 1 : x;
+}
+
 /**
  * The word under a cell: the run of non-space cells around it on that row,
  * bounded by the scope's clip and its excluded regions — the range a
@@ -228,7 +234,8 @@ export function rowSeparator(buffer: Buffer, above: SelectionRow, below: Selecti
 function rowChars(buffer: Buffer, row: SelectionRow, from: number, to: number): string {
   let line = '';
   for (const part of row.parts) {
-    for (let x = Math.max(part.x0, from); x < Math.min(part.x1, to); x++) {
+    // A part that starts on the right half of a wide glyph has the glyph.
+    for (let x = leadOf(buffer, Math.max(part.x0, from), row.y); x < Math.min(part.x1, to); x++) {
       line += buffer.get(x, row.y).char;
     }
   }
@@ -358,8 +365,10 @@ export function applySelection(buffer: Buffer, segments: readonly SelectionSegme
   if (segments.length === 0) return buffer;
   const out = buffer.clone();
   for (const seg of segments) {
-    for (let x = seg.x0; x < seg.x1; x++) {
+    // A segment that starts on the right half of a wide glyph covers the glyph.
+    for (let x = leadOf(buffer, seg.x0, seg.y); x < seg.x1; x++) {
       const cell = buffer.get(x, seg.y);
+      if (cell.char === '') continue; // restyled with its lead — set writes the pair
       out.set(x, seg.y, cell.char, selectedStyle(cell.style));
     }
   }
@@ -519,11 +528,19 @@ export class SelectionController {
     const scope = this.scopeAt(anchor.x, anchor.y);
     if (scope === null) return '';
     return this.apply({
-      anchor: clampToRect(anchor, scope.clip),
-      head: clampToRect(head, scope.clip),
+      anchor: this.snapToLead(clampToRect(anchor, scope.clip)),
+      head: this.snapToLead(clampToRect(head, scope.clip)),
       clip: scope.clip,
       excluded: scope.excluded,
     });
+  }
+
+  // A point on the right half of a wide glyph means the glyph: its lead cell.
+  private snapToLead(point: Point): Point {
+    const frame = this.host.frame();
+    if (frame === null) return point;
+    const x = leadOf(frame, point.x, point.y);
+    return x === point.x ? point : { x, y: point.y };
   }
 
   /** Select the word under a cell — the double-click rule. Returns the text. */
@@ -563,7 +580,7 @@ export class SelectionController {
     }
     // The press may have landed on the scope's own border or padding; the
     // anchor belongs inside its content rect either way.
-    const anchor = clampToRect({ x: key.x, y: key.y }, scope.clip);
+    const anchor = this.snapToLead(clampToRect({ x: key.x, y: key.y }, scope.clip));
     this.range = { anchor, head: anchor, clip: scope.clip, excluded: scope.excluded };
     this.dragging = true;
   }
@@ -596,7 +613,7 @@ export class SelectionController {
     const range = this.range;
     if (!this.dragging || range === null) return;
     if (key.x === undefined || key.y === undefined) return;
-    const head = clampToRect({ x: key.x, y: key.y }, range.clip);
+    const head = this.snapToLead(clampToRect({ x: key.x, y: key.y }, range.clip));
     if (head.x === range.head.x && head.y === range.head.y) return;
     this.range = { ...range, head };
     this.recompute();
@@ -629,7 +646,7 @@ export class SelectionController {
 function charsOf(buffer: Buffer, segments: readonly SelectionSegment[]): string {
   let out = '';
   for (const seg of segments) {
-    for (let x = seg.x0; x < seg.x1; x++) out += buffer.get(x, seg.y).char;
+    for (let x = leadOf(buffer, seg.x0, seg.y); x < seg.x1; x++) out += buffer.get(x, seg.y).char;
   }
   return out;
 }

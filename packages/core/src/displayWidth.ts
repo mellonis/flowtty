@@ -5,11 +5,9 @@
 // inline two sorted range tables (no external package) and binary-search them.
 //
 // Tables: the Markus Kuhn `combining` set (zero-width) and the East Asian
-// Wide+Fullwidth block ranges (the set `is-fullwidth-code-point` uses). This is
-// per-code-point, not grapheme-aware: an emoji ZWJ sequence (e.g. 👩‍👧) sums its
-// parts rather than measuring as one cluster, which over-counts such sequences.
-// Good enough for column alignment of typical TUI content (Latin + CJK + lone
-// emoji); callers needing cluster-exact widths should pre-segment.
+// Wide+Fullwidth block ranges (the set `is-fullwidth-code-point` uses). Per
+// code point: clusters (flags, skin tones, ZWJ sequences, combining marks) are
+// measured by `clusterWidth` in graphemes.ts, which builds on this table.
 //
 // Input is expected to be plain text — NOT ANSI-styled. flowtty keeps styling
 // in the cell Style, separate from the string, so there are no escape sequences
@@ -118,15 +116,4 @@ export function charWidth(cp: number): 0 | 1 | 2 {
   if (inRanges(cp, ZERO_WIDTH)) return 0;
   if (inRanges(cp, WIDE)) return 2;
   return 1;
-}
-
-/**
- * Display width in terminal cells of a string, summing `charWidth` over its
- * code points (surrogate pairs counted once). See the file header for the
- * grapheme-cluster caveat. Expects plain text, not ANSI-styled.
- */
-export function stringWidth(str: string): number {
-  let w = 0;
-  for (const ch of str) w += charWidth(ch.codePointAt(0)!);
-  return w;
 }

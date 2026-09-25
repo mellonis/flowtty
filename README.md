@@ -92,10 +92,9 @@ screen capture are involved.
 Alpha — `1.0.0-alpha.x` on npm. APIs can still change between alphas; each
 release's notes list what breaks. Runs on Node and Bun.
 
-Not there yet: cell-accurate wide glyphs (a CJK or emoji glyph takes one grid
-cell, so text after it overlaps its right half), hit-testing a mouse key against
-the laid-out tree (the keys themselves carry the cell), the Kitty keyboard
-protocol — see [what is deferred](docs/terminal.md#still-deferred-later-milestones).
+Not there yet: hit-testing a mouse key against the laid-out tree (the keys
+themselves carry the cell), the Kitty keyboard protocol — see
+[what is deferred](docs/terminal.md#still-deferred-later-milestones).
 
 ## License
 

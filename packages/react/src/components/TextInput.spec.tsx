@@ -2,7 +2,7 @@ import React from "react";
 import { expect, test } from 'vitest';
 import { createElement, useState } from 'react';
 import { render, Box, Text } from '../index.js';
-import { TestBackend, flush } from '@flowtty/core/testing';
+import { TestBackend, flush, flushAsync } from '@flowtty/core/testing';
 import { TextInput } from './TextInput.js';
 
 test('TextInput renders the value with a trailing cursor bar', async () => {
@@ -217,11 +217,13 @@ test('an emoji is one character: typed, stepped over, deleted whole, and drawn i
   expect(captured).toBe('a😀b');
   backend.press({ name: 'left' }); backend.press({ name: 'left' });
   await flush();
-  // The caret sits ON the emoji: one inverse cell holding the whole character.
+  // The caret sits ON the emoji: the whole character in one lead cell, its
+  // continuation cell inverse with it, and 'b' two columns on.
   const buf = backend.lastBuffer!;
   expect(buf.get(1, 0).char).toBe('😀');
   expect(buf.get(1, 0).style.inverse).toBe(true);
-  expect(buf.get(2, 0).char).toBe('b');
+  expect(buf.get(2, 0)).toEqual({ char: '', style: buf.get(1, 0).style });
+  expect(buf.get(3, 0).char).toBe('b');
   backend.press({ name: 'delete' });
   await flush();
   expect(captured).toBe('ab');
@@ -336,4 +338,51 @@ test('width pins the band, and the text scrolls inside it', async () => {
   backend.type('abcdefgh');
   await flush();
   expect(backend.lastFrame).toBe('defgh |');           // 6 cells: the last five characters and the caret
+});
+
+// ─── display columns ─────────────────────────────────────────────────────────
+
+test('the caret on a wide glyph covers both of its cells', async () => {
+  function App() {
+    return createElement(TextInput, { value: 'a日b', onChange: () => {}, isFocused: true, frame: 'none' });
+  }
+  const backend = new TestBackend(10, 1);
+  await render(createElement(App), backend);
+  // The caret starts at the end; two steps left put it on 日 (the editor steps by cluster).
+  backend.press({ name: 'left' });
+  backend.press({ name: 'left' });
+  await flush();
+  const buf = backend.lastBuffer!;
+  expect([0, 1, 2, 3].map((x) => buf.get(x, 0).char)).toEqual(['a', '日', '', 'b']);
+  expect(buf.get(1, 0).style.inverse).toBe(true);
+  expect(buf.get(2, 0).style.inverse).toBe(true);
+  expect(buf.get(3, 0).style.inverse).toBeUndefined();
+});
+
+test('scrolling through wide text leaves a blank column instead of half a glyph at the window edge', async () => {
+  function App() {
+    // The default `field` band stretches to its width and windows the text (`none` is content-sized and grows instead).
+    return createElement(TextInput, { value: '日本語日本語', onChange: () => {}, width: 5, isFocused: true });
+  }
+  const backend = new TestBackend(5, 1);
+  await render(createElement(App), backend);
+  await flushAsync(backend); // onLayout has delivered the width
+  // Each caret move commits synchronously, with the band's width along with it.
+  backend.press({ name: 'home' });
+  await flush();
+  // Window [0, 5): 日 (0–1), 本 (2–3), 語 would need 4–5 → blank at 4.
+  expect(backend.lastFrame).toBe('日本');
+  backend.press({ name: 'end' });
+  await flush();
+  // Caret at the end (column 12) → window is columns [8, 13): 本 (8–9), 語 (10–11), the caret cell (12).
+  expect(backend.lastFrame).toBe('本語');
+});
+
+test('a masked value shows one dot per cluster', async () => {
+  function App() {
+    return createElement(TextInput, { value: '🇯🇵a', onChange: () => {}, mask: true, frame: 'none' });
+  }
+  const backend = new TestBackend(10, 1);
+  await render(createElement(App), backend);
+  expect(backend.lastFrame).toBe('••');
 });

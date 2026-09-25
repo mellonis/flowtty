@@ -175,3 +175,34 @@ test('wrapTextLines: a break inside a run of spaces carries the whole run', () =
     { text: 'cd' },
   ]);
 });
+
+// ─── display width ───────────────────────────────────────────────────────────
+
+test('wrap mode measures in display columns: CJK wraps at half the characters', () => {
+  expect(wrapText('日本語日本語', 6, 'wrap')).toEqual(['日本語', '日本語']);
+  expect(wrapText('日本語 abc', 6, 'wrap')).toEqual(['日本語', 'abc']);
+});
+
+test('wrap mode never splits a wide cluster: it moves whole to the next line', () => {
+  expect(wrapText('a日本', 4, 'wrap')).toEqual(['a日', '本']);
+  expect(wrapText('ab日', 3, 'wrap')).toEqual(['ab', '日']);
+});
+
+test('wrap mode: a cluster wider than the line still makes progress', () => {
+  expect(wrapText('日本', 1, 'wrap')).toEqual(['日', '本']);
+});
+
+test('wrap mode: a flag and a decomposed accent are one character', () => {
+  expect(wrapText('🇯🇵🇯🇵', 2, 'wrap')).toEqual(['🇯🇵', '🇯🇵']);
+  expect(wrapText('café ok', 4, 'wrap')).toEqual(['café', 'ok']);
+});
+
+test('truncate mode measures in columns and drops a wide cluster that would not fit before the ellipsis', () => {
+  expect(wrapText('日本語', 4, 'truncate')).toEqual(['日…']);
+  expect(wrapText('日本語', 5, 'truncate')).toEqual(['日本…']);
+  expect(wrapText('日本語', 6, 'truncate')).toEqual(['日本語']);
+});
+
+test('the continuation join survives a wrap through wide text', () => {
+  expect(wrapTextLines('日本 語', 4, 'wrap')).toEqual([{ text: '日本', continues: ' ' }, { text: '語' }]);
+});

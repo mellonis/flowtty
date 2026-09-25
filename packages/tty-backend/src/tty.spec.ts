@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import { Buffer, type Key } from '@flowtty/core';
 import { TtyBackend } from './tty.js';
 import { isInteractive, NotInteractiveError } from './interactive.js';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open, MOUSE_ON, MOUSE_OFF, BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open, MOUSE_ON, MOUSE_OFF, BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF, cursorTo } from './ansi.js';
 
 function makeStdinStub() {
   const emitter = new EventEmitter() as EventEmitter & {
@@ -343,33 +343,63 @@ test('TtyBackend.draw (diff): emits OSC 8 open/close around a newly-linked cell'
   back.dispose();
 });
 
-test('TtyBackend.draw (full): backs cursor one column after a wide glyph, not after ASCII', () => {
-  const { stub: out, writes } = makeStub(3, 1);
+test('TtyBackend.draw (full): a wide glyph is written once, its continuation cell emits nothing', () => {
+  const { stub: out, writes } = makeStub(4, 1);
   const back = new TtyBackend(out);
-  const buf = new Buffer(3, 1);
-  buf.set(0, 0, '日'); // East Asian Wide → stringWidth 2
-  buf.set(1, 0, 'x');
-  buf.set(2, 0, 'y');
+  const buf = new Buffer(4, 1);
+  buf.set(0, 0, '日'); // cells 0,1
+  buf.set(2, 0, 'x');
+  buf.set(3, 0, 'y');
   back.draw(buf);
   const drawWrite = writes[1]!;
-  // Wide glyph is immediately followed by a backspace so the next cell overwrites
-  // its second column; the ASCII cells are not.
-  expect(drawWrite).toContain('日\b');
-  expect(drawWrite).not.toContain('x\b');
+  expect(drawWrite).not.toContain('\b');
+  expect(drawWrite.replace(/\x1b\[[0-9;]*m/g, '')).toContain('日xy');
   back.dispose();
 });
 
-test('TtyBackend.draw (diff): backs cursor after a wide glyph and keeps row alignment', () => {
-  const { stub: out, writes } = makeStub(3, 1);
+test('TtyBackend.draw (diff): a wide glyph replacing two narrow cells keeps the cursor column-aligned', () => {
+  const { stub: out, writes } = makeStub(4, 1);
   const back = new TtyBackend(out);
-  const buf1 = new Buffer(3, 1);
-  buf1.set(0, 0, 'a'); buf1.set(1, 0, 'b'); buf1.set(2, 0, 'c');
+  const buf1 = new Buffer(4, 1);
+  buf1.set(0, 0, 'a'); buf1.set(1, 0, 'b'); buf1.set(2, 0, 'c'); buf1.set(3, 0, 'd');
   back.draw(buf1);
-  const buf2 = new Buffer(3, 1);
-  buf2.set(0, 0, '日'); buf2.set(1, 0, 'b'); buf2.set(2, 0, 'c');
+  const buf2 = new Buffer(4, 1);
+  buf2.set(0, 0, '日'); buf2.set(2, 0, 'c'); buf2.set(3, 0, 'e');
   back.draw(buf2);
   const diff = writes[writes.length - 1]!;
-  expect(diff).toContain('日\b');
+  expect(diff).not.toContain('\b');
+  // 日 at column 0 moved the cursor to column 2; 'c' is unchanged; 'e' at 3 needs a move.
+  expect(diff).toContain('日');
+  expect(diff).toContain(cursorTo(3, 0) + 'e');
+  back.dispose();
+});
+
+test('TtyBackend.draw (diff): two narrow cells replacing a wide glyph are both emitted, adjacent', () => {
+  const { stub: out, writes } = makeStub(4, 1);
+  const back = new TtyBackend(out);
+  const buf1 = new Buffer(4, 1);
+  buf1.set(0, 0, '日'); buf1.set(2, 0, 'c');
+  back.draw(buf1);
+  const buf2 = new Buffer(4, 1);
+  buf2.set(0, 0, 'a'); buf2.set(1, 0, 'b'); buf2.set(2, 0, 'c');
+  back.draw(buf2);
+  const diff = writes[writes.length - 1]!;
+  expect(diff).toContain('ab');
+  expect(diff).not.toContain(cursorTo(1, 0));
+  back.dispose();
+});
+
+test('TtyBackend.draw (diff): a changed wide glyph emits itself and nothing after it', () => {
+  const { stub: out, writes } = makeStub(8, 1);
+  const back = new TtyBackend(out);
+  const buf1 = new Buffer(8, 1);
+  buf1.set(0, 0, 'a'); buf1.set(1, 0, 'b'); buf1.set(2, 0, 'c');
+  back.draw(buf1);
+  const buf2 = new Buffer(8, 1);
+  buf2.set(0, 0, '日'); buf2.set(2, 0, 'c');
+  back.draw(buf2);
+  const diff = writes[writes.length - 1]!;
+  expect(diff.replace(/\x1b\[[0-9;]*[mH]/g, '')).toBe('日');
   back.dispose();
 });
 

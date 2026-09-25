@@ -1,5 +1,5 @@
 import React, { useRef, useState, type ReactNode } from 'react';
-import { editorReducer as reduce, inputRows, caretPosition, type Key } from '@flowtty/core';
+import { editorReducer as reduce, inputRows, caretPosition, graphemes, clusterWidth, stringWidth, fitClusters, type Key } from '@flowtty/core';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
@@ -152,9 +152,13 @@ export function TextArea(props: TextAreaProps): ReactNode {
           const r = first + i;
           const isCaretRow = isFocused && r === caret.row;
           const isLastRow = r === rows.length - 1;
-          // Characters, not UTF-16 units: an emoji is one cell and must never be sliced in two.
-          const cells = [...row.text];
-          const tailCells = isLastRow ? [...trailing].slice(0, Math.max(0, wrapWidth - cells.length)) : [];
+          // Clusters, not UTF-16 units — and the caret's `col` is a display
+          // column: a wide glyph is one cluster of two columns and is never
+          // sliced in two.
+          const cells = graphemes(row.text);
+          const rowWidth = stringWidth(row.text);
+          const ghost = isLastRow ? graphemes(trailing) : [];
+          const tailCells = ghost.slice(0, fitClusters(ghost, Math.max(0, wrapWidth - rowWidth)));
           const tail = tailCells.join('');
           if (!isCaretRow) {
             return (
@@ -164,10 +168,15 @@ export function TextArea(props: TextAreaProps): ReactNode {
               </Box>
             );
           }
-          const before = cells.slice(0, caret.col).join('');
-          const onText = caret.col < cells.length;
-          const caretChar = onText ? cells[caret.col]! : tailCells[0] ?? CURSOR_AT_END;
-          const after = onText ? cells.slice(caret.col + 1).join('') : '';
+          // The cluster the caret column starts: rows begin on cluster
+          // boundaries and the editor keeps the cursor on one, so the column
+          // is always a cluster start.
+          let caretIdx = 0;
+          for (let c = 0; caretIdx < cells.length && c < caret.col; caretIdx++) c += clusterWidth(cells[caretIdx]!);
+          const before = cells.slice(0, caretIdx).join('');
+          const onText = caretIdx < cells.length;
+          const caretChar = onText ? cells[caretIdx]! : tailCells[0] ?? CURSOR_AT_END;
+          const after = onText ? cells.slice(caretIdx + 1).join('') : '';
           const dimAfter = onText ? tail : tailCells.slice(1).join('');
           return (
             <Box key={r} flexDirection="row">

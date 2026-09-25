@@ -70,8 +70,8 @@ expect(backend.lastFrame).toBe('▸ [ ] a\n  [ ] b');
 expect(backend.lastBuffer!.get(0, 0).style).toMatchObject({ fg: 'cyan', bold: true }); // the focused marker
 ```
 
-The grid is one cell per code point, so `x` in `get(x, y)` is a character index
-into the row — see [Display width](terminal.md#display-width).
+`x` in `get(x, y)` is a display column: a wide glyph (CJK, emoji) holds its
+cell and the next, whose `char` is `''` — see [Display width](terminal.md#display-width).
 
 - `backend.bells` — how many times the app rang the bell; `backend.notifications`
   — every `{ title, body? }` it posted, in order, exactly as the app passed them
@@ -87,6 +87,10 @@ expect(await renderToString(<Report data={rows} />, { width: 60 })).toMatchSnaps
 
 See [Rendering to a string](app.md#rendering-to-a-string). Reach for
 `TestBackend` when the test presses keys.
+
+A frame row that holds a wide glyph (`日本`) reads shorter than the grid is
+wide: the glyph's second cell is `''` and vanishes in the text, exactly as it
+takes no extra column on screen (see [Display width](terminal.md#display-width)).
 
 ## Sending input
 

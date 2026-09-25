@@ -3,6 +3,7 @@ import { createElement } from 'react';
 import { describe, test, expect, vi } from 'vitest';
 import { render } from '../internal/render.js';
 import { TestBackend, flushAsync } from '@flowtty/core/testing';
+import { stringWidth } from '@flowtty/core';
 import { DialogHost } from './DialogHost.js';
 import { Menu, type MenuItem } from './Menu.js';
 
@@ -212,4 +213,46 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
 
   // Page-mute behavior is covered by inert.test.ts (which tests the underlying
   // <Box inert> primitive that Menu uses to gate its `children` prop).
+  test('a panel pads labels by display column: the focused band is as wide as the widest label for CJK and Latin alike', async () => {
+    const items: MenuItem[] = [{ key: 'f', label: 'File', submenu: [
+      { key: 'a', label: '日本語', onSelect: () => {} },
+      { key: 'b', label: 'ab', onSelect: () => {} },
+    ] }];
+    const backend = new TestBackend(40, 8);
+    await render(createElement(DialogHost, null, createElement(Menu, { items })), backend);
+    await flushAsync(backend);
+    backend.press({ name: 'f10' });
+    await flushAsync(backend);
+    backend.press({ name: 'down' });
+    await flushAsync(backend);
+    const inverseCells = (y: number) => {
+      const buf = backend.lastBuffer!;
+      let n = 0;
+      for (let x = 0; x < buf.width; x++) if (buf.get(x, y).style.inverse) n++;
+      return n;
+    };
+    const rows = backend.lastFrame.split('\n');
+    const cjkRow = rows.findIndex((l) => l.includes('日本語'));
+    const abRow = rows.findIndex((l) => l.includes('ab'));
+    // 日本語 is focused: its band is the panel's label width, six columns — not
+    // the nine that padding by UTF-16 unit would give.
+    expect(inverseCells(cjkRow)).toBe(stringWidth('日本語'));
+    backend.press({ name: 'down' });
+    await flushAsync(backend);
+    expect(inverseCells(abRow)).toBe(stringWidth('日本語'));
+  });
+  test('a title with wide glyphs offsets the dropdown by its display width', async () => {
+    const items: MenuItem[] = [{ key: 'f', label: 'File', submenu: [{ key: 'a', label: 'Aaa', onSelect: () => {} }] }];
+    const backend = new TestBackend(40, 8);
+    await render(createElement(DialogHost, null, createElement(Menu, { items, title: '日本' })), backend);
+    await flushAsync(backend);
+    backend.press({ name: 'f10' });
+    await flushAsync(backend);
+    backend.press({ name: 'down' });
+    await flushAsync(backend);
+    const rows = backend.lastFrame.split('\n');
+    const corner = rows.find((l) => l.includes('╭'))!;
+    // The panel opens under its item, which starts right after " 日本 " (six columns).
+    expect(stringWidth(corner.slice(0, corner.indexOf('╭')))).toBe(stringWidth(' 日本 '));
+  });
 });

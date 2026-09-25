@@ -1,5 +1,5 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
-import { stringWidth, takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme } from '@flowtty/core';
+import { takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme } from '@flowtty/core';
 import {
   decodeKeys,
   detectHyperlinkSupport,
@@ -431,6 +431,9 @@ export class InlineTtyBackend implements Backend {
       let lineLink: string | undefined;
       for (let x = 0; x < buffer.width; x++) {
         const cell = buffer.get(x, y);
+        // The continuation of the wide glyph just written: the terminal
+        // advanced over that column when it drew the lead.
+        if (cell.char === '') continue;
         if (JSON.stringify(cell.style) !== JSON.stringify(last)) {
           if (lineLink !== undefined && lineLink !== cell.style.link) line += OSC8_CLOSE;
           line += RESET + sgr(cell.style, this.sgrOptions);
@@ -439,10 +442,6 @@ export class InlineTtyBackend implements Backend {
           lineLink = cell.style.link;
         }
         line += cell.char;
-        // Interim wide-char handling (see TtyBackend.drawFull): back the cursor
-        // up one after an East Asian Wide/emoji glyph so the next cell overwrites
-        // its second column rather than shifting the row right.
-        if (stringWidth(cell.char) === 2) line += '\b';
       }
       if (lineLink !== undefined) line += OSC8_CLOSE;
       lines.push(line + RESET);

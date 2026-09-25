@@ -1,6 +1,6 @@
 import React from 'react';
 import { useState, type ReactNode } from 'react';
-import { DEFAULT_BORDER_STYLE, GRID_CHARS, windowAround, type BorderStyle } from '@flowtty/core';
+import { DEFAULT_BORDER_STYLE, GRID_CHARS, fitClusters, graphemes, stringWidth, windowAround, type BorderStyle } from '@flowtty/core';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -24,7 +24,7 @@ export interface TableColumn<T> {
   header?: string;
   /** Horizontal alignment of header + cell content. Default 'left'. */
   align?: TableAlign;
-  /** Fixed content width (cells, excluding padding). Auto-sized to content when omitted. */
+  /** Fixed content width (display columns, excluding padding). Auto-sized to content when omitted. */
   width?: number;
   /** Lower / upper bounds for auto-sizing (cells). */
   minWidth?: number;
@@ -71,21 +71,22 @@ export interface TableProps<T> {
   scrollable?: boolean;
 }
 
-const cpLen = (s: string): number => [...s].length;
-
-// Truncate to `width` code points with a trailing ellipsis, then pad to exactly
-// `width` per `align`. Measured in code points to match the paint grid (see
-// docs/plans/table.md — the painter is one cell per code point).
+// Truncate to `width` display columns with a trailing ellipsis, then pad to
+// exactly `width` per `align`. A wide cluster that would not fit before the
+// ellipsis is dropped, never torn (see docs/terminal.md, display width).
 function fitCell(raw: string, width: number, align: TableAlign): string {
   if (width <= 0) return '';
-  const chars = [...raw];
   let body: string;
-  if (chars.length > width) {
-    body = width === 1 ? '…' : chars.slice(0, width - 1).join('') + '…';
+  if (stringWidth(raw) > width) {
+    if (width === 1) body = '…';
+    else {
+      const clusters = graphemes(raw);
+      body = clusters.slice(0, fitClusters(clusters, width - 1)).join('') + '…';
+    }
   } else {
     body = raw;
   }
-  const deficit = width - cpLen(body);
+  const deficit = width - stringWidth(body);
   if (deficit <= 0) return body;
   if (align === 'right') return ' '.repeat(deficit) + body;
   if (align === 'center') {
@@ -166,11 +167,11 @@ export function Table<T>({
   const pad = Math.max(0, cellPadding);
   const ncols = columns.length;
 
-  // Natural content width per column (code points), honoring explicit width / bounds.
+  // Natural content width per column (display columns), honoring explicit width / bounds.
   const natural = columns.map((col, c) => {
     if (typeof col.width === 'number') return Math.max(0, col.width);
-    let w = cpLen(headerTextOf(col));
-    for (let i = 0; i < data.length; i++) w = Math.max(w, cpLen(cellTextOf(col, data[i]!, i)));
+    let w = stringWidth(headerTextOf(col));
+    for (let i = 0; i < data.length; i++) w = Math.max(w, stringWidth(cellTextOf(col, data[i]!, i)));
     if (col.minWidth !== undefined) w = Math.max(w, col.minWidth);
     if (col.maxWidth !== undefined) w = Math.min(w, col.maxWidth);
     return Math.max(0, w);

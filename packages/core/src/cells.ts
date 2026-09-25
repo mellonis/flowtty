@@ -1,4 +1,6 @@
 import type { Color } from './colors.js';
+import { clusterWidth } from './graphemes.js';
+import { noteWarning } from './warnings.js';
 export interface Style {
   fg?: Color;
   bg?: Color;
@@ -17,7 +19,14 @@ export interface Style {
 }
 
 export interface Cell {
-  char: string; // one display column (M0 assumes width-1 glyphs)
+  /**
+   * One grapheme cluster of display width 1 or 2 (`clusterWidth`), `''` for
+   * the continuation column of the wide cluster in the cell to its left (it
+   * carries the lead's style), or `' '` filler. Readers that concatenate chars
+   * get the row's text for free; a backend skips `''` — the terminal advanced
+   * over that column when it drew the lead. See docs/terminal.md (display width).
+   */
+  char: string;
   style: Style;
 }
 
@@ -64,9 +73,46 @@ export class Buffer {
     }));
   }
 
+  /**
+   * Write one cluster at (x, y). A wide cluster takes this cell and the next
+   * (`''`); at the right edge, where it cannot, a blank is written instead.
+   * Whichever half of an existing wide cluster this write lands on, the other
+   * half becomes a blank in its old style — half a glyph is never left behind.
+   * A zero-width cluster (a lone combining mark) has no cell and is stored as
+   * a blank; `''` is not accepted, it is what `set` writes, never what it takes.
+   */
   set(x: number, y: number, char: string, style: Style = {}): void {
     if (x < 0 || y < 0 || x >= this.width || y >= this.height) return;
-    this.cells[y * this.width + x] = { char, style };
+    if (char === '') {
+      noteWarning('flowtty: Buffer.set was given an empty char; the continuation of a wide glyph is written by set itself. The call was ignored.');
+      return;
+    }
+    const cells = this.cells;
+    const i = y * this.width + x;
+    this.untear(i, x);
+    let w = clusterWidth(char);
+    if (w === 0) { char = ' '; w = 1; }
+    if (w === 2) {
+      if (x + 1 >= this.width) { cells[i] = { char: ' ', style }; return; }
+      // The cell to the right becomes this cluster's continuation; if it was
+      // the lead of another wide cluster, that one's continuation is orphaned.
+      this.untear(i + 1, x + 1);
+      cells[i] = { char, style };
+      cells[i + 1] = { char: '', style };
+      return;
+    }
+    cells[i] = { char, style };
+  }
+
+  // Cell `i` (at column `x`) is about to be overwritten: if it is one half of
+  // a wide cluster, blank the other half so the frame never shows a torn glyph.
+  private untear(i: number, x: number): void {
+    const cells = this.cells;
+    if (cells[i]!.char === '') {
+      cells[i - 1] = { char: ' ', style: cells[i - 1]!.style }; // a continuation never sits in column 0
+    } else if (x + 1 < this.width && cells[i + 1]!.char === '') {
+      cells[i + 1] = { char: ' ', style: cells[i + 1]!.style };
+    }
   }
 
   // Out-of-bounds reads return a fresh blank cell (mirrors set()'s no-op).
@@ -115,6 +161,8 @@ export class Buffer {
 
   // Plain-text frame. Trailing ASCII spaces are trimmed (cosmetic), but NBSP
   // (U+00A0) and other content are preserved — NBSP-safety is a flowtty value.
+  // A continuation cell (`''`) vanishes in the concatenation, as it takes no
+  // extra column on screen.
   toString(): string {
     const lines: string[] = [];
     for (let y = 0; y < this.height; y++) {

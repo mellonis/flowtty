@@ -1,3 +1,4 @@
+import { clusterWidth, graphemes } from '@flowtty/core';
 // Markdown SOURCE highlighter — the counterpart to layout.ts. Where
 // layoutMarkdown *renders* markdown (consuming markers, e.g. `**x**` → bold
 // "x"), this colors the raw source while keeping every character intact, the
@@ -42,7 +43,7 @@ function headingColor(level: number): string {
 }
 
 function pushText(out: StyledChar[], text: string, style: SpanStyle): void {
-  for (const ch of [...text]) out.push({ ch, style });
+  for (const ch of graphemes(text)) out.push({ ch, style });
 }
 
 // Inline highlighter that KEEPS the markdown markers, dimming them so the
@@ -147,11 +148,21 @@ function lineToChars(line: string, code: CodeLine | undefined): StyledChar[] {
   return inlineSourceChars(line, {});
 }
 
-// Hard char-wrap preserving every cell. width<=0 → no wrap.
+// Hard wrap by display column, preserving every cluster and never splitting a
+// wide one (a row takes at least one, so a glyph wider than the row still
+// moves). width<=0 → no wrap.
 function hardWrap(chars: StyledChar[], width: number): StyledChar[][] {
-  if (width <= 0 || chars.length <= width) return [chars];
+  if (width <= 0) return [chars];
   const lines: StyledChar[][] = [];
-  for (let i = 0; i < chars.length; i += width) lines.push(chars.slice(i, i + width));
+  let row: StyledChar[] = [];
+  let w = 0;
+  for (const c of chars) {
+    const cw = clusterWidth(c.ch);
+    if (row.length > 0 && w + cw > width) { lines.push(row); row = []; w = 0; }
+    row.push(c);
+    w += cw;
+  }
+  if (row.length > 0 || lines.length === 0) lines.push(row);
   return lines;
 }
 

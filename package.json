@@ -20,7 +20,8 @@
     "things-tui:ddev": "npm run things-tui:ddev -w @flowtty/examples",
     "inline-build-log": "npm run inline-build-log -w @flowtty/examples",
     "docker-logs-tui": "npm run docker-logs-tui -w @flowtty/examples",
-    "docker-logs-tui:demo": "npm run docker-logs-tui:demo -w @flowtty/examples"
+    "docker-logs-tui:demo": "npm run docker-logs-tui:demo -w @flowtty/examples",
+    "wide-glyphs": "npm run wide-glyphs -w @flowtty/examples"
   },
   "devDependencies": {
     "typescript": "^7",

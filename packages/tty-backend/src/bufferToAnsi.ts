@@ -58,6 +58,9 @@ export function bufferToAnsi(buffer: Buffer, options: BufferToAnsiOptions = {}):
 
     for (let x = 0; x < end; x++) {
       const cell = buffer.get(x, y);
+      // A continuation cell emits nothing: the wide glyph before it already
+      // took its column. See docs/terminal.md (display width).
+      if (cell.char === '') continue;
       const seq = sgr(cell.style, sgrOptions);
       if (seq !== penSgr) {
         // SGR is additive, so the previous attributes have to be dropped before
@@ -73,16 +76,6 @@ export function bufferToAnsi(buffer: Buffer, options: BufferToAnsiOptions = {}):
         penLink = link;
       }
       line += cell.char;
-      // No `\b` after a double-width glyph here, unlike TtyBackend.drawFull and
-      // InlineTtyBackend: that trick keeps a repainted grid column-aligned by
-      // letting the next cell overwrite the glyph's second column. This text is
-      // written once into the normal screen and then belongs to the scrollback,
-      // a pipe or a file — where a backspace is a control byte that survives
-      // `tee`, confuses a pager and breaks copy-paste and `grep`. A row with a
-      // wide glyph runs one column longer per glyph instead; that is the same
-      // one-cell-per-code-point limitation the grid already has, and
-      // `Buffer.toString()`, this function's plain-text sibling, makes the same
-      // trade. See docs/terminal.md (display width).
     }
 
     // RESET ends any open style before the newline; OSC 8 is not closed by

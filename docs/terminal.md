@@ -43,24 +43,39 @@ warning when they exit (never mid-frame, where it would corrupt the display).
 
 ## Display width
 
-`stringWidth(str)` / `charWidth(codePoint)` measure how many terminal **cells**
-text occupies: 1 for most glyphs, 2 for East Asian Wide/Fullwidth and most emoji,
-0 for combining marks, zero-width formatters, and control bytes. The tables (the
-Markus Kuhn combining set + the East Asian Wide/Fullwidth blocks) are inlined —
-no dependency. Use it to align columns or budget a row's width when laying out
-your own content (it's the primitive the upcoming `<Table>` builds on).
+The grid's unit is the display **column**, and a cell holds one **grapheme
+cluster**: a base with its combining marks, a flag's two regional indicators,
+an emoji with its skin tone or ZWJ sequence. A cluster occupies one column, or
+two for East Asian Wide / Fullwidth glyphs and emoji presentation; a wide
+cluster takes two cells of the grid, and nothing ever draws over its second
+half. Zero-width marks never take a cell of their own.
+
+`stringWidth(str)` measures a string in columns; `graphemes(str)` splits it
+into clusters; `clusterWidth(cluster)` measures one; `fitClusters(clusters,
+width)` says how many leading clusters fit a width; `prevGrapheme` /
+`nextGrapheme` step a UTF-16 index over one cluster. `charWidth(codePoint)` is
+the per-code-point table underneath (Markus Kuhn's combining set plus the East
+Asian Wide / Fullwidth blocks — inlined, no dependency). Every component
+measures with these; use them to align columns or budget a row when laying
+out your own content.
 
 ```ts
-import { stringWidth } from '@flowtty/react';
+import { stringWidth, graphemes } from '@flowtty/react';
 
-stringWidth('café');  // 4  (combining accent adds 0)
-stringWidth('日本語'); // 6  (each ideograph is 2)
-stringWidth('a😀b');  // 4
+stringWidth('café');    // 4  (a combining accent adds 0)
+stringWidth('日本語');  // 6  (each ideograph is 2)
+stringWidth('a😀b');    // 4
+stringWidth('🇯🇵👍🏽');  // 4  (a flag and a toned thumb: one cluster of 2 each)
+graphemes('e\u0301x'); // ['é', 'x']
 ```
 
-Measurement is per-code-point, not grapheme-aware, so an emoji ZWJ sequence
-(👩‍👧) over-counts; pre-segment if you need cluster-exact widths. Expects plain
-text (styling lives in the cell, not the string).
+A control character measures 1: paint substitutes a space for it. Expects
+plain text — styling lives in the cell, not the string.
+
+**The remainder.** Terminals do not all agree on emoji: one that does not join
+a ZWJ sequence draws it wider than 2, and a code point newer than the tables
+may be drawn wide where flowtty counts 1. Such a row drifts by a column on
+that terminal. flowtty measures by its tables and does not probe the terminal.
 
 ## Environment
 
@@ -359,14 +374,6 @@ hit the screen. Keep them out of a running app, or write to a file.
 
 ## Still deferred (later milestones)
 
-- Wide-character **rendering**: the grid is still one cell per code point. The
-  backends back the cursor up one column after a double-width glyph (measured via
-  `stringWidth`) so the row stays column-aligned instead of shifting right — but
-  this overlaps the glyph's second column with the next cell. Text printed into
-  the normal screen (`FinalFrameBackend`, `bufferToAnsi`) does not do that — a
-  backspace would survive into the log file — so such a row runs one column
-  longer per wide glyph. Cell-accurate CJK/emoji layout waits on paint reserving
-  the second cell.
 - Scrolling-region optimization for log-stream apps.
 - Column-only cursor moves (`CSI <col>G`) when row is unchanged — small extra perf nibble.
 - `position: 'relative'`.

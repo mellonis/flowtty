@@ -1,3 +1,4 @@
+import { stringWidth } from '../graphemes.js';
 import { Align, Display, Edge, FlexDirection, Gutter, Justify, MeasureMode, PositionType, Wrap, type Yoga, type YogaNode } from './yoga.js';
 import { wrapText, type WrapMode } from '../wrap.js';
 import type { BorderStyle } from './borders.js';
@@ -405,7 +406,7 @@ function acMap(v: BoxProps['alignContent']): number {
 
 export function measureText(text: string): { width: number; height: number } {
   const lines = text.split('\n');
-  const width = lines.reduce((m, l) => Math.max(m, [...l].length), 0);
+  const width = lines.reduce((m, l) => Math.max(m, stringWidth(l)), 0);
   return { width, height: lines.length };
 }
 
@@ -448,7 +449,7 @@ export function refreshMeasure(inst: Instance, _Yoga: Yoga): void {
       ) {
         const cap = Math.max(0, Math.floor(width));
         const lines = wrapText(text, cap, mode);
-        const longest = lines.reduce((m, l) => Math.max(m, [...l].length), 0);
+        const longest = lines.reduce((m, l) => Math.max(m, stringWidth(l)), 0);
         return { width: longest, height: lines.length };
       }
       return measureText(text);

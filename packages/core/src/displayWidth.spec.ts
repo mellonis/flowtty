@@ -1,5 +1,5 @@
 import { describe, test, expect } from 'vitest';
-import { charWidth, stringWidth } from './displayWidth.js';
+import { charWidth } from './displayWidth.js';
 
 describe('charWidth', () => {
   test('ASCII and Latin printable are width 1', () => {
@@ -42,33 +42,5 @@ describe('charWidth', () => {
     expect(charWidth(0x200d)).toBe(0);    // ZWJ
     expect(charWidth(0xfe0f)).toBe(0);    // variation selector-16
     expect(charWidth(0xfeff)).toBe(0);    // BOM / ZWNBSP
-  });
-});
-
-describe('stringWidth', () => {
-  test('plain ASCII is its code-point length', () => {
-    expect(stringWidth('hello')).toBe(5);
-    expect(stringWidth('')).toBe(0);
-  });
-
-  test('CJK counts double', () => {
-    expect(stringWidth('日本語')).toBe(6);
-    expect(stringWidth('aあb')).toBe(4);  // 1 + 2 + 1
-  });
-
-  test('decomposed accents do not add width', () => {
-    // 'e' + combining acute → 1 cell, not 2
-    expect(stringWidth('é')).toBe(1);
-    expect(stringWidth('café')).toBe(4);
-  });
-
-  test('counts astral (surrogate-pair) code points once at their true width', () => {
-    expect(stringWidth('😀')).toBe(2);    // one emoji code point, width 2
-    expect(stringWidth('a😀b')).toBe(4);
-  });
-
-  test('control characters contribute nothing', () => {
-    expect(stringWidth('a\tb')).toBe(2);
-    expect(stringWidth('\x1b[0m')).toBe(3); // ESC=0, then '[', '0', 'm'
   });
 });

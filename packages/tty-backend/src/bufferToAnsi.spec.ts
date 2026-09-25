@@ -136,13 +136,11 @@ test('a hyperlink is closed at the end of its line, never bleeding into the next
   expect(out).toBe(`${osc8Open('https://example.com')}a${OSC8_CLOSE}\nb`);
 });
 
-test('a wide glyph is written as-is — no backspace, the output is meant for a log', () => {
-  const buffer = new Buffer(2, 1);
+test('a wide glyph is written once; its continuation cell emits nothing', () => {
+  const buffer = new Buffer(3, 1);
   buffer.set(0, 0, '日');
-  buffer.set(1, 0, 'x');
-  const out = bufferToAnsi(buffer, opts);
-  expect(out).toBe('日x');
-  expect(out).not.toContain('\b');
+  buffer.set(2, 0, 'x');
+  expect(bufferToAnsi(buffer, opts)).toBe('日x');
 });
 
 test('an NBSP survives trimming — only ASCII spaces are trailing filler', () => {

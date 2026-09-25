@@ -248,12 +248,13 @@ describe('layoutMarkdown', () => {
     expect(text(lines[2]!)).toBe('a         b   c');
   });
 
-  test('table padding counts grid columns: a wide glyph is one, like any code point', () => {
+  test('table padding counts display columns: a wide glyph is two', () => {
     const lines = layoutMarkdown('| s | n |\n| - | - |\n| ✅ ok | 1 |\n| four | 2 |', 40);
-    // "✅ ok" and "four" are both 4 code points, so their second cells start
-    // at the same grid column (see the painted-grid test in Markdown.spec.tsx).
+    // "✅ ok" is five columns (the emoji takes two) and "four" is four, so
+    // "four" gets one more space of padding and the second cells line up
+    // (see the painted-grid test in Markdown.spec.tsx).
     expect(text(lines[2]!)).toBe('✅ ok  1');
-    expect(text(lines[3]!)).toBe('four  2');
+    expect(text(lines[3]!)).toBe('four   2');
   });
 
   test('a table wider than the width shrinks its widest column and wraps the cell', () => {
@@ -287,9 +288,9 @@ describe('layoutMarkdown', () => {
     for (const l of lines) expect([...text(l)].length).toBeLessThanOrEqual(30);
   });
 
-  test('wrapping counts grid columns, so wide glyphs fill the width like any code point', () => {
-    const lines = layoutMarkdown('日本語 日本語 日本語', 8);
-    expect(lines.map(text)).toEqual(['日本語 日本語', '日本語']);
+  test('wrapping counts display columns, so three ideographs take six', () => {
+    expect(layoutMarkdown('日本語 日本語 日本語', 8).map(text)).toEqual(['日本語', '日本語', '日本語']);
+    expect(layoutMarkdown('日本語 日本語 日本語', 13).map(text)).toEqual(['日本語 日本語', '日本語']);
   });
 
   test('a fenced code line longer than the width hard-wraps, keeping its token colors — it never overflows', () => {
@@ -573,5 +574,11 @@ describe('continuation marks', () => {
   test('a separate paragraph never continues into the next one', () => {
     const lines = layoutMarkdown('one\n\ntwo', 20);
     expect(lines.every((l) => l.continues === undefined)).toBe(true);
+  });
+  test('a fenced code line keeps a ZWJ family as one cluster of two columns: no early wrap, no tear', () => {
+    // Three families are six columns; with the two-column bar they fit a width of eight on one row.
+    const lines = layoutMarkdown('```\n👩‍👧👩‍👧👩‍👧\n```', 8);
+    const rows = lines.map(text).filter((t) => t.includes('👩‍👧'));
+    expect(rows).toEqual(['│ 👩‍👧👩‍👧👩‍👧']);
   });
 });
