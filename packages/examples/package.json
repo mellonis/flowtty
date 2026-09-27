@@ -11,7 +11,8 @@
     "inline-build-log": "tsx inline-build-log/index.tsx",
     "docker-logs-tui": "tsx docker-logs-tui/index.tsx",
     "docker-logs-tui:demo": "tsx docker-logs-tui/index.tsx --demo",
-    "wide-glyphs": "tsx wide-glyphs/index.tsx"
+    "wide-glyphs": "tsx wide-glyphs/index.tsx",
+    "mouse": "tsx mouse/index.tsx"
   },
   "dependencies": {
     "@flowtty/react": "*",
