@@ -173,6 +173,21 @@ describe('drag selection', () => {
     expect(inverseCells(backend)).toEqual([]);
   });
 
+  test('a mousemove after a finished drag keeps the selection', async () => {
+    const backend = new TestBackend(12, 1);
+    await render(
+      createElement(Listening, null, createElement(Text, null, 'hello world')),
+      backend,
+    );
+    await flushAsync(backend);
+    drag(backend, [0, 0], [4, 0]);
+    await flush();
+    expect(inverseCells(backend)).not.toEqual([]);
+    backend.mouse('move', 8, 0);
+    await flush();
+    expect(inverseCells(backend)).not.toEqual([]);
+  });
+
   test('a second press drops the previous selection', async () => {
     const backend = new TestBackend(12, 1);
     await render(

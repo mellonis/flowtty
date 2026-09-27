@@ -451,9 +451,10 @@ export interface SelectionHost {
  *
  * Left button only. `mousedown` anchors (and drops whatever was selected),
  * `mousedrag` extends, `mouseup` finishes and reports the text. A press and a
- * release on the same cell is a click and selects nothing. Any non-mouse key
- * drops a finished selection; the wheel does not, because content that scrolls
- * under a selection invalidates it through `observe` instead.
+ * release on the same cell is a click and selects nothing. Any other key
+ * drops a finished selection; the wheel, a resting-pointer move and the
+ * pointer leaving do not, because content that scrolls under a selection
+ * invalidates it through `observe` instead.
  */
 export class SelectionController {
   private readonly host: SelectionHost;
@@ -483,6 +484,10 @@ export class SelectionController {
       // The wheel is a mouse key, not a keystroke: it leaves a selection alone,
       // and the content check drops it if the pane under it actually scrolled.
       case 'wheelup': case 'wheeldown': return;
+      // Motion with no button held, and the pointer leaving the window, are
+      // mouse keys too, not keystrokes: they leave a selection alone.
+      // See docs/input.md (clicks and hover).
+      case 'mousemove': case 'mouseleave': return;
       default: this.drop();
     }
   }
