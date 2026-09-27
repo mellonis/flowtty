@@ -19,13 +19,19 @@ import React from "react";
  *   In any submenu:        ↑/k, ↓/j navigate;  → / Enter open nested or trigger leaf;
  *                          ← (or Esc) closes the current panel.
  *   Esc at top:            calls onExit (or cancel() in a nested dialog).
+ * Mouse (docs/input.md, clicks and hover): a click on a bar item engages the
+ *   menu and opens its submenu (or runs the leaf); the open one closes again.
+ *   A click on a panel item does what Enter does on it. A press anywhere else
+ *   while the menu is engaged collapses the panels and disengages, and is
+ *   consumed so the page under the menu does not act on it.
  *
  * `useDialogHost().openDialog(<Menu …>)` works — the menu inherits dialog Esc
  * semantics via useDialog().cancel() when onExit isn't provided.
  */
 
-import { useState, type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 import { DEFAULT_BORDER_STYLE, stringWidth } from '@flowtty/core';
+import type { Rect } from '@flowtty/core/host';
 import { Box } from './base/Box.js';
 import { useInput } from '../hooks/useInput.js';
 import { useDialog, useDialogHost } from '../hooks/useDialog.js';
@@ -84,6 +90,10 @@ function panelWidth(items: MenuItem[]): number {
   return PANEL_PAD + maxLabel + 1 + (hasSub ? 1 : 0) + PANEL_PAD;
 }
 
+const inside = (r: Rect | null | undefined, x: number | undefined, y: number | undefined): boolean =>
+  r != null && x !== undefined && y !== undefined
+  && x >= r.left && x < r.left + r.width && y >= r.top && y < r.top + r.height;
+
 function itemsAtPath(root: MenuItem[], path: number[]): MenuItem[] {
   let cur = root;
   for (const idx of path) {
@@ -112,11 +122,31 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
   const { openDialog } = useDialogHost();
   const { cancel } = useDialog();
   const { width: termWidth } = useTerminalSize();
+  // Where each open panel was painted, for "a press outside the panels".
+  const panelRects = useRef<(Rect | null)[]>([]);
 
   const depth = openPath.length;                                // # of open submenu panels
   const activeItems = itemsAtPath(items, openPath);             // items in deepest visible level
   const activeLen = activeItems.length;
   const cursorClamped = Math.min(cursor, Math.max(0, activeLen - 1));
+
+  // A leaf: run it, then fully disengage — collapse all panels AND deactivate
+  // so input returns to the page.
+  function runLeaf(item: Exclude<MenuItem, { submenu: MenuItem[] }>) {
+    if ('render' in item) {
+      // If onPage is wired, route the rendered node OUT of the menu (caller
+      // stores it as the page below the bar). Otherwise fall back to opening
+      // it as a dialog over the menu (legacy mode).
+      const node = item.render();
+      if (onPage) onPage(node);
+      else void openDialog(node);
+    } else {
+      item.onSelect();
+    }
+    setOpenPath([]);
+    setCursor(0);
+    setActive(false);
+  }
 
   function openCurrent() {
     const item = activeItems[cursorClamped];
@@ -125,24 +155,33 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
       // Push current cursor into openPath, reset cursor for the new panel.
       setOpenPath((p) => [...p, cursorClamped]);
       setCursor(0);
-    } else if ('render' in item) {
-      // If onPage is wired, route the rendered node OUT of the menu (caller
-      // stores it as the page below the bar). Otherwise fall back to opening
-      // it as a dialog over the menu (legacy mode).
-      const node = item.render();
-      if (onPage) onPage(node);
-      else void openDialog(node);
-      // Leaf-select fully disengages: collapse all panels AND deactivate so
-      // input returns to the page.
-      setOpenPath([]);
-      setCursor(0);
-      setActive(false);
     } else {
-      item.onSelect();
-      setOpenPath([]);
-      setCursor(0);
-      setActive(false);
+      runLeaf(item);
     }
+  }
+
+  // A click on bar item `i`: engage, and open its submenu (the open one closes
+  // again — the bar item is a toggle), or run the leaf.
+  function pickTop(i: number) {
+    const item = items[i];
+    if (!item) return;
+    setActive(true);
+    if (!('submenu' in item)) { setCursor(i); runLeaf(item); return; }
+    if (depth > 0 && openPath[0] === i) { setOpenPath([]); setCursor(i); return; }
+    setOpenPath([i]);
+    setCursor(0);
+  }
+
+  // A click on item `i` of panel `panelIdx`: what Enter does on it — a nested
+  // submenu opens (the open one closes its cascade), a leaf runs.
+  function pickInPanel(panelIdx: number, i: number) {
+    const item = itemsAtPath(items, openPath.slice(0, panelIdx + 1))[i];
+    if (!item) return;
+    if (!('submenu' in item)) { runLeaf(item); return; }
+    const path = openPath.slice(0, panelIdx + 1);
+    if (openPath[panelIdx + 1] === i) { setOpenPath(path); setCursor(i); return; }
+    setOpenPath([...path, i]);
+    setCursor(0);
   }
 
   function closeCurrent() {
@@ -172,6 +211,19 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
     if (!active) {
       if (key.name === 'escape' && onExit) { onExit(); return true; }
       return;
+    }
+
+    // Engaged, and a press that no item took (an item's onClick withholds its
+    // press): on a panel's chrome it is nothing; anywhere else — the page, the
+    // bar's blank — it collapses the panels and disengages. Consumed either
+    // way, so the page under the menu does not act on it.
+    if (key.name === 'mousedown') {
+      if (!panelRects.current.slice(0, depth).some((r) => inside(r, key.x, key.y))) {
+        setOpenPath([]);
+        setCursor(0);
+        setActive(false);
+      }
+      return true;
     }
 
     // Engaged: a key the menu acts on is consumed — nobody behind it sees it.
@@ -286,7 +338,7 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
           const isOpenInPath = depth > 0 && openPath[0] === i;
           const highlight = active && (isFocused || isOpenInPath);
           return (
-            <Box key={it.key} bold={highlight} inverse={highlight}>
+            <Box key={it.key} bold={highlight} inverse={highlight} onClick={() => pickTop(i)}>
               {text(it)}
             </Box>
           );
@@ -313,6 +365,7 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
         flexDirection="column"
         // As with the bar: a dropdown is chrome. See docs/input.md (selection).
         selectable={false}
+        onLayout={(r) => { panelRects.current[panelIdx] = r; }}
       >
         {p.items.map((it, i) => {
           const focused = i === focusedIdx;
@@ -321,7 +374,7 @@ export function Menu({ items, title, helpHint, onExit, onPage, children }: MenuP
           const padded = it.label + ' '.repeat(Math.max(0, maxLabel - stringWidth(it.label))); // by column, not UTF-16 unit
           const text = hasAnySubmenu ? `${padded}  ${marker}` : padded;
           return (
-            <Box key={it.key} bold={focused || opened} inverse={focused}>
+            <Box key={it.key} bold={focused || opened} inverse={focused} onClick={() => pickInPanel(panelIdx, i)}>
               {text}
             </Box>
           );

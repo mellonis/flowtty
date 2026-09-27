@@ -1,8 +1,10 @@
 import React from "react";
-import { createElement } from 'react';
+import { createElement, type ReactNode } from 'react';
+import { Box } from './base/Box.js';
+import { Text } from './base/Text.js';
 import { describe, test, expect, vi } from 'vitest';
 import { render } from '../internal/render.js';
-import { TestBackend, flushAsync } from '@flowtty/core/testing';
+import { TestBackend, flush, flushAsync } from '@flowtty/core/testing';
 import { stringWidth } from '@flowtty/core';
 import { DialogHost } from './DialogHost.js';
 import { Menu, type MenuItem } from './Menu.js';
@@ -254,5 +256,110 @@ describe('Menu (MacOS-style: top bar + cascading submenus, F10 to engage)', () =
     const corner = rows.find((l) => l.includes('╭'))!;
     // The panel opens under its item, which starts right after " 日本 " (six columns).
     expect(stringWidth(corner.slice(0, corner.indexOf('╭')))).toBe(stringWidth(' 日本 '));
+  });
+
+  describe('mouse', () => {
+    const items: MenuItem[] = [
+      { key: 'file', label: 'File', submenu: [
+        { key: 'open', label: 'Open', onSelect: vi.fn() },
+        { key: 'recent', label: 'Recent', submenu: [{ key: 'r1', label: 'One', onSelect: vi.fn() }] },
+      ]},
+      { key: 'edit', label: 'Edit', submenu: [{ key: 'undo', label: 'Undo', onSelect: vi.fn() }] },
+      { key: 'quit', label: 'Quit', onSelect: vi.fn() },
+    ];
+    const leaf = (key: string) => {
+      const find = (list: MenuItem[]): MenuItem | undefined => {
+        for (const it of list) { if (it.key === key) return it; if ('submenu' in it) { const f = find(it.submenu); if (f) return f; } }
+        return undefined;
+      };
+      return (find(items) as { onSelect: () => void }).onSelect as ReturnType<typeof vi.fn>;
+    };
+    const click = (backend: TestBackend, x: number, y: number) => { backend.mouse('down', x, y); backend.mouse('up', x, y); };
+    const rowOf = (backend: TestBackend, text: string) => backend.lastFrame.split('\n').findIndex((l) => l.includes(text));
+    const colOf = (backend: TestBackend, text: string) => backend.lastFrame.split('\n')[rowOf(backend, text)]!.indexOf(text);
+    const mount = async (page?: ReactNode) => {
+      const backend = new TestBackend(40, 10);
+      await render(createElement(DialogHost, null, createElement(Menu, { items }, page)), backend);
+      await flushAsync(backend);
+      return backend;
+    };
+
+    test('idle: a click on a bar item engages and opens its panel; a click on the open one closes it', async () => {
+      const backend = await mount();
+      click(backend, colOf(backend, 'File') + 1, 0);
+      await flush();
+      expect(backend.lastFrame).toContain('Open');
+      click(backend, colOf(backend, 'File') + 1, 0);
+      await flush();
+      expect(backend.lastFrame).not.toContain('Open');
+    });
+
+    test('a click on another bar item while a panel is open switches panels', async () => {
+      const backend = await mount();
+      click(backend, colOf(backend, 'File') + 1, 0);
+      await flush();
+      click(backend, colOf(backend, 'Edit') + 1, 0);
+      await flush();
+      expect(backend.lastFrame).toContain('Undo');
+      expect(backend.lastFrame).not.toContain('Open');
+    });
+
+    test('a click on a panel leaf runs it and disengages; on a submenu item opens the cascade', async () => {
+      const backend = await mount();
+      click(backend, colOf(backend, 'File') + 1, 0);
+      await flush();
+      click(backend, colOf(backend, 'Recent'), rowOf(backend, 'Recent'));
+      await flush();
+      expect(backend.lastFrame).toContain('One');
+      click(backend, colOf(backend, 'One'), rowOf(backend, 'One'));
+      await flush();
+      expect(leaf('r1')).toHaveBeenCalledTimes(1);
+      expect(backend.lastFrame).not.toContain('One');
+      expect(backend.lastFrame).not.toContain('Open');
+      // Disengaged: an arrow key no longer moves the bar.
+      backend.press({ name: 'right' });
+      await flushAsync(backend);
+      expect(backend.lastFrame.split('\n')[0]).toContain('File');
+    });
+
+    test('a click on a bar leaf runs it without opening anything', async () => {
+      const backend = await mount();
+      click(backend, colOf(backend, 'Quit') + 1, 0);
+      await flush();
+      expect(leaf('quit')).toHaveBeenCalledTimes(1);
+      expect(backend.lastFrame).not.toContain('╭');
+    });
+
+    test('a press outside the panels closes them and disengages, and the page under the menu does not see it', async () => {
+      const seen: string[] = [];
+      function Page() {
+        // A page box with its own onClick, and a listener for what reaches the page.
+        return createElement(Box, { onClick: () => seen.push('page-click'), height: 3 }, createElement(Text, null, 'the page'));
+      }
+      const backend = await mount(createElement(Page));
+      const y = rowOf(backend, 'the page'); // before the panel covers the text
+      click(backend, colOf(backend, 'File') + 1, 0);
+      await flush();
+      expect(backend.lastFrame).toContain('Open');
+      click(backend, 30, y);
+      await flush();
+      expect(backend.lastFrame).not.toContain('Open');
+      expect(seen).toEqual([]);
+      // Disengaged: the next click on the page is the page's.
+      click(backend, 30, y);
+      await flush();
+      expect(seen).toEqual(['page-click']);
+    });
+
+    test('a press on a panel border is consumed and changes nothing', async () => {
+      const backend = await mount();
+      click(backend, colOf(backend, 'File') + 1, 0);
+      await flush();
+      const top = rowOf(backend, '╭');
+      const left = backend.lastFrame.split('\n')[top]!.indexOf('╭');
+      click(backend, left, top);
+      await flush();
+      expect(backend.lastFrame).toContain('Open');
+    });
   });
 });

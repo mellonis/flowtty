@@ -201,8 +201,13 @@ A bar of commands across the top of a full-screen app, with cascading panels.
 
 F10 engages the bar; ←/→ move along it, ↓/Enter open a panel, ↑/↓ move in it,
 → opens a submenu, Enter picks (the item's `onSelect`), Escape closes a panel and
-then disengages. While the menu is engaged the page under it is `inert` — its
-`useInput` handlers do not fire. `Menu` needs a full-screen backend and renders
+then disengages. The mouse does the same: a click on a bar item engages the menu
+and opens its panel (a click on the open one closes it, a click on another
+switches), a click on a panel item does what Enter does on it, and a press
+anywhere else while the menu is engaged collapses the panels and disengages —
+that press is consumed, so the page under the menu does not act on it. While
+the menu is engaged the page under it is `inert` — its `useInput` handlers and
+its `onClick` boxes do not fire. `Menu` needs a full-screen backend and renders
 nothing (with a one-shot warning) on an inline one. Its items are commands,
 `{ key, label, submenu? }`, not values — see [Choosing](#choosing).
 

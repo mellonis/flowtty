@@ -27,6 +27,10 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
   `onSubmit`), `ListMultiSelect` toggles, `Table` and `ScrollList` report
   `onRowClick(index, key)`, the `Select` popup picks and closes (toggles and
   stays open with `multiple`).
+- `Menu` takes the mouse: a click on a bar item engages and opens its panel
+  (the open one closes, another switches), a click on a panel item does what
+  Enter does, a press anywhere else while engaged collapses and disengages
+  and is consumed. Keyboard behaviour unchanged.
 
 ### Changed
 
