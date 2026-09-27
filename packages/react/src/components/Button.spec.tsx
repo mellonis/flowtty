@@ -3,7 +3,7 @@ import { describe, test, expect, vi } from 'vitest';
 import { createElement } from 'react';
 import { render } from '../internal/render.js';
 import { TestBackend } from '@flowtty/core/testing';
-import { flushAsync } from '@flowtty/core/testing';
+import { flush, flushAsync } from '@flowtty/core/testing';
 import { FocusGroup } from './FocusGroup.js';
 import { Box } from './base/Box.js';
 import { Button } from './Button.js';
@@ -82,5 +82,38 @@ describe('Button', () => {
     backend.press({ name: 'return' });
     await flushAsync(backend);
     expect(bFn).toHaveBeenCalledTimes(1);
+  });
+
+  test('hover: the label underlines under the pointer and composes with focus', async () => {
+    const backend = new TestBackend(30, 2);
+    const r = await render(
+      createElement(FocusGroup, {},
+        createElement(Box, { flexDirection: 'column' },
+          createElement(Button, { label: 'Save', onPress: () => {} }),
+          createElement(Button, { label: 'Quit', shortcut: 'q', onPress: () => {} }),
+        ),
+      ),
+      backend,
+    );
+    await flushAsync(backend);
+    const at = (x: number, y: number) => backend.lastBuffer!.get(x, y).style;
+    expect(at(2, 0).underline).toBeUndefined();
+    backend.mouse('move', 2, 0);
+    await flush();
+    // The focused button: hovered — underline over the inverse + bold.
+    expect(at(2, 0).underline).toBe(true);
+    expect(at(2, 0).inverse).toBe(true);
+    expect(at(2, 0).bold).toBe(true);
+    backend.mouse('move', 2, 1);
+    await flush();
+    expect(at(2, 0).underline).toBeUndefined();
+    expect(at(2, 1).underline).toBe(true);
+    expect(at(2, 1).inverse).toBeUndefined();
+    // The shortcut hint is not part of the button's look.
+    expect(at(10, 1).underline).toBeUndefined();
+    backend.mouse('leave');
+    await flush();
+    expect(at(2, 1).underline).toBeUndefined();
+    r.unmount();
   });
 });

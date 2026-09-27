@@ -3,6 +3,7 @@ import type { ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import { useHover } from '../hooks/useHover.js';
 
 export interface ButtonProps {
   /** Button label. */
@@ -18,6 +19,7 @@ export interface ButtonProps {
 
 export function Button({ label, shortcut, onPress }: ButtonProps): ReactNode {
   const { isFocused, focus } = useFocus();
+  const [hovered, hover] = useHover();
 
   useInput((key) => {
     if ((isFocused && key.name === 'return') || (shortcut !== undefined && key.name === shortcut)) {
@@ -26,10 +28,13 @@ export function Button({ label, shortcut, onPress }: ButtonProps): ReactNode {
     }
   });
 
-  // Visual: `[ label ]` plus dim `shortcut` after. Focused → inverse + bold.
+  // Visual: `[ label ]` plus dim `shortcut` after. Focused → inverse + bold;
+  // under the pointer → underlined, over the focus look when both hold. The
+  // hover props ride on the box that already takes the click. See
+  // docs/input.md (clicks and hover).
   return (
     <Box flexDirection="row">
-      <Box bold={isFocused} inverse={isFocused} onClick={() => { focus(); onPress(); }}>{`[ ${label} ]`}</Box>
+      <Box bold={isFocused} inverse={isFocused} underline={hovered} {...hover} onClick={() => { focus(); onPress(); }}>{`[ ${label} ]`}</Box>
       {shortcut ? <Box dim>{` (${shortcut})`}</Box> : null}
     </Box>
   );

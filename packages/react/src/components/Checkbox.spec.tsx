@@ -1,6 +1,6 @@
 import React, { useState, type ReactNode } from 'react';
 import { describe, expect, test, vi } from 'vitest';
-import { TestBackend, flushAsync } from '@flowtty/core/testing';
+import { TestBackend, flush, flushAsync } from '@flowtty/core/testing';
 import { render } from '../internal/render.js';
 import { Box } from './base/Box.js';
 import { FocusGroup } from './FocusGroup.js';
@@ -119,6 +119,27 @@ describe('Checkbox', () => {
     const { backend, unmount } = await mount(<Checkbox label="x" checked={false} onChange={onChange} isFocused={false} />);
     expect(backend.press({ name: ' ' })).toBe(false);
     expect(onChange).not.toHaveBeenCalled();
+    unmount();
+  });
+
+  test('hover: the label underlines under the pointer, the marker does not', async () => {
+    const { backend, unmount } = await mount(<Checkbox checked={false} onChange={() => {}} label="Notify" />);
+    const at = (x: number) => backend.lastBuffer!.get(x, 0).style;
+    backend.mouse('move', 5, 0);
+    await flush();
+    expect(at(0).underline).toBeUndefined(); // `[ ]`
+    expect(at(4).underline).toBe(true); // `Notify`
+    backend.mouse('leave');
+    await flush();
+    expect(at(4).underline).toBeUndefined();
+    unmount();
+  });
+
+  test('hover: with no label the marker underlines', async () => {
+    const { backend, unmount } = await mount(<Checkbox checked onChange={() => {}} />);
+    backend.mouse('move', 1, 0);
+    await flush();
+    expect(backend.lastBuffer!.get(1, 0).style.underline).toBe(true);
     unmount();
   });
 });

@@ -233,3 +233,30 @@ test('a click on a row toggles it', async () => {
   await flush();
   expect(changes).toEqual([['b'], []]);
 });
+
+test('ListSelect hover: the row label under the pointer underlines, apart from the cursor row', async () => {
+  function App() {
+    return createElement(ListSelect, {
+      items: [{ label: 'apple', value: 'a' }, { label: 'banana', value: 'b' }],
+      value: 'a', onChange: () => {}, onSubmit: () => {}, isFocused: true,
+    });
+  }
+  const backend = new TestBackend(20, 3);
+  await render(createElement(App), backend);
+  const at = (x: number, y: number) => backend.lastBuffer!.get(x, y).style;
+  backend.mouse('move', 4, 1);
+  await flush();
+  expect(at(2, 1).underline).toBe(true); // banana, hovered
+  expect(at(0, 1).underline).toBeUndefined(); // its marker
+  expect(at(2, 1).bold).toBeUndefined(); // not the cursor row
+  expect(at(2, 0).bold).toBe(true); // the cursor row keeps its look
+  expect(at(2, 0).underline).toBeUndefined();
+  backend.mouse('move', 4, 0);
+  await flush();
+  expect(at(2, 0).underline).toBe(true); // hovered AND cursor: both hold
+  expect(at(2, 0).bold).toBe(true);
+  expect(at(2, 1).underline).toBeUndefined();
+  backend.mouse('leave');
+  await flush();
+  expect(at(2, 0).underline).toBeUndefined();
+});

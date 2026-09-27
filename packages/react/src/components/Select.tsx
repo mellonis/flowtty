@@ -7,9 +7,11 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import { useHover } from '../hooks/useHover.js';
 import { useDialog, useDialogHost } from '../hooks/useDialog.js';
 import { DialogHostPresentContext } from '../context/dialogContext.js';
 import { checkboxMarker, type CheckboxFrame } from './checkboxMarker.js';
+import { ListRow } from './ListRow.js';
 
 export type { SelectItem } from '@flowtty/core';
 
@@ -113,6 +115,9 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
   } = props;
   const { isFocused: ctxFocused, focus } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
+  // Under the pointer the value is underlined (the arrow is not). The hover
+  // props ride on whichever box takes the click. See docs/components.md (Select).
+  const [hovered, hover] = useHover();
   const host = useDialogHost();
   const hasHost = useContext(DialogHostPresentContext);
   const [open, setOpen] = useState(false);
@@ -190,8 +195,9 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
       inverse={open}
       onLayout={frame === 'border' ? undefined : (r) => { rectRef.current = r; }}
       onClick={frame === 'border' ? undefined : onTriggerClick}
+      onHoverChange={frame === 'border' ? undefined : hover.onHoverChange}
     >
-      <Text color={fg} bold={isFocused} wrap="truncate">{text}</Text>
+      <Text color={fg} bold={isFocused} underline={hovered} wrap="truncate">{text}</Text>
       <Box flexGrow={1} flexShrink={1} />
       <Text color={isFocused ? 'cyan' : fg} bold={isFocused} dim={!isFocused && !band}>{open ? ' ▴' : ' ▾'}</Text>
     </Box>
@@ -208,6 +214,7 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
       width={width} minWidth={minWidth} maxWidth={maxWidth} flexGrow={flexGrow} flexShrink={flexShrink}
       onLayout={(r) => { rectRef.current = r; }}
       onClick={onTriggerClick}
+      {...hover}
     >
       {row}
     </Box>
@@ -316,14 +323,13 @@ function SelectPopup<T>({ store, multiple, filter, maxRows, hasAddRow, checkboxF
         const isAdd = hasAddRow && rowIndex === visible.length;
         const item = isAdd ? null : items[visible[rowIndex]!]!;
         const label = isAdd ? '+ add new' : `${multiple ? `${checkboxMarker(picked.includes(item!.value), checkboxFrame).text} ` : ''}${item!.label}`;
+        // The popup is the focused thing while it is open: its rows are drawn
+        // as a focused list's.
         return (
-          <Box
-            key={isAdd ? '__add__' : visible[rowIndex]!} flexDirection="row"
+          <ListRow
+            key={isAdd ? '__add__' : visible[rowIndex]!} isCursor={isCursor} isFocused label={label}
             onClick={() => { setCursor(rowIndex); choose(rowIndex); }}
-          >
-            <Text color={isCursor ? 'cyan' : undefined} bold={isCursor}>{isCursor ? '▸ ' : '  '}</Text>
-            <Text bold={isCursor}>{label}</Text>
-          </Box>
+          />
         );
       })}
     </Box>

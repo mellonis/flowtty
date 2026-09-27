@@ -1,7 +1,7 @@
 import React from "react";
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { Box } from './base/Box.js';
-import { Text } from './base/Text.js';
+import { ListRow } from './ListRow.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
 import { checkboxMarker, type CheckboxFrame } from './checkboxMarker.js';
@@ -99,15 +99,8 @@ export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
     return true; // the key did something here: nobody behind the list sees it
   }, { isActive: isFocused });
 
-  // Focus has to be visible: Tab landing on a list that looks exactly as before
-  // leaves the user lost. Focused → a colored, bold marker and a bold cursor
-  // row; unfocused → the marker is still there (it marks the row) but dim. The
-  // text is identical either way, so layouts don't shift.
-  const row = (isCursor: boolean, label: string, key: string | number, onClick?: () => void) => (
-    <Box key={key} flexDirection="row" onClick={onClick}>
-      <Text color={isFocused && isCursor ? 'cyan' : undefined} bold={isFocused && isCursor} dim={!isFocused}>{isCursor ? '▸ ' : '  '}</Text>
-      <Text bold={isFocused && isCursor}>{label}</Text>
-    </Box>
+  const row = (isCursor: boolean, label: string, key: string | number, onClick: () => void) => (
+    <ListRow key={key} isCursor={isCursor} isFocused={isFocused} label={label} onClick={onClick} />
   );
   return (
     <Box flexDirection="column" onClick={focus}>{/* blank space focuses; a row's own onClick is nearer and toggles */}

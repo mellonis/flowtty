@@ -216,6 +216,16 @@ function FoldLine({ title }) {
   under a resting pointer changes — a list scrolled, a row appeared — the
   hover follows without any motion. `onHoverChange(hovered)` is the prop the
   hook wraps.
+- **The built-in components show hover** the same way, once the backend has
+  it on: the thing under the pointer is underlined, a look no focus state
+  uses, so focus and hover read apart and both show when they coincide.
+  `Button` underlines its `[ label ]` (not the shortcut hint), `Checkbox` its
+  label, `ListSelect`, `ListMultiSelect` and the `Select` popup the row's
+  label, `Table` with `onRowClick` the row's cells, the closed `Select` its
+  value. `TextInput` and `TextArea` show nothing — a field is not an action —
+  and a `ScrollList` row is the caller's: hover inside it is the item's own
+  `useHover`. Each component's entry in [components.md](components.md) says
+  what it shows. None of it costs anything while hover is off: nothing fires.
 - **`inert` and dialogs.** A box under an `inert` ancestor, or on the page
   under an open dialog, gets neither clicks nor hover, and does not shield
   what is under it: the chain is cut at the muted box, so the click reaches

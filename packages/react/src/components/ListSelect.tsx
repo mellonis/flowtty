@@ -2,6 +2,7 @@ import React from "react";
 import { useState, type ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
+import { ListRow } from './ListRow.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
 import { selectReducer as reduce, visibleIndices, type SelectItem, type SelectState } from '@flowtty/core';
@@ -68,17 +69,9 @@ export function ListSelect<T>(props: ListSelectProps<T>): ReactNode {
   return (
     <Box onClick={focus}>{/* blank space focuses; a row's own onClick is nearer and picks */}
       {state.filter !== '' && <Text>{`filter: ${state.filter}`}</Text>}
-      {/* Focus has to be visible (see ListMultiSelect): colored bold marker + bold row
-          when focused, a dim marker when not; the text is the same either way. */}
-      {visible.map((origIdx, row) => {
-        const isCursor = row === cursorClamped;
-        return (
-          <Box key={origIdx} flexDirection="row" onClick={() => pick(row)}>
-            <Text color={isFocused && isCursor ? 'cyan' : undefined} bold={isFocused && isCursor} dim={!isFocused}>{isCursor ? '▸ ' : '  '}</Text>
-            <Text bold={isFocused && isCursor}>{items[origIdx]!.label}</Text>
-          </Box>
-        );
-      })}
+      {visible.map((origIdx, row) => (
+        <ListRow key={origIdx} isCursor={row === cursorClamped} isFocused={isFocused} label={items[origIdx]!.label} onClick={() => pick(row)} />
+      ))}
     </Box>
   );
 }

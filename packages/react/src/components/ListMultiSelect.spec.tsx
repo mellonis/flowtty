@@ -256,3 +256,24 @@ test('checkboxFrame="none" draws one glyph per row instead of the brackets', asy
   await render(createElement(App), backend);
   expect(backend.lastFrame).toBe('▸ ☐ a\n  ☑ b');
 });
+
+test('hover: the row label under the pointer underlines, the add-new row too', async () => {
+  function App() {
+    return createElement(ListMultiSelect<string>, {
+      items: [{ label: 'a', value: 'a' }, { label: 'b', value: 'b' }],
+      value: [], onChange: () => {}, onSubmit: () => {}, onAddNew: () => {},
+    });
+  }
+  const backend = new TestBackend(20, 3);
+  await render(createElement(App), backend);
+  const at = (x: number, y: number) => backend.lastBuffer!.get(x, y).style;
+  backend.mouse('move', 5, 1);
+  await flush();
+  expect(at(2, 1).underline).toBe(true); // `[ ] b`
+  expect(at(0, 1).underline).toBeUndefined(); // its marker
+  expect(at(2, 0).underline).toBeUndefined();
+  backend.mouse('move', 5, 2);
+  await flush();
+  expect(at(2, 2).underline).toBe(true); // `+ add new`
+  expect(at(2, 1).underline).toBeUndefined();
+});

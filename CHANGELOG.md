@@ -7,6 +7,20 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- **A hover look for the built-in components.** With the backend's `mouse:
+  { hover: true }`, the thing under the pointer is underlined — a look no
+  focus state uses, so the two read apart and both show when they coincide:
+  `Button` its `[ label ]`, `Checkbox` its label (the marker with no label),
+  `ListSelect`, `ListMultiSelect` and the `Select` popup the row's label,
+  `Table` with `onRowClick` the row's cells, the closed `Select` its value.
+  `TextInput`, `TextArea` and `ScrollList` rows show nothing. A list row's
+  hover is its own state: a move re-renders the row left and the row entered,
+  nothing else. See docs/input.md (clicks and hover).
+
 ## 1.0.0-alpha.32 — 2026-09-28
 
 ### Added

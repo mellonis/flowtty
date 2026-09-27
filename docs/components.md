@@ -82,7 +82,9 @@ several lines use [`<TextArea>`](#textarea).
 match: `field` (default) is the filled band, stretched across its column;
 `none` is bare text sized to its content with no background, for a filter bar
 (`Search: query_`); `border` is the band inside a bordered box, three rows tall.
-The validation error line goes below whichever frame.
+The validation error line goes below whichever frame. Under the pointer the
+field shows nothing (`TextArea` alike): a field is not an action, and a click
+on it only focuses.
 
 **Width.** In a column the field is as wide as the column. In a row it is as
 wide as its text and grows as the text does — give it `width` to pin it (the
@@ -146,7 +148,9 @@ appears in `items`. `checkboxFrame="none"` draws the rows' checkboxes as glyphs
 its text, for a filter bar (`Sprint: current ▾  Tags: 2 ▾`); `border` is a
 bordered box. `placeholder` (default `—`) shows when nothing is chosen. Focus is
 shown as on the other fields: a bold value and a cyan arrow; while the popup is
-open the arrow turns `▴` and the field is inverse. `width`, `minWidth`,
+open the arrow turns `▴` and the field is inverse. Under the pointer the value
+is underlined, the arrow is not; a popup row underlines its label, as the
+lists' rows do. `width`, `minWidth`,
 `maxWidth`, `flexGrow` and `flexShrink` pass through to the box. `TextInput` has
 the same `frame`.
 
@@ -186,7 +190,9 @@ checkboxes as glyphs (`☑` / `☐`) instead of `[x]` / `[ ]` — see
 Enter on it.
 
 Both lists show focus: a colored, bold `▸` and a bold cursor row when focused, a
-dim marker when not.
+dim marker when not. The row under the pointer underlines its label (the marker
+stays), so the hovered row and the cursor row read apart, and both show when
+they are the same row.
 
 ## Menu
 
@@ -230,7 +236,8 @@ next state: the opposite of `checked`, and `true` from `'mixed'`. Enter is left
 alone — in a form it is the submit, and a `Button` beside the checkbox listens
 for it. It is a focusable: Tab reaches it, and focus shows as a cyan, bold
 marker and a bold label; unfocused, a checked marker is green and an unchecked
-one dim.
+one dim. Under the pointer the label is underlined — the marker, when there is
+no label.
 
 `frame` picks the marker: `brackets` (default) is ASCII and reads everywhere,
 `none` is one glyph, the same glyphs Markdown's task lists draw.
@@ -277,6 +284,8 @@ bookkeeping.
 - **`ghost`** — untyped completion drawn dim after the value while the caret is
   at its end, with the caret on the ghost's first character; not part of the
   value. **`suffix`** renders after it (a key hint). Typed text is never dimmed.
+- **Under the pointer** nothing changes, as for `TextInput`: a click on the
+  field only focuses it.
 
 The pure parts are exported for custom fields: the editor reducer takes
 `{ multiline: true, width }`, and `inputRows(value, width, cursor?)` /
@@ -323,7 +332,9 @@ optional `header` (defaults to the key), `align` (`'left'` | `'right'` |
 `onRowClick(index, key)` — a click on a data row; the header and the
 horizontal rules report nothing. The table still handles no keys itself. A
 row's click box includes its own vertical border cells (the `│` at each edge
-and between columns).
+and between columns). With `onRowClick` the row under the pointer underlines
+its cells — over the selected row's bar too — and the header never does;
+without it the table shows no hover.
 
 **Fit-to-width.** With no `width` prop the table measures its container (via
 `onLayout`, falling back to the terminal width before the first layout) and

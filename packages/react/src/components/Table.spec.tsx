@@ -298,4 +298,47 @@ describe('Table', () => {
     expect(subscribers.size).toBe(0);
     r.unmount();
   });
+
+  test('hover with onRowClick: the row under the pointer underlines its cells, over the selected row too; the header does not', async () => {
+    const backend = new TestBackend(30, 8);
+    const columns: TableColumn<Person>[] = [{ accessor: 'name', header: 'Name' }, { accessor: 'age', header: 'Age' }];
+    const data: Person[] = [{ name: 'Ann', age: 30 }, { name: 'Bo', age: 7 }];
+    const r = await render(<Table data={data} columns={columns} width={30} selectedIndex={0} onRowClick={() => {}} />, backend);
+    await flushAsync(backend);
+    const rows = backend.lastFrame.split('\n');
+    const header = rows.findIndex((l) => l.includes('Name'));
+    const ann = rows.findIndex((l) => l.includes('Ann'));
+    const bo = rows.findIndex((l) => l.includes('Bo'));
+    const at = (x: number, y: number) => backend.lastBuffer!.get(x, y).style;
+    const xName = rows[bo]!.indexOf('Bo');
+    const xAge = rows[bo]!.indexOf('7');
+    backend.mouse('move', xName, bo);
+    await flush();
+    expect(at(xName, bo).underline).toBe(true);
+    expect(at(xAge, bo).underline).toBe(true); // every cell of the row
+    expect(at(xName, ann).underline).toBeUndefined();
+    backend.mouse('move', xName, ann);
+    await flush();
+    expect(at(xName, ann).underline).toBe(true);
+    expect(at(xName, ann).inverse).toBe(true); // the selected row keeps its bar
+    expect(at(xName, bo).underline).toBeUndefined();
+    backend.mouse('move', xName, header);
+    await flush();
+    expect(at(xName, header).underline).toBeUndefined();
+    expect(at(xName, ann).underline).toBeUndefined();
+    r.unmount();
+  });
+
+  test('hover without onRowClick shows nothing', async () => {
+    const backend = new TestBackend(30, 8);
+    const columns: TableColumn<Person>[] = [{ accessor: 'name', header: 'Name' }];
+    const data: Person[] = [{ name: 'Ann', age: 30 }];
+    const r = await render(<Table data={data} columns={columns} width={30} />, backend);
+    await flushAsync(backend);
+    const ann = backend.lastFrame.split('\n').findIndex((l) => l.includes('Ann'));
+    backend.mouse('move', 3, ann);
+    await flush();
+    expect(backend.lastBuffer!.get(3, ann).style.underline).toBeUndefined();
+    r.unmount();
+  });
 });

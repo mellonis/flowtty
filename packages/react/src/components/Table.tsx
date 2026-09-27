@@ -161,6 +161,7 @@ export function Table<T>({
   const term = useTerminalSize();
   const [measured, setMeasured] = useState(0);
   const [measuredH, setMeasuredH] = useState(0);
+  const [hoveredRow, setHoveredRow] = useState<number | null>(null);
   const fixed = typeof width === 'number';
   // Budget: explicit prop > measured container > terminal width (pre-layout fallback).
   const budget = fixed ? width : (measured > 0 ? measured : term.width);
@@ -223,12 +224,19 @@ export function Table<T>({
   // styles layer underneath: their dim/color/underline/strikethrough still
   // apply, but the row's inverse + bold take precedence so the cursor stays
   // legible over any column accent.
+  // Under the pointer a row's cells are underlined, over the selected row's
+  // bar too. One hovered index for the table, set through the row's
+  // `onHoverChange`: the rows are closures of this render, not components, and
+  // a cursor move already re-renders them all. Only rows with `onRowClick`
+  // take part. See docs/components.md (Table).
   const renderRow = (
     cells: string[], header: boolean, selected = false,
     styles?: (TableCellStyle | undefined)[],
     onClick?: (key: Key) => void,
+    index?: number,
   ) => {
     const spans: React.ReactNode[] = [];
+    const hovered = index !== undefined && index === hoveredRow;
     if (bordered) spans.push(<Text key="l" color={borderColor}>{chars!.v}</Text>);
     for (let c = 0; c < ncols; c++) {
       const content = padStr + fitCell(cells[c] ?? '', colWidths[c]!, columns[c]!.align ?? 'left') + padStr;
@@ -240,19 +248,24 @@ export function Table<T>({
               key={`c${c}`}
               bold={selected || st?.bold}
               inverse={selected}
+              underline={hovered || st?.underline}
               dim={st?.dim}
               color={selected ? undefined : st?.color}
-              underline={st?.underline}
               strikethrough={st?.strikethrough}
             >{content}</Text>,
       );
       if (bordered) spans.push(<Text key={`v${c}`} color={borderColor} inverse={selected && c < ncols - 1}>{chars!.v}</Text>);
     }
-    // `onClick` is only ever spread IN when a handler was given — never present
-    // with value `undefined` — so a table with no `onRowClick` puts no row (and
-    // no header row) through `MouseScope`: no passive input subscription, no
-    // `mouseScope` prop, per row. See docs/input.md (clicks and hover).
-    return <Box flexDirection="row" {...(onClick === undefined ? {} : { onClick })}>{spans}</Box>;
+    // `onClick` / `onHoverChange` are only ever spread IN when a handler was
+    // given — never present with value `undefined` — so a table with no
+    // `onRowClick` puts no row (and no header row) through `MouseScope`: no
+    // passive input subscription, no `mouseScope` prop, per row. See
+    // docs/input.md (clicks and hover).
+    const mouse = onClick === undefined ? {} : {
+      onClick,
+      onHoverChange: (on: boolean) => setHoveredRow((prev) => (on ? index! : prev === index ? null : prev)),
+    };
+    return <Box flexDirection="row" {...mouse}>{spans}</Box>;
   };
 
   const headerCells = columns.map((col) => headerTextOf(col));
@@ -267,7 +280,7 @@ export function Table<T>({
         const styles = columns.map((col) => col.cellStyle?.(row, abs));
         return (
           <React.Fragment key={abs}>
-            {renderRow(cells, false, abs === selIdx, styles, onRowClick === undefined ? undefined : (k) => onRowClick(abs, k))}
+            {renderRow(cells, false, abs === selIdx, styles, onRowClick === undefined ? undefined : (k) => onRowClick(abs, k), abs)}
           </React.Fragment>
         );
       })}

@@ -1,6 +1,6 @@
 import React, { useState, type ReactNode } from 'react';
 import { describe, expect, test, vi } from 'vitest';
-import { TestBackend, flushAsync } from '@flowtty/core/testing';
+import { TestBackend, flush, flushAsync } from '@flowtty/core/testing';
 import { render } from '../internal/render.js';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
@@ -251,6 +251,36 @@ describe('Select — focus', () => {
 });
 
 describe('Select — mouse', () => {
+  test('hover: the closed field underlines its value under the pointer; popup rows underline their label', async () => {
+    const { backend, frame, unmount } = await mount(<Single initial="team" />);
+    const at = (x: number, y: number) => backend.lastBuffer!.get(x, y).style;
+    backend.mouse('move', 2, 0);
+    await flush();
+    expect(at(0, 0).underline).toBe(true); // `Team` on the band
+    expect(at(19, 0).underline).toBeUndefined(); // the `▾`
+    backend.mouse('leave');
+    await flush();
+    expect(at(0, 0).underline).toBeUndefined();
+
+    backend.mouse('down', 3, 0); backend.mouse('up', 3, 0);
+    const lines = await frame();
+    const y = lines.findIndex((l) => l.includes('Business'));
+    const x = lines[y]!.indexOf('Business');
+    backend.mouse('move', x + 2, y);
+    await flush();
+    expect(at(x, y).underline).toBe(true); // the hovered row's label
+    expect(at(x - 2, y).underline).toBeUndefined(); // its marker
+    const yCursor = lines.findIndex((l) => l.includes('▸'));
+    expect(at(x, yCursor).underline).toBeUndefined();
+    expect(at(x, yCursor).bold).toBe(true); // the cursor row keeps its look
+    // While the popup is open the field is under a dialog: no hover on it.
+    backend.mouse('move', 2, 0);
+    await flush();
+    expect(at(0, 0).underline).toBeUndefined();
+    expect(at(x, y).underline).toBeUndefined();
+    unmount();
+  });
+
   test('a press on the field opens; a press on a row picks it; a press outside closes', async () => {
     const onChange = vi.fn();
     const { backend, frame, unmount } = await mount(<Single initial="hobby" onChange={onChange} />);

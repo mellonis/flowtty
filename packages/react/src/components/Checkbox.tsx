@@ -5,6 +5,7 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
+import { useHover } from '../hooks/useHover.js';
 import { checkboxMarker, type CheckboxFrame, type CheckboxState } from './checkboxMarker.js';
 
 export type { CheckboxFrame, CheckboxState } from './checkboxMarker.js';
@@ -34,6 +35,7 @@ export interface CheckboxProps {
 export function Checkbox({ checked, onChange, label, frame = 'brackets', isFocused: explicitFocus }: CheckboxProps): ReactNode {
   const { isFocused: ctxFocused, focus } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
+  const [hovered, hover] = useHover();
   const toggle = () => onChange(checked === 'mixed' ? true : !checked);
 
   useInput((key: Key) => {
@@ -45,12 +47,14 @@ export function Checkbox({ checked, onChange, label, frame = 'brackets', isFocus
 
   // Focus has to be visible: a cyan, bold marker and a bold label. Unfocused,
   // a checked marker keeps its green and an unchecked one goes dim — so the
-  // state reads at a glance either way.
+  // state reads at a glance either way. Under the pointer the label is
+  // underlined — the marker when there is no label. See docs/components.md
+  // (Checkbox).
   const marker = checkboxMarker(checked, frame);
   return (
-    <Box flexDirection="row" onClick={() => { focus(); toggle(); }}>
-      <Text color={isFocused ? 'cyan' : marker.color} bold={isFocused} dim={!isFocused && marker.color === undefined}>{marker.text}</Text>
-      {label !== undefined ? <Text bold={isFocused}>{` ${label}`}</Text> : null}
+    <Box flexDirection="row" {...hover} onClick={() => { focus(); toggle(); }}>
+      <Text color={isFocused ? 'cyan' : marker.color} bold={isFocused} dim={!isFocused && marker.color === undefined} underline={hovered && label === undefined}>{marker.text}</Text>
+      {label !== undefined ? <Text bold={isFocused} underline={hovered}>{` ${label}`}</Text> : null}
     </Box>
   );
 }
