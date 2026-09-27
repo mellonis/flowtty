@@ -121,10 +121,14 @@ export function ScrollList<T>({
       // lies outside the box's clip, and under a one-row clip it always would
       // — a wrapped paragraph would copy as several lines. A taller item
       // spills under the next row, which paints over it.
+      // `onClick` is spread in only when `onRowClick` was given — never present
+      // with value `undefined` — so a list with no `onRowClick` puts no row
+      // through `MouseScope`: no passive input subscription per row.
+      // See docs/input.md (clicks and hover).
       <Box
         key={keyOf ? keyOf(item, i) : i}
         height={rowHeight} flexShrink={0} flexGrow={0}
-        onClick={onRowClick === undefined ? undefined : (k) => onRowClick(i, k)}
+        {...(onRowClick === undefined ? {} : { onClick: (k: Key) => onRowClick(i, k) })}
       >
         {renderItem(item, i)}
       </Box>,

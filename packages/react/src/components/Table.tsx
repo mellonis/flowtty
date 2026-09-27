@@ -248,7 +248,11 @@ export function Table<T>({
       );
       if (bordered) spans.push(<Text key={`v${c}`} color={borderColor} inverse={selected && c < ncols - 1}>{chars!.v}</Text>);
     }
-    return <Box flexDirection="row" onClick={onClick}>{spans}</Box>;
+    // `onClick` is only ever spread IN when a handler was given — never present
+    // with value `undefined` — so a table with no `onRowClick` puts no row (and
+    // no header row) through `MouseScope`: no passive input subscription, no
+    // `mouseScope` prop, per row. See docs/input.md (clicks and hover).
+    return <Box flexDirection="row" {...(onClick === undefined ? {} : { onClick })}>{spans}</Box>;
   };
 
   const headerCells = columns.map((col) => headerTextOf(col));

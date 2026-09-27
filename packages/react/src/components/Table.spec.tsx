@@ -284,4 +284,18 @@ describe('Table', () => {
     expect(clicked).toEqual([1]);
     r.unmount();
   });
+
+  test('no onRowClick leaves no passive mouse subscription — rows and header stay plain boxes', async () => {
+    const backend = new TestBackend(30, 8);
+    const columns: TableColumn<Person>[] = [{ accessor: 'name', header: 'Name' }, { accessor: 'age', header: 'Age' }];
+    const data: Person[] = [{ name: 'Ann', age: 30 }, { name: 'Bo', age: 7 }];
+    const r = await render(<Table data={data} columns={columns} width={30} />, backend);
+    await flushAsync(backend);
+    // No `useInput` anywhere and no `onRowClick`: the render root must attach
+    // no key listener at all — a passive table view claims no raw mode, no
+    // bracketed paste, no mouse reporting on a TtyBackend.
+    const subscribers = (backend as unknown as { subscribers: Set<unknown> }).subscribers;
+    expect(subscribers.size).toBe(0);
+    r.unmount();
+  });
 });

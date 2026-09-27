@@ -7,6 +7,7 @@ import { render } from './render.js';
 import { Box } from '../components/base/Box.js';
 import { Text } from '../components/base/Text.js';
 import { DialogHost } from '../components/DialogHost.js';
+import { Button } from '../components/Button.js';
 import { useDialogHost } from '../hooks/useDialog.js';
 import { useInput } from '../hooks/useInput.js';
 
@@ -157,5 +158,34 @@ test('onClick flipping between a handler and undefined does not remount the box'
   backend.mouse('down', 0, 0); backend.mouse('up', 0, 0);
   await flush();
   expect(clicks).toEqual([1]);
+  r.unmount();
+});
+
+test('an onClick ancestor arms on the press and withholds it: a useClick component inside (Button) never sees it', async () => {
+  // Control: the same Button, at the same cell, with no onClick ancestor —
+  // it gets the click on its own. This is what tells the assertion below
+  // apart from a coordinate that simply missed the button.
+  const plain = new TestBackend(20, 4);
+  const plainSeen: string[] = [];
+  const rPlain = await render(<Button label="Go" onPress={() => plainSeen.push('button')} />, plain);
+  await flushAsync(plain);
+  plain.mouse('down', 1, 0); plain.mouse('up', 1, 0);
+  await flush();
+  expect(plainSeen).toEqual(['button']);
+  rPlain.unmount();
+
+  const backend = new TestBackend(20, 4);
+  const seen: string[] = [];
+  const r = await render(
+    <Box onClick={() => seen.push('box')}>
+      <Button label="Go" onPress={() => seen.push('button')} />
+    </Box>,
+    backend,
+  );
+  await flushAsync(backend);
+  // (1, 0) is inside the button's "[ Go ]" rect, itself inside the box.
+  backend.mouse('down', 1, 0); backend.mouse('up', 1, 0);
+  await flush();
+  expect(seen).toEqual(['box']);
   r.unmount();
 });

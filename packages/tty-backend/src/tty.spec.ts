@@ -1204,14 +1204,39 @@ test('a newer move sent at once does not leave an older held move to go out afte
   vi.useFakeTimers();
   try {
     const { stdin, seen, back } = hoverBackend();
+    // The throttle reads a monotonic clock (`performance.now()`), not the wall
+    // clock — `vi.setSystemTime` moves `Date.now()` but never `performance.now()`
+    // (see the backward-wall-clock test below), so the jump is driven through a
+    // spy instead. Driving it by hand, rather than `vi.advanceTimersByTime`,
+    // crosses the window WITHOUT firing the pending flush timer — the exact
+    // race this test pins.
+    let clock = 0;
+    const spy = vi.spyOn(performance, 'now').mockImplementation(() => clock);
     stdin.emit('data', '\x1b[<35;2;2M'); // (1,1): first ever move, reported at once, lastMoveAt = t0
     stdin.emit('data', '\x1b[<35;3;2M'); // (2,1): within 16 ms — held, timer due at t0+16
     // The clock crosses the throttle window WITHOUT the timer callback having
     // run yet (several data events handled in one poll phase, e.g.).
-    vi.setSystemTime(Date.now() + 20);
-    stdin.emit('data', '\x1b[<35;4;2M'); // (3,1): window is clear now — sent at once
+    clock += 20;
+    stdin.emit('data', '\x1b[<35;4;2M'); // (3,1): window is clear now — sent AT ONCE, synchronously
+    expect(seen).toEqual(['move 1,1', 'move 3,1']);
     vi.runAllTimers(); // the stale timer for (2,1) must not resurrect it after (3,1)
     expect(seen).toEqual(['move 1,1', 'move 3,1']);
+    back.dispose();
+  } finally { vi.restoreAllMocks(); vi.useRealTimers(); }
+});
+
+test('a backward wall-clock step does not stall the throttle — it reads a monotonic clock, not Date.now()', () => {
+  vi.useFakeTimers();
+  try {
+    const { stdin, seen, back } = hoverBackend();
+    stdin.emit('data', '\x1b[<35;2;2M'); // (1,1): first move, reported at once, lastMoveAt = t0
+    // The wall clock steps back an hour (an NTP correction, e.g.): `Date.now()`
+    // now reads far below `lastMoveAt`, but the throttle's clock never moved.
+    vi.setSystemTime(Date.now() - 60 * 60 * 1000);
+    stdin.emit('data', '\x1b[<35;3;2M'); // (2,1): still within 16 ms of t0 — held, same as any other move
+    expect(seen).toEqual(['move 1,1']);
+    vi.advanceTimersByTime(16); // the ordinary throttle window — not 16 ms + an hour
+    expect(seen).toEqual(['move 1,1', 'move 2,1']);
     back.dispose();
   } finally { vi.useRealTimers(); }
 });

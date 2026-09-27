@@ -49,7 +49,7 @@ Only `size` and `draw` are required; everything else is feature-detected.
   `text` for a paste, `x` / `y` for the mouse and `button` for a mouse key that
   names one (see docs/input.md, the mouse). Two more names cover motion:
   `mousemove` (motion with no button, only when the app asked for hover —
-  coalesce it: one per cell, at most one per frame) and `mouseleave` (the
+  coalesce it: one per cell, at most one per ~16 ms) and `mouseleave` (the
   pointer left the window, no cell). Without `onKey` the app is a passive view
   and `useInput` handlers never fire. `decodeKeys` from
   `@flowtty/tty-backend` turns raw stdin bytes into keys, if your source is a

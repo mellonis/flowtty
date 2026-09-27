@@ -115,8 +115,10 @@ useInput((key) => {
   carries neither — the pointer is outside the grid by then. `shift`, `meta`
   and `ctrl` come from the report, as for any other key.
 
-All of it — wheel included — needs `new TtyBackend(stdout, stdin, { mouse: true })`.
-It is off by default, and the cost is real: see below. Inline mode
+All of it — wheel included — needs `new TtyBackend(stdout, stdin, { mouse: true })`
+(or `{ mouse: { hover: true } }`, which turns reporting on by itself — a
+separate `mouse: true` alongside it is not needed). It is off by default, and
+the cost is real: see below. Inline mode
 (`InlineTtyBackend`) never enables it — the wheel there belongs to the terminal's
 own scrollback.
 
@@ -181,14 +183,24 @@ function FoldLine({ title }) {
 - **`onClick(key)`** fires on a left press and release in the same cell over
   the box, with no drag between (a drag is a selection). The box painted on
   top wins where boxes overlap, and the nearest box with a handler up from it
-  gets the click — once. Its press and release are withheld from `useInput`,
-  the way `useClick` consumes them; a press that reaches no handler goes on to
-  subscribers as before. A box with `onClick` or `onHoverChange` keeps a
-  passive input subscription while it is mounted, so the backend feeds it keys
-  even in an app with no `useInput` of its own. A click does not focus the
-  box: call `focus()` in the handler when it should, as `Button` does.
+  gets the click — once, and that handler's press is withheld from `useInput`
+  even where it becomes a drag: the press arms on `mousedown` and is withheld
+  right there, before anyone knows whether it will stay a click, so a
+  subscriber sees `mousedrag` / `mouseup` with no `mousedown` before them — an
+  app's own press/drag/release state machine over a clickable region must
+  tolerate that orphan drag. A press that reaches no `onClick` up the chain
+  goes on to subscribers as before. This also means an `onClick` ancestor
+  claims the press for every cell inside it: a `useClick` component nested
+  inside one (a `Button`, `Checkbox`, field or `Select` trigger) never sees the
+  `mousedown` its own click detection needs, and gets no click — put a field
+  or a button in a row with `onRowClick` only once it has moved to `onClick`
+  itself. A box with `onClick` or `onHoverChange` keeps a passive input
+  subscription while it is mounted, so the backend feeds it keys even in an
+  app with no `useInput` of its own. A click does not focus the box: call
+  `focus()` in the handler when it should, as `Button` does.
   `useClick(rectRef, handler)` still works for a component that wants its own
-  rect logic.
+  rect logic — as long as nothing between it and the pointer already claims
+  `onClick`.
 - **The prop toggles, the key stays.** `onClick={disabled ? undefined : fn}`
   keeps the box's element type stable — the key is present either way, only
   the value changes — so the subtree under it is never remounted for it.
@@ -204,8 +216,10 @@ function FoldLine({ title }) {
   hook wraps.
 - **`inert` and dialogs.** A box under an `inert` ancestor, or on the page
   under an open dialog, gets neither clicks nor hover, and does not shield
-  what is under it: the click reaches nothing and the keys go on to
-  subscribers (which is how a `Select` popup closes on a press outside it).
+  what is under it: the chain is cut at the muted box, so the click reaches
+  nothing **inside** that subtree — an `onClick` ancestor *outside* it still
+  gets the click — and the keys go on to subscribers (which is how a `Select`
+  popup closes on a press outside it).
 - **Hover needs asking for.** `new TtyBackend(stdout, stdin, { mouse:
   { hover: true } })` turns on any-event tracking (`?1003h`): the terminal
   reports every pointer move, which a slow SSH link feels. Without it
@@ -416,6 +430,13 @@ function Collapsed({ children }: { children: ReactNode }) {
   return <Box onLayout={(r) => { rect.current = r; }}>{open ? children : <Text dim>▸ …</Text>}</Box>;
 }
 ```
+
+A `useClick` component (so every field above, `Button` included) needs the
+`mousedown` that arms its click, and does not get it under a box that already
+claims `onClick`: that ancestor's `onClick` wins the press instead (see
+[Clicks and hover](#clicks-and-hover)). A row given `onRowClick` (`Table`,
+`ScrollList`) should not contain a `Button`, `Checkbox` or other field until
+that field moves to `onClick` itself.
 
 `<Button>` is focusable. Props:
 

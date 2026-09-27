@@ -191,7 +191,11 @@ export class TtyBackend implements Backend {
       this.dropHeldMove();
       return;
     }
-    const now = Date.now();
+    // Monotonic, unlike `Date.now()`: a wall-clock step backward (an NTP
+    // correction, e.g.) would otherwise make `now - lastMoveAt` hugely
+    // negative, holding every move and arming its timer for 16 ms plus the
+    // size of the jump. See docs/input.md (clicks and hover).
+    const now = performance.now();
     if (now - this.lastMoveAt >= TtyBackend.MOVE_INTERVAL_MS) { this.dropHeldMove(); this.emitMove(key, now); return; }
     this.heldMove = key;
     if (this.moveTimer === null) {
@@ -202,7 +206,7 @@ export class TtyBackend implements Backend {
   private flushHeldMove(): void {
     const held = this.heldMove;
     this.dropHeldMove();
-    if (held !== null && !(this.lastMoveCell !== null && this.lastMoveCell.x === held.x && this.lastMoveCell.y === held.y)) this.emitMove(held, Date.now());
+    if (held !== null && !(this.lastMoveCell !== null && this.lastMoveCell.x === held.x && this.lastMoveCell.y === held.y)) this.emitMove(held, performance.now());
   }
 
   private dropHeldMove(): void {
