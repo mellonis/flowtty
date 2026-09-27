@@ -20,8 +20,19 @@ function MouseScope({ props, children }: { props: BoxProps; children?: ReactNode
   return createElement('flowtty-box', { ...props, mouseScope }, children);
 }
 
-/** The host element for a box: through the mouse scope when it takes clicks or hover, bare otherwise. */
+/**
+ * The host element for a box: through the mouse scope when it takes clicks or
+ * hover, bare otherwise. Decided by whether `onClick` / `onHoverChange` is a
+ * KEY on `props`, not by its value: `onClick={disabled ? undefined : fn}`
+ * keeps the key (JSX does not drop an explicit `undefined`), so a handler
+ * toggling on and off never changes the element type here and the subtree
+ * underneath is never remounted for it — `MouseScope` and the mouse
+ * controller both already treat an undefined handler as "nothing to call".
+ * A conditional SPREAD of the prop (`{...(cond ? { onClick: fn } : {})}`)
+ * does not get this for free — that removes the key rather than setting it
+ * to undefined — so keep the prop present. See docs/input.md (clicks and hover).
+ */
 export function hostBox(props: BoxProps, children?: ReactNode): ReactNode {
-  if (props.onClick !== undefined || props.onHoverChange !== undefined) return createElement(MouseScope, { props }, children);
+  if ('onClick' in props || 'onHoverChange' in props) return createElement(MouseScope, { props }, children);
   return createElement('flowtty-box', props, children);
 }

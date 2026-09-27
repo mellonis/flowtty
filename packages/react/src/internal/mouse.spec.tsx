@@ -123,3 +123,39 @@ test('hover follows content that scrolls under a resting pointer', async () => {
   expect(calls).toEqual(['a:true', 'a:false', 'b:true']);
   r.unmount();
 });
+
+test('onClick flipping between a handler and undefined does not remount the box', async () => {
+  const backend = new TestBackend(20, 4);
+  const clicks: number[] = [];
+  let nextId = 0;
+  let setEnabled!: (enabled: boolean) => void;
+  // A fresh mount picks a new id (via the lazy initializer); a re-render of
+  // the SAME instance keeps it. Unlike component state, `nextId` lives
+  // outside React and is not reset by a remount, so it tells the two apart.
+  function Child() {
+    const [id] = useState(() => ++nextId);
+    return <Text>{String(id)}</Text>;
+  }
+  function App() {
+    const [enabled, setState] = useState(true);
+    setEnabled = setState;
+    return (
+      <Box onClick={enabled ? () => clicks.push(1) : undefined}>
+        <Child />
+      </Box>
+    );
+  }
+  const r = await render(<App />, backend);
+  await flushAsync(backend);
+  expect(backend.lastFrame).toContain('1');
+  setEnabled(false);
+  await flushAsync(backend);
+  expect(backend.lastFrame).toContain('1');
+  setEnabled(true);
+  await flushAsync(backend);
+  expect(backend.lastFrame).toContain('1');
+  backend.mouse('down', 0, 0); backend.mouse('up', 0, 0);
+  await flush();
+  expect(clicks).toEqual([1]);
+  r.unmount();
+});
