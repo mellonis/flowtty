@@ -1,7 +1,7 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import { takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme, setWidthPolicy, type WidthPolicy } from '@flowtty/core';
 import { detectWidthPolicy } from './widthPolicy.js';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, takeUnknownColors } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, MOUSE_HOVER_OFF, MOUSE_HOVER_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, takeUnknownColors } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
 import { isInteractive, NotInteractiveError } from './interactive.js';
@@ -24,12 +24,16 @@ export interface TtyBackendOptions {
   /** The environment `widths: 'auto'` detects from. Default `process.env`. */
   env?: NodeJS.ProcessEnv;
   /**
-   * Report the mouse wheel as 'wheelup' / 'wheeldown' keys. Off by default:
-   * while mouse reporting is on, the terminal hands drag-to-select to the app,
-   * so users lose native text selection (most terminals restore it with Shift
-   * or Option held).
+   * Report the mouse: the wheel as 'wheelup' / 'wheeldown', buttons as
+   * 'mousedown' / 'mousedrag' / 'mouseup'. `{ hover: true }` also reports
+   * motion with no button held, as 'mousemove' (coalesced: one per cell, at
+   * most one per ~16 ms) and the pointer leaving the window as 'mouseleave'.
+   * Off by default: while mouse reporting is on, the terminal hands
+   * drag-to-select to the app, so users lose native text selection (most
+   * terminals restore it with Shift or Option held); hover adds a report per
+   * pointer move, which a slow link feels. See docs/input.md (clicks and hover).
    */
-  mouse?: boolean;
+  mouse?: boolean | { hover?: boolean };
   /** Follow the terminal's light / dark scheme: ask for its background once
    *  keys are read, and listen for a change (DEC mode 2031, or a focus-in where
    *  the terminal has no 2031). On by default; `false` asks nothing and
@@ -126,37 +130,111 @@ export class TtyBackend implements Backend {
     if (this.pendingInput.endsWith('\x1b')) this.pendingInput = this.pendingInput.slice(0, -1);
   }
 
+  // Hover coalescing: the last move of a chunk is the one that counts, and
+  // between chunks a move is held for up to 16 ms so a sweep across the screen
+  // is one key per frame, not one per cell. See docs/input.md (clicks and hover).
+  private lastMoveAt = -Infinity;
+  private lastMoveCell: { x: number; y: number } | null = null;
+  private heldMove: Key | null = null;
+  private moveTimer: ReturnType<typeof setTimeout> | null = null;
+  private static readonly MOVE_INTERVAL_MS = 16;
+
   private decodeAndDeliver(s: string): void {
     const { keys, rest, reports } = decodeKeys(s);
     this.pendingInput = rest;
     // What the terminal said back is not input: the tracker acts on it, and
     // no subscriber ever sees it as a key.
     if (reports.length > 0) this.scheme.handle(reports);
+    // The pointer left the window: whatever it hovered is no longer under it,
+    // so the cell it left is not a duplicate the next time the pointer enters it.
+    if (this.hoverOn && reports.some((r) => r.type === 'focus' && !r.focused)) {
+      this.dropHeldMove();
+      this.lastMoveCell = null;
+      this.deliver({ name: 'mouseleave', sequence: '', ctrl: false, meta: false, shift: false });
+    }
+    // Only the last move of the chunk matters, and only when hover was asked
+    // for — a stale ?1003h left on by a previous run must not leak a move to
+    // an app that never asked for one. A non-move key flushes the pending
+    // move first, so a click never precedes its position, in one chunk or across two.
+    let lastMove: Key | null = null;
     for (const raw of keys) {
-      // A press is counted first, so a subscriber sees a double-click as one.
-      const key = this.clicks.count(raw);
-      // Subscribers first: one that returns true has consumed the key, and
-      // the defaults below stand down for it. See docs/input.md (keys and
-      // useInput).
-      let consumed = false;
-      for (const h of [...this.subscribers]) if (h(key) === true) consumed = true;
-      if (consumed) continue;
-      // Ctrl-C / Ctrl-D in raw mode are delivered as keypresses (NOT signals —
-      // raw mode swallows SIGINT). Default-handle them as "exit with restore"
-      // so an app that does not take them over is not unkillable.
-      if (key.ctrl && (key.name === 'c' || key.name === 'd')) {
-        this.dispose();
-        process.exit(130);
+      if (raw.name === 'mousemove') {
+        if (this.hoverOn) lastMove = raw;
+        continue;
       }
-      // Ctrl+Z, the shell's suspend, arrives as a key in raw mode too. Hand
-      // the terminal back before stopping, so the shell prompt lands on the
-      // normal screen; `onContinue` takes it again on `fg`.
-      if (key.ctrl && key.name === 'z' && this.options.suspendKey !== false) {
-        this.suspend();
-        process.kill(process.pid, 'SIGTSTP');
-      }
+      if (lastMove !== null) { this.move(lastMove); lastMove = null; }
+      this.flushHeldMove();
+      this.deliver(raw);
+    }
+    if (lastMove !== null) this.move(lastMove);
+  }
+
+  // Either emits `key` at once (the throttle window is clear) or holds it to
+  // go out when the window reopens — whichever happens first, a repeat of the
+  // cell already reported is dropped.
+  private move(key: Key): void {
+    if (this.lastMoveCell !== null && this.lastMoveCell.x === key.x && this.lastMoveCell.y === key.y) return;
+    const now = Date.now();
+    if (now - this.lastMoveAt >= TtyBackend.MOVE_INTERVAL_MS) { this.emitMove(key, now); return; }
+    this.heldMove = key;
+    if (this.moveTimer === null) {
+      this.moveTimer = setTimeout(() => { this.moveTimer = null; this.flushHeldMove(); }, TtyBackend.MOVE_INTERVAL_MS - (now - this.lastMoveAt));
     }
   }
+
+  private flushHeldMove(): void {
+    const held = this.heldMove;
+    this.dropHeldMove();
+    if (held !== null && !(this.lastMoveCell !== null && this.lastMoveCell.x === held.x && this.lastMoveCell.y === held.y)) this.emitMove(held, Date.now());
+  }
+
+  private dropHeldMove(): void {
+    this.heldMove = null;
+    if (this.moveTimer !== null) { clearTimeout(this.moveTimer); this.moveTimer = null; }
+  }
+
+  private emitMove(key: Key, at: number): void {
+    this.lastMoveAt = at;
+    this.lastMoveCell = { x: key.x!, y: key.y! };
+    this.deliver(key);
+  }
+
+  private deliver(raw: Key): void {
+    // A press is counted first, so a subscriber sees a double-click as one.
+    const key = this.clicks.count(raw);
+    // Subscribers first: one that returns true has consumed the key, and
+    // the defaults below stand down for it. See docs/input.md (keys and
+    // useInput).
+    let consumed = false;
+    for (const h of [...this.subscribers]) if (h(key) === true) consumed = true;
+    if (consumed) return;
+    // Ctrl-C / Ctrl-D in raw mode are delivered as keypresses (NOT signals —
+    // raw mode swallows SIGINT). Default-handle them as "exit with restore"
+    // so an app that does not take them over is not unkillable.
+    if (key.ctrl && (key.name === 'c' || key.name === 'd')) {
+      this.dispose();
+      process.exit(130);
+    }
+    // Ctrl+Z, the shell's suspend, arrives as a key in raw mode too. Hand
+    // the terminal back before stopping, so the shell prompt lands on the
+    // normal screen; `onContinue` takes it again on `fg`.
+    if (key.ctrl && key.name === 'z' && this.options.suspendKey !== false) {
+      this.suspend();
+      process.kill(process.pid, 'SIGTSTP');
+    }
+  }
+
+  private get mouseOn(): boolean { return this.options.mouse !== undefined && this.options.mouse !== false; }
+  private get hoverOn(): boolean { return typeof this.options.mouse === 'object' && this.options.mouse.hover === true; }
+  // The single place that knows both directions of mouse reporting, hover
+  // included — every enable / disable site below calls this instead of
+  // inlining `MOUSE_ON` / `MOUSE_OFF`.
+  private mouseSequence(on: boolean): string {
+    if (!this.mouseOn) return '';
+    if (on) return MOUSE_ON + (this.hoverOn ? MOUSE_HOVER_ON : '');
+    return (this.hoverOn ? MOUSE_HOVER_OFF : '') + MOUSE_OFF;
+  }
+
   private inputAttached = false;
   private terminalEntered = false;
   // Double- and triple-click detection for the selection — see docs/input.md.
@@ -413,7 +491,7 @@ export class TtyBackend implements Backend {
       // Lazy like raw mode: a passive view never stops or continues.
       process.on('SIGCONT', this.onContinue);
       // Only a backend that reads keys asks for bracketed paste; dispose() undoes it.
-      this.out.write(BRACKETED_PASTE_ON + (this.options.mouse ? MOUSE_ON : ''));
+      this.out.write(BRACKETED_PASTE_ON + this.mouseSequence(true));
       // Same for the scheme: its answer arrives as input, so it is only asked
       // for once input is read.
       if (this.options.colorScheme !== false) this.scheme.start();
@@ -460,7 +538,7 @@ export class TtyBackend implements Backend {
       if (this.input.isTTY) this.input.setRawMode(true);
       this.input.on('data', this.inputDataHandler);
       this.input.resume();
-      this.out.write(BRACKETED_PASTE_ON + (this.options.mouse ? MOUSE_ON : ''));
+      this.out.write(BRACKETED_PASTE_ON + this.mouseSequence(true));
       if (this.options.colorScheme !== false) this.scheme.start();
     }
     this.previousBuffer = null;
@@ -479,9 +557,13 @@ export class TtyBackend implements Backend {
       if (this.input.isTTY) this.input.setRawMode(false);
       this.input.pause();
       this.pendingInput = '';
+      // A resumed app starts from nothing: no pending timer, no memory of
+      // where the pointer last was.
+      this.dropHeldMove();
+      this.lastMoveCell = null;
       // Reports off first — they were turned on last.
       this.scheme.stop();
-      this.out.write((this.options.mouse ? MOUSE_OFF : '') + BRACKETED_PASTE_OFF);
+      this.out.write(this.mouseSequence(false) + BRACKETED_PASTE_OFF);
     }
     if (this.terminalEntered) {
       // Show cursor + reset SGR while still in alt-screen, then exit alt-screen

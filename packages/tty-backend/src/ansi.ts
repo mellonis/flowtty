@@ -11,10 +11,17 @@ export const BRACKETED_PASTE_OFF = '\x1b[?2004l';
 // Mouse reporting: presses and releases (1000), plus motion while a button is
 // held (1002) so a drag reports every cell it crosses, in SGR encoding (1006) —
 // decimal coordinates with no 223-column cap. 1003 (motion with no button) is
-// deliberately not asked for: it floods stdin with reports nothing acts on.
+// asked for separately (`MOUSE_HOVER_ON`), only when the app wants hover — on
+// its own it floods stdin with a report per pointer move.
 // The single source for both directions — turned off in reverse order.
 export const MOUSE_ON = '\x1b[?1000h\x1b[?1002h\x1b[?1006h';
 export const MOUSE_OFF = '\x1b[?1006l\x1b[?1002l\x1b[?1000l';
+
+// Any-event tracking: motion reports with no button held, for hover. Asked for
+// on top of MOUSE_ON only when the app wants it — it is a report per pointer
+// move. See docs/input.md (clicks and hover).
+export const MOUSE_HOVER_ON = '\x1b[?1003h';
+export const MOUSE_HOVER_OFF = '\x1b[?1003l';
 
 // Following the terminal's light / dark scheme (docs/terminal.md, light and
 // dark). OSC 11 with `?` asks for the default background, answered as

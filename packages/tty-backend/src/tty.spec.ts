@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import { Buffer, type Key } from '@flowtty/core';
 import { TtyBackend } from './tty.js';
 import { isInteractive, NotInteractiveError } from './interactive.js';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open, MOUSE_ON, MOUSE_OFF, BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF, cursorTo } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open, MOUSE_ON, MOUSE_OFF, MOUSE_HOVER_ON, MOUSE_HOVER_OFF, BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF, cursorTo } from './ansi.js';
 
 function makeStdinStub() {
   const emitter = new EventEmitter() as EventEmitter & {
@@ -1086,6 +1086,116 @@ test('two left presses on the same cell in quick succession arrive as clicks 1 a
   stdin.emit('data', '\x1b[<0;5;3M');
   expect(clicks).toEqual([1, 2]);
   b.dispose();
+});
+
+// ─── hover ───────────────────────────────────────────────────────────────────
+
+function hoverBackend(cols = 20) {
+  const { stub: out, writes } = makeStub(cols, 4);
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin, { mouse: { hover: true } });
+  const seen: string[] = [];
+  back.onKey((k) => { seen.push(k.name === 'mousemove' ? `move ${k.x},${k.y}` : k.name); });
+  return { back, writes, stdin, seen };
+}
+
+test('mouse: { hover: true } asks for any-event tracking and undoes it on dispose', () => {
+  const { back, writes } = hoverBackend();
+  expect(writes.join('')).toContain(MOUSE_HOVER_ON);
+  back.dispose();
+  expect(writes.join('')).toContain(MOUSE_HOVER_OFF);
+});
+
+test('mouse: true alone asks for no motion reports, and never delivers a mousemove', () => {
+  const { stub: out, writes } = makeStub(20, 4);
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin, { mouse: true });
+  const seen: string[] = [];
+  back.onKey((k) => seen.push(k.name));
+  expect(writes.join('')).not.toContain('?1003h');
+  // A stale ?1003h left by a crashed previous app must not leak a move to an
+  // app that never asked for hover.
+  stdin.emit('data', '\x1b[<35;2;2M');
+  expect(seen).toEqual([]);
+  back.dispose();
+});
+
+test('a burst of moves in one chunk is one mousemove with the last position', () => {
+  vi.useFakeTimers();
+  try {
+    const { stdin, seen, back } = hoverBackend();
+    stdin.emit('data', '\x1b[<35;2;2M\x1b[<35;3;2M\x1b[<35;4;2M');
+    expect(seen).toEqual(['move 3,1']);
+    back.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('moves within 16 ms are held; the last position goes out when the timer fires; the same cell is not repeated', () => {
+  vi.useFakeTimers();
+  try {
+    const { stdin, seen, back } = hoverBackend();
+    stdin.emit('data', '\x1b[<35;2;2M');
+    stdin.emit('data', '\x1b[<35;3;2M');
+    stdin.emit('data', '\x1b[<35;4;2M');
+    expect(seen).toEqual(['move 1,1']);
+    vi.advanceTimersByTime(16);
+    expect(seen).toEqual(['move 1,1', 'move 3,1']);
+    vi.advanceTimersByTime(16);
+    stdin.emit('data', '\x1b[<35;4;2M');
+    expect(seen).toEqual(['move 1,1', 'move 3,1']);
+    back.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('a press flushes a held move first, so a click never precedes its position', () => {
+  vi.useFakeTimers();
+  try {
+    const { stdin, seen, back } = hoverBackend();
+    stdin.emit('data', '\x1b[<35;2;2M');
+    stdin.emit('data', '\x1b[<35;6;2M');
+    stdin.emit('data', '\x1b[<0;6;2M');
+    expect(seen).toEqual(['move 1,1', 'move 5,1', 'mousedown']);
+    back.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('a move and a press decoded from the SAME chunk still come out move-before-press', () => {
+  vi.useFakeTimers();
+  try {
+    const { stdin, seen, back } = hoverBackend();
+    stdin.emit('data', '\x1b[<35;6;2M\x1b[<0;6;2M');
+    expect(seen).toEqual(['move 5,1', 'mousedown']);
+    back.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('a focus-out becomes mouseleave when hover is on, and a held move is dropped with it', () => {
+  vi.useFakeTimers();
+  try {
+    const { stdin, seen, back } = hoverBackend();
+    stdin.emit('data', '\x1b[<35;2;2M');
+    stdin.emit('data', '\x1b[<35;3;2M');
+    stdin.emit('data', '\x1b[O');
+    expect(seen).toEqual(['move 1,1', 'mouseleave']);
+    vi.advanceTimersByTime(20);
+    expect(seen).toEqual(['move 1,1', 'mouseleave']);
+    // The leave clears the last-hovered cell, so the pointer coming back onto
+    // it is reported again rather than suppressed as a duplicate.
+    stdin.emit('data', '\x1b[<35;2;2M');
+    expect(seen).toEqual(['move 1,1', 'mouseleave', 'move 1,1']);
+    back.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('suspend() turns motion reports off and resume() on again', () => {
+  const { back, writes } = hoverBackend();
+  writes.length = 0;
+  back.suspend();
+  expect(writes.join('')).toContain(MOUSE_HOVER_OFF);
+  writes.length = 0;
+  back.resume();
+  expect(writes.join('')).toContain(MOUSE_HOVER_ON);
+  back.dispose();
 });
 
 // ─── console capture ─────────────────────────────────────────────────────────
