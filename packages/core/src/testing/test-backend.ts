@@ -149,26 +149,28 @@ export class TestBackend implements Backend {
 
   /**
    * Deliver one mouse button event at cell (x, y) — a press, one step of a drag,
-   * or a release. `button` defaults to 'left'; a drag is a run of `'drag'` calls
-   * between a `'down'` and an `'up'`, which is how a terminal reports one.
-   * `clicks` on a `'down'` is the press count a TTY backend would have counted:
-   * 2 for a double-click, 3 for a triple. Default 1.
+   * a release, motion with no button held, or the pointer leaving the window.
+   * `button` defaults to 'left'; a drag is a run of `'drag'` calls between a
+   * `'down'` and an `'up'`, which is how a terminal reports one. `clicks` on a
+   * `'down'` is the press count a TTY backend would have counted: 2 for a
+   * double-click, 3 for a triple. Default 1. `'leave'` carries no `x` / `y`.
    */
   mouse(
-    kind: 'down' | 'drag' | 'up',
+    kind: 'down' | 'drag' | 'up' | 'move' | 'leave',
     x = 0,
     y = 0,
     options: { button?: MouseButton; shift?: boolean; meta?: boolean; ctrl?: boolean; clicks?: number } = {},
   ): void {
+    const mods = { shift: options.shift ?? false, meta: options.meta ?? false, ctrl: options.ctrl ?? false };
+    if (kind === 'leave') { this.press({ name: 'mouseleave', ...mods }); return; }
+    if (kind === 'move') { this.press({ name: 'mousemove', x, y, ...mods }); return; }
     this.press({
       name: kind === 'down' ? 'mousedown' : kind === 'drag' ? 'mousedrag' : 'mouseup',
       button: options.button ?? 'left',
       ...(kind === 'down' ? { clicks: options.clicks ?? 1 } : {}),
       x,
       y,
-      shift: options.shift ?? false,
-      meta: options.meta ?? false,
-      ctrl: options.ctrl ?? false,
+      ...mods,
     });
   }
 

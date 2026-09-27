@@ -1,4 +1,5 @@
 import { stringWidth } from '../graphemes.js';
+import type { Key } from '../keys.js';
 import { Align, Display, Edge, FlexDirection, Gutter, Justify, MeasureMode, PositionType, Wrap, type Yoga, type YogaNode } from './yoga.js';
 import { wrapText, type WrapMode } from '../wrap.js';
 import type { BorderStyle } from './borders.js';
@@ -132,6 +133,21 @@ export interface BoxProps {
    *  will infinite-loop. Pattern:
    *    onLayout={(r) => { if (!size || size.width !== r.width || size.height !== r.height) setSize(r); }} */
   onLayout?: (rect: Rect) => void;
+  /** A click on this box: the left button pressed and released in one cell
+   *  over it, with no drag between. The nearest box with a handler up the
+   *  chain from the topmost box under the cell gets it, once, with the mouse
+   *  key; the press and the release are then withheld from `useInput`. A
+   *  click does not focus the box: call `focus()` in the handler if it
+   *  should. See docs/input.md (clicks and hover). */
+  onClick?: (key: Key) => void;
+  /** The pointer entered (`true`) or left (`false`) this box — only on a
+   *  change. Needs the backend's `mouse: { hover: true }`; `useHover()` wraps
+   *  it. See docs/input.md (clicks and hover). */
+  onHoverChange?: (hovered: boolean) => void;
+  /** Adapter-internal: the input scope the box was rendered in. The mouse
+   *  controller skips a box whose scope is muted (`inert`, an open dialog).
+   *  The React adapter sets it; app code never does. */
+  mouseScope?: { isMuted(): boolean };
   /** Stacking order within the same paint pass. Higher values paint on top.
    *  Default 0. Tree order is the tiebreaker. Does NOT cross pass boundaries:
    *  absolutes always overlay stack-flow regardless of zIndex. */

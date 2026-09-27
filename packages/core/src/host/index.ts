@@ -52,6 +52,10 @@ export type {
   Point, SelectionHost, SelectionRange, SelectionRow, SelectionScope, SelectionSegment,
 } from './selection.js';
 
+// Clicks and hover over the committed frame. See docs/input.md (clicks and hover).
+export { MouseController } from './mouse.js';
+export type { MouseHost } from './mouse.js';
+
 // Border glyph table (used when adapters render borders themselves; the paint
 // pass already uses this internally).
 export { BORDER_CHARS } from './borders.js';

@@ -12,7 +12,7 @@ export const NAMED_KEYS = [
   'up', 'down', 'left', 'right', 'home', 'end', 'pageup', 'pagedown',
   'f1', 'f2', 'f3', 'f4', 'f5', 'f6', 'f7', 'f8', 'f9', 'f10', 'f11', 'f12',
   'paste', 'wheelup', 'wheeldown',
-  'mousedown', 'mousedrag', 'mouseup',
+  'mousedown', 'mousedrag', 'mouseup', 'mousemove', 'mouseleave',
 ] as const;
 
 export type NamedKey = typeof NAMED_KEYS[number];
@@ -34,7 +34,10 @@ export interface Key {
    * 'end', 'pageup', 'pagedown'. A bracketed paste is one key named 'paste'
    * whose content is in `text`. Mouse wheel steps are 'wheelup' / 'wheeldown',
    * and a button press, a drag and a release are 'mousedown', 'mousedrag' and
-   * 'mouseup' — all five positioned by `x` / `y`.
+   * 'mouseup' — all five positioned by `x` / `y`. `mousemove` is motion with
+   * no button held (only when the backend was asked for hover) and
+   * `mouseleave` the pointer leaving the window; `mouseleave` carries no
+   * `x` / `y`.
    */
   name: KeyName;
   /**
@@ -46,8 +49,11 @@ export interface Key {
   text?: string;
   /**
    * Cell under the pointer for a mouse key ('wheelup', 'wheeldown',
-   * 'mousedown', 'mousedrag', 'mouseup'): 0-based column and row, the same
-   * coordinates `onLayout` rects use. Undefined for every other key.
+   * 'mousedown', 'mousedrag', 'mouseup', 'mousemove'): 0-based column and row,
+   * the same coordinates `onLayout` rects use. Undefined for every other key.
+   * `mousemove` is motion with no button held (only when the backend was
+   * asked for hover) and `mouseleave` the pointer leaving the window;
+   * `mouseleave` carries no `x` / `y`.
    */
   x?: number;
   y?: number;
