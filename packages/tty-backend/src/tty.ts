@@ -145,13 +145,12 @@ export class TtyBackend implements Backend {
     // What the terminal said back is not input: the tracker acts on it, and
     // no subscriber ever sees it as a key.
     if (reports.length > 0) this.scheme.handle(reports);
-    // The pointer left the window: whatever it hovered is no longer under it,
-    // so the cell it left is not a duplicate the next time the pointer enters it.
-    if (this.hoverOn && reports.some((r) => r.type === 'focus' && !r.focused)) {
-      this.dropHeldMove();
-      this.lastMoveCell = null;
-      this.deliver({ name: 'mouseleave', sequence: '', ctrl: false, meta: false, shift: false });
-    }
+    // The pointer left the window: whatever it hovered is no longer under it.
+    // Computed now but delivered after the loop below (not before it), so a
+    // move decoded from the SAME chunk as the focus-out cannot be reported
+    // after its own mouseleave — the ordering `decodeKeys` throws away between
+    // `keys` and `reports`.
+    const leaving = this.hoverOn && reports.some((r) => r.type === 'focus' && !r.focused);
     // Only the last move of the chunk matters, and only when hover was asked
     // for — a stale ?1003h left on by a previous run must not leak a move to
     // an app that never asked for one. A non-move key flushes the pending
@@ -166,14 +165,26 @@ export class TtyBackend implements Backend {
       this.flushHeldMove();
       this.deliver(raw);
     }
-    if (lastMove !== null) this.move(lastMove);
+    if (leaving) {
+      this.dropHeldMove();
+      this.lastMoveCell = null;
+      this.deliver({ name: 'mouseleave', sequence: '', ctrl: false, meta: false, shift: false });
+    } else if (lastMove !== null) {
+      this.move(lastMove);
+    }
   }
 
   // Either emits `key` at once (the throttle window is clear) or holds it to
-  // go out when the window reopens — whichever happens first, a repeat of the
-  // cell already reported is dropped.
+  // go out when the window reopens — whichever happens first. A move back
+  // onto the cell already reported is not held either: subscribers already
+  // think the pointer is there, so a stale held move for some OTHER cell must
+  // not go out later and contradict it.
   private move(key: Key): void {
-    if (this.lastMoveCell !== null && this.lastMoveCell.x === key.x && this.lastMoveCell.y === key.y) return;
+    if (this.disposed || this.suspended) return;
+    if (this.lastMoveCell !== null && this.lastMoveCell.x === key.x && this.lastMoveCell.y === key.y) {
+      this.dropHeldMove();
+      return;
+    }
     const now = Date.now();
     if (now - this.lastMoveAt >= TtyBackend.MOVE_INTERVAL_MS) { this.emitMove(key, now); return; }
     this.heldMove = key;

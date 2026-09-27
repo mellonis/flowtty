@@ -1187,6 +1187,31 @@ test('a focus-out becomes mouseleave when hover is on, and a held move is droppe
   } finally { vi.useRealTimers(); }
 });
 
+test('a move that returns to the already-reported cell drops a stale held move for a different cell', () => {
+  vi.useFakeTimers();
+  try {
+    const { stdin, seen, back } = hoverBackend();
+    stdin.emit('data', '\x1b[<35;3;2M'); // (2,1): first ever move, reported at once
+    stdin.emit('data', '\x1b[<35;2;2M'); // (1,1): held (within 16 ms)
+    stdin.emit('data', '\x1b[<35;3;2M'); // back to (2,1): already the reported cell — not a new held move
+    vi.advanceTimersByTime(16);
+    expect(seen).toEqual(['move 2,1']); // no stale (1,1) goes out after the pointer left it
+    back.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('a move and a focus-out decoded from the SAME chunk still end on mouseleave, never leaking a move after it', () => {
+  vi.useFakeTimers();
+  try {
+    const { stdin, seen, back } = hoverBackend();
+    stdin.emit('data', '\x1b[<35;3;2M\x1b[O');
+    // The window lost focus in the same instant the report arrived, so the
+    // move it carried is moot — the important thing is mouseleave is last.
+    expect(seen.at(-1)).toBe('mouseleave');
+    back.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
 test('suspend() turns motion reports off and resume() on again', () => {
   const { back, writes } = hoverBackend();
   writes.length = 0;
