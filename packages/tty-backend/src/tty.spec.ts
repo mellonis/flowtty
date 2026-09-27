@@ -105,6 +105,62 @@ test('TtyBackend.onKey: multiple subscribers each get every key', () => {
   back.dispose();
 });
 
+// A stdin chunk can end exactly on the ESC that starts a sequence; the rest
+// arrives in the next chunk. Delivered as Escape at once, the rest would then
+// decode as typed text ("[<65;3;4M" in an input field). The backend holds a
+// trailing ESC for a moment instead.
+test('TtyBackend: a chunk ending in ESC waits for the next chunk — a split mouse report is one key', () => {
+  vi.useFakeTimers();
+  try {
+    const { stub: out } = makeStub();
+    const stdin = makeStdinStub();
+    const back = new TtyBackend(out, stdin);
+    const seen: string[] = [];
+    back.onKey((k) => seen.push(k.name));
+    stdin.emit('data', '\x1b');
+    stdin.emit('data', '[<65;3;4M');
+    expect(seen).toEqual(['wheeldown']);
+    stdin.emit('data', '\x1b');
+    stdin.emit('data', '[A');
+    expect(seen).toEqual(['wheeldown', 'up']);
+    back.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('TtyBackend: a lone ESC with nothing after it is the Escape key, after a short wait', () => {
+  vi.useFakeTimers();
+  try {
+    const { stub: out } = makeStub();
+    const stdin = makeStdinStub();
+    const back = new TtyBackend(out, stdin);
+    const seen: string[] = [];
+    back.onKey((k) => seen.push(k.name));
+    stdin.emit('data', '\x1b');
+    expect(seen).toEqual([]);
+    vi.advanceTimersByTime(50);
+    expect(seen).toEqual(['escape']);
+    // Text after a held ESC that turned out to be Escape decodes as text.
+    stdin.emit('data', 'x');
+    expect(seen).toEqual(['escape', 'x']);
+    back.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
+test('TtyBackend: a held ESC is dropped by dispose, not delivered later', () => {
+  vi.useFakeTimers();
+  try {
+    const { stub: out } = makeStub();
+    const stdin = makeStdinStub();
+    const back = new TtyBackend(out, stdin);
+    const seen: string[] = [];
+    back.onKey((k) => seen.push(k.name));
+    stdin.emit('data', '\x1b');
+    back.dispose();
+    vi.advanceTimersByTime(50);
+    expect(seen).toEqual([]);
+  } finally { vi.useRealTimers(); }
+});
+
 test('TtyBackend.dispose: idempotent (calling twice does not throw)', () => {
   const { stub: out } = makeStub();
   const stdin = makeStdinStub();

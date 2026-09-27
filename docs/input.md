@@ -147,6 +147,11 @@ can't reject such a typo (any character is a valid name), so
 `TestBackend.press()` does: it throws on a name no terminal produces, which stops
 a test from blessing a branch real input never reaches.
 
+`escape` arrives about 30 ms after the key: a lone `ESC` byte at the end of a
+read may be the start of a sequence whose rest is still on its way (a mouse
+report the OS split), so the TTY backend waits that long before calling it
+Escape. Nothing else is delayed.
+
 A handler that matches on names it knows is unaffected by the mouse keys: their
 names are multi-character, so they are never mistaken for a printable character.
 `<TextInput>`, `<TextArea>`, `<ListSelect>` and `<ListMultiSelect>` ignore them.

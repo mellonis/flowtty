@@ -20,8 +20,10 @@ export type TerminalReport =
  * Callers that read stdin in chunks must prepend `rest` to the next chunk so a
  * sequence split across reads (e.g. ESC[ in one read, A in the next) decodes as
  * one key instead of surfacing as a stray Escape. A lone trailing ESC is NOT
- * buffered — without a timer we can't tell "Escape pressed" from "start of a
- * sequence", and treating it as Escape is the more useful default.
+ * buffered here — without a timer this function can't tell "Escape pressed"
+ * from "start of a sequence", so it is the Escape key. `TtyBackend` holds a
+ * trailing ESC for a moment before handing it in, which is where the timer
+ * lives.
  *
  * Handles:
  *  - printable ASCII / Unicode (one Key per code point; `name === sequence`)

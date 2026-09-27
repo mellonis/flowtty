@@ -7,6 +7,16 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Fixed
+
+- A stdin chunk that ended exactly on the `ESC` of a mouse report or an
+  arrow key delivered an Escape key, and the rest of the sequence as typed
+  text (`[<65;3;4M` in a field while scrolling). `TtyBackend` now holds a
+  trailing `ESC` for 30 ms: more bytes complete the sequence, silence makes
+  it the Escape key.
+
 ## 1.0.0-alpha.31 — 2026-09-25
 
 ### Changed

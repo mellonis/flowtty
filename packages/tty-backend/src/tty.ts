@@ -95,8 +95,38 @@ export class TtyBackend implements Backend {
   private pendingInput = '';
   // Arrow-property so `removeListener` finds the same reference we added.
   // `NodeBuffer` avoids the name-clash with our cells `Buffer` import.
+  // A chunk that ends exactly on ESC is ambiguous: the Escape key, or the
+  // first byte of a sequence whose rest is in the next chunk (a mouse report
+  // split by the OS is the usual case — delivered as Escape at once, the rest
+  // would decode as typed text). The ESC is held for ESC_WAIT_MS; more bytes
+  // resolve it, the timer resolves it as Escape. See docs/input.md (keys and useInput).
+  private static readonly ESC_WAIT_MS = 30;
+  private escTimer: ReturnType<typeof setTimeout> | null = null;
+
   private readonly inputDataHandler = (chunk: NodeBuffer | string): void => {
-    const s = this.pendingInput + (typeof chunk === 'string' ? chunk : chunk.toString('utf-8'));
+    if (this.escTimer !== null) { clearTimeout(this.escTimer); this.escTimer = null; }
+    let s = this.pendingInput + (typeof chunk === 'string' ? chunk : chunk.toString('utf-8'));
+    const holdEsc = s.endsWith('\x1b');
+    if (holdEsc) s = s.slice(0, -1);
+    this.decodeAndDeliver(s);
+    if (holdEsc) {
+      this.pendingInput += '\x1b';
+      this.escTimer = setTimeout(() => {
+        this.escTimer = null;
+        // Nothing followed: the ESC was the key itself.
+        const held = this.pendingInput;
+        this.pendingInput = '';
+        this.decodeAndDeliver(held);
+      }, TtyBackend.ESC_WAIT_MS);
+    }
+  };
+
+  private dropHeldEsc(): void {
+    if (this.escTimer !== null) { clearTimeout(this.escTimer); this.escTimer = null; }
+    if (this.pendingInput.endsWith('\x1b')) this.pendingInput = this.pendingInput.slice(0, -1);
+  }
+
+  private decodeAndDeliver(s: string): void {
     const { keys, rest, reports } = decodeKeys(s);
     this.pendingInput = rest;
     // What the terminal said back is not input: the tracker acts on it, and
@@ -126,7 +156,7 @@ export class TtyBackend implements Backend {
         process.kill(process.pid, 'SIGTSTP');
       }
     }
-  };
+  }
   private inputAttached = false;
   private terminalEntered = false;
   // Double- and triple-click detection for the selection — see docs/input.md.
@@ -406,6 +436,7 @@ export class TtyBackend implements Backend {
   suspend(): void {
     if (this.disposed || this.suspended) return;
     this.suspended = true;
+    this.dropHeldEsc();
     this.leaveTerminal();
     // The child gets the console with the terminal; what we caught waits for exit.
     this.held.push(...(this.capture?.release() ?? []));
@@ -464,6 +495,7 @@ export class TtyBackend implements Backend {
     // Set first: from here on the terminal is being handed back, so a late
     // bell() or notify() has nowhere to write.
     this.disposed = true;
+    this.dropHeldEsc();
     // Already handed over: the terminal is the shell's, and writing the leave
     // sequence again would disturb what it shows now.
     if (!this.suspended) this.leaveTerminal();
