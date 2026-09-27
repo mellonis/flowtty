@@ -396,8 +396,4 @@ hit the screen. Keep them out of a running app, or write to a file.
 - Scrolling-region optimization for log-stream apps.
 - Column-only cursor moves (`CSI <col>G`) when row is unchanged — small extra perf nibble.
 - `position: 'relative'`.
-- Hit-testing a mouse key against the laid-out tree — the wheel and the buttons
-  are reported with the cell under the pointer, but working out which component
-  that cell belongs to is still the app's job (see
-  [Paste and the mouse](input.md#paste-and-the-mouse)).
 - Kitty keyboard protocol.
