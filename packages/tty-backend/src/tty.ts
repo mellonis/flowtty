@@ -31,7 +31,10 @@ export interface TtyBackendOptions {
    * Off by default: while mouse reporting is on, the terminal hands
    * drag-to-select to the app, so users lose native text selection (most
    * terminals restore it with Shift or Option held); hover adds a report per
-   * pointer move, which a slow link feels. See docs/input.md (clicks and hover).
+   * pointer move, which a slow link feels. `mouseleave` rides on the window
+   * focus reports the `colorScheme` tracker turns on: with `colorScheme:
+   * false` the pointer leaving is never reported, and hover only clears on
+   * the next move. See docs/input.md (clicks and hover).
    */
   mouse?: boolean | { hover?: boolean };
   /** Follow the terminal's light / dark scheme: ask for its background once
@@ -175,10 +178,13 @@ export class TtyBackend implements Backend {
   }
 
   // Either emits `key` at once (the throttle window is clear) or holds it to
-  // go out when the window reopens — whichever happens first. A move back
-  // onto the cell already reported is not held either: subscribers already
-  // think the pointer is there, so a stale held move for some OTHER cell must
-  // not go out later and contradict it.
+  // go out when the window reopens — whichever happens first. Either way, any
+  // move still held for an OLDER position is dropped first: sent at once, it
+  // would go out ahead of `key` and thus be stale before it is even seen (the
+  // clock can cross the throttle window before that move's own timer callback
+  // runs); held, its timer would otherwise fire later and report a position
+  // the pointer has already left. A move back onto the cell already reported
+  // is not held either, for the same reason.
   private move(key: Key): void {
     if (this.disposed || this.suspended) return;
     if (this.lastMoveCell !== null && this.lastMoveCell.x === key.x && this.lastMoveCell.y === key.y) {
@@ -186,7 +192,7 @@ export class TtyBackend implements Backend {
       return;
     }
     const now = Date.now();
-    if (now - this.lastMoveAt >= TtyBackend.MOVE_INTERVAL_MS) { this.emitMove(key, now); return; }
+    if (now - this.lastMoveAt >= TtyBackend.MOVE_INTERVAL_MS) { this.dropHeldMove(); this.emitMove(key, now); return; }
     this.heldMove = key;
     if (this.moveTimer === null) {
       this.moveTimer = setTimeout(() => { this.moveTimer = null; this.flushHeldMove(); }, TtyBackend.MOVE_INTERVAL_MS - (now - this.lastMoveAt));

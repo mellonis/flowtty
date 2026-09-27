@@ -1200,6 +1200,22 @@ test('a move that returns to the already-reported cell drops a stale held move f
   } finally { vi.useRealTimers(); }
 });
 
+test('a newer move sent at once does not leave an older held move to go out after it', () => {
+  vi.useFakeTimers();
+  try {
+    const { stdin, seen, back } = hoverBackend();
+    stdin.emit('data', '\x1b[<35;2;2M'); // (1,1): first ever move, reported at once, lastMoveAt = t0
+    stdin.emit('data', '\x1b[<35;3;2M'); // (2,1): within 16 ms — held, timer due at t0+16
+    // The clock crosses the throttle window WITHOUT the timer callback having
+    // run yet (several data events handled in one poll phase, e.g.).
+    vi.setSystemTime(Date.now() + 20);
+    stdin.emit('data', '\x1b[<35;4;2M'); // (3,1): window is clear now — sent at once
+    vi.runAllTimers(); // the stale timer for (2,1) must not resurrect it after (3,1)
+    expect(seen).toEqual(['move 1,1', 'move 3,1']);
+    back.dispose();
+  } finally { vi.useRealTimers(); }
+});
+
 test('a move and a focus-out decoded from the SAME chunk still end on mouseleave, never leaking a move after it', () => {
   vi.useFakeTimers();
   try {
