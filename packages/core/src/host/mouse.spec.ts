@@ -1,7 +1,7 @@
 import { expect, test } from 'vitest';
 import type { Key } from '../keys.js';
 import { getYoga } from './yoga.js';
-import { appendChild, createInstance, type BoxProps, type Container, type Instance } from './host.js';
+import { appendChild, createInstance, removeChild, type BoxProps, type Container, type Instance } from './host.js';
 import { computeLayout } from './layout.js';
 import { MouseController } from './mouse.js';
 
@@ -100,6 +100,50 @@ test('a box whose scope is muted is skipped, and so are its ancestors in the sam
   muted = false;
   m.handle(down(1, 0)); m.handle(up(1, 0));
   expect(got).toEqual(['row']);
+});
+
+test('a box whose scope is muted between press and release does not get the click', async () => {
+  const c = await newContainer();
+  const got: string[] = [];
+  let muted = false;
+  const scope = { isMuted: () => muted };
+  const root = box(c, { width: 20, height: 5, flexDirection: 'column' });
+  box(c, { width: 6, height: 2, onClick: () => got.push('row'), mouseScope: scope }, root);
+  computeLayout(c, 20, 5);
+  const m = new MouseController({ container: c });
+  expect(m.handle(down(1, 0))).toBe(true);
+  muted = true; // a key that arrived between the press and the release opened a dialog
+  expect(m.handle(up(1, 0))).toBe(false);
+  expect(got).toEqual([]);
+});
+
+test('a box removed between press and release does not get the click', async () => {
+  const c = await newContainer();
+  const got: string[] = [];
+  const root = box(c, { width: 20, height: 5, flexDirection: 'column' });
+  const row = box(c, { width: 6, height: 2, onClick: () => got.push('row') }, root);
+  computeLayout(c, 20, 5);
+  const m = new MouseController({ container: c });
+  expect(m.handle(down(1, 0))).toBe(true);
+  removeChild(root, row, c.Yoga); // the real unmount path — a re-render dropped the row
+  computeLayout(c, 20, 5);
+  expect(m.handle(up(1, 0))).toBe(false);
+  expect(got).toEqual([]);
+});
+
+test('a different box under the same cell at release does not get the click either', async () => {
+  const c = await newContainer();
+  const got: string[] = [];
+  const root = box(c, { width: 20, height: 5, flexDirection: 'column' });
+  const row = box(c, { width: 6, height: 2, onClick: () => got.push('row') }, root);
+  computeLayout(c, 20, 5);
+  const m = new MouseController({ container: c });
+  expect(m.handle(down(1, 0))).toBe(true);
+  removeChild(root, row, c.Yoga);
+  box(c, { width: 6, height: 2, onClick: () => got.push('replacement') }, root);
+  computeLayout(c, 20, 5);
+  expect(m.handle(up(1, 0))).toBe(false);
+  expect(got).toEqual([]);
 });
 
 test('hover: entering a box calls onHoverChange(true) once, leaving it calls false once; moving inside it calls nothing', async () => {

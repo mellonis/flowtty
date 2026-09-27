@@ -26,6 +26,16 @@ function liveChain(chain: readonly HitBox[]): Instance[] {
   return out;
 }
 
+// The nearest box with `onClick` up the chain from the topmost box under the
+// cell — a click's target, at either end of it. Null when nothing in the
+// chain wants one.
+function topmostClickable(chain: readonly Instance[]): Instance | null {
+  for (let i = chain.length - 1; i >= 0; i--) {
+    if (chain[i]!.props.onClick !== undefined) return chain[i]!;
+  }
+  return null;
+}
+
 export class MouseController {
   private readonly host: MouseHost;
   /** The press that may become a click: its cell, and the box that would get it. */
@@ -70,22 +80,22 @@ export class MouseController {
   private press(key: Key): boolean {
     this.armed = null;
     if (key.button !== 'left' || key.x === undefined || key.y === undefined) return false;
-    const chain = liveChain(hitTest(this.host.container, key.x, key.y));
-    for (let i = chain.length - 1; i >= 0; i--) {
-      if (chain[i]!.props.onClick !== undefined) {
-        this.armed = { x: key.x, y: key.y, target: chain[i]! };
-        return true;
-      }
-    }
-    return false;
+    const target = topmostClickable(liveChain(hitTest(this.host.container, key.x, key.y)));
+    if (target === null) return false;
+    this.armed = { x: key.x, y: key.y, target };
+    return true;
   }
 
   private release(key: Key): boolean {
     const armed = this.armed;
     this.armed = null;
     if (armed === null || key.x !== armed.x || key.y !== armed.y) return false;
-    // The handler is read again at release: a re-render between the two keys
-    // may have replaced it (or removed it, in which case there is no click).
+    // The cell is hit-tested again, from scratch: a key between the press and
+    // the release may have muted the target's scope (a dialog opened), removed
+    // it from the tree (a list refreshed), or put a different box on top of the
+    // same cell — the click must go only to the box that is still exactly what
+    // the press armed, read fresh in case a re-render replaced its handler.
+    if (topmostClickable(liveChain(hitTest(this.host.container, key.x, key.y))) !== armed.target) return false;
     const onClick = armed.target.props.onClick;
     if (onClick === undefined) return false;
     onClick(key);
