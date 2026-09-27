@@ -41,8 +41,9 @@ export type TerminalReport =
  *  - SGR mouse reports: ESC[<b;x;yM (press / motion) and ESC[<b;x;ym (release)
  *    — wheel steps become {name: 'wheelup' | 'wheeldown', x, y} (0-based cell),
  *    button events become {name: 'mousedown' | 'mousedrag' | 'mouseup', button,
- *    x, y}. Motion with no button held and buttons flowtty does not name are
- *    consumed and dropped. See docs/input.md (the mouse).
+ *    x, y}, and motion with no button held becomes {name: 'mousemove', x, y}.
+ *    Buttons flowtty does not name are consumed and dropped. See docs/input.md
+ *    (the mouse).
  *
  *  - Keys reported by code point: CSI-u (ESC[13;2u) and xterm modifyOtherKeys
  *    (ESC[27;2;13~) → the usual name plus modifiers, e.g. Shift+Enter =
@@ -84,15 +85,19 @@ function decodeSgrMouse(params: string, final: string): Omit<Key, 'sequence'> | 
     if (final !== 'M') return null;
     return { name: code === 64 ? 'wheelup' : 'wheeldown', ...at };
   }
-  if (code > 2) return final === 'm' && code === 3
-    // A release names its button under SGR 1006 — except in the X10-shaped form
-    // "no button", which a few terminals still send. Surfacing it as a
+  if (code === 3) {
+    // A release names its button under SGR 1006 — except in the X10-shaped
+    // form "no button", which a few terminals still send. Surfacing it as a
     // buttonless 'mouseup' is deliberate: dropping it would leave a drag open
     // forever, which is worse than an absent field.
-    ? { name: 'mouseup', ...at }
-    // Code 3 with 'M' is motion with nothing held (only 1003 asks for it), and
-    // 66/67/128+ are buttons flowtty does not name.
-    : null;
+    if (final === 'm') return { name: 'mouseup', ...at };
+    // Motion with nothing held: a terminal sends it only under 1003, which the
+    // backend asks for when the app wants hover. The motion bit is set on
+    // these reports; without it a "press of no button" is not a key at all.
+    return motion ? { name: 'mousemove', ...at } : null;
+  }
+  // 66/67 (the horizontal wheel) and 128+ are buttons flowtty does not name.
+  if (code > 3) return null;
 
   const button = MOUSE_BUTTONS[code]!;
   if (final === 'm') return { name: 'mouseup', button, ...at };

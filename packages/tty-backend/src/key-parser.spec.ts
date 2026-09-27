@@ -303,10 +303,14 @@ test('a release that names no button is still a mouseup — with button left und
   expect([up!.x, up!.y]).toEqual([2, 3]);
 });
 
-test('motion with NO button held is dropped — it is noise unless 1003 is on', () => {
-  const { keys, rest } = decodeKeys('a\x1b[<35;5;6Mb');
-  expect(keys.map((k) => k.name)).toEqual(['a', 'b']);
-  expect(rest).toBe('');
+test('motion with no button held is mousemove: the terminal sends it only when 1003 is on', () => {
+  const { keys } = decodeKeys('a\x1b[<35;5;6Mb');
+  expect(keys.map((k) => [k.name, k.x, k.y, k.button])).toEqual([['a', undefined, undefined, undefined], ['mousemove', 4, 5, undefined], ['b', undefined, undefined, undefined]]);
+});
+
+test('mousemove carries the modifiers of the report', () => {
+  const [k] = decodeKeys('\x1b[<39;5;6M').keys; // 3 + 4 (shift) + 32 (motion)
+  expect([k!.name, k!.shift, k!.meta, k!.ctrl]).toEqual(['mousemove', true, false, false]);
 });
 
 test('button codes flowtty does not decode are dropped silently, never mis-named', () => {
