@@ -1,6 +1,7 @@
-import { Children, createElement, isValidElement, type ReactNode } from 'react';
-import type { TextRun } from '@flowtty/core';
+import { Children, isValidElement, type ReactNode } from 'react';
+import type { Key, TextRun } from '@flowtty/core';
 import { Span, type SpanProps } from './Span.js';
+import { hostBox } from './mouseScope.js';
 import type { Color } from '@flowtty/core';
 
 export interface TextProps {
@@ -25,6 +26,13 @@ export interface TextProps {
    *  content — a gutter, a bar — and for text that is not the point.
    *  See docs/input.md (selection). */
   selectable?: boolean;
+  /** A click on this text: the left button pressed and released in one cell
+   *  over it, with no drag between. See docs/input.md (clicks and hover). */
+  onClick?: (key: Key) => void;
+  /** The pointer entered (`true`) or left (`false`) this text — only on a
+   *  change. Needs the backend's `mouse: { hover: true }`; `useHover()` wraps
+   *  it. See docs/input.md (clicks and hover). */
+  onHoverChange?: (hovered: boolean) => void;
 }
 
 // Fold children into runs — the strings as they are, each <Span> as a run with
@@ -54,7 +62,7 @@ export function Text({ children, ...style }: TextProps): ReactNode {
   // the ordinary path, where React keeps the text nodes.)
   if (hasSpan(children)) {
     const runs = toRuns(children, {}, []);
-    if (runs !== null) return createElement('flowtty-box', { ...style, runs });
+    if (runs !== null) return hostBox({ ...style, runs });
   }
 
   // An empty string is a blank line, but React creates no host text node for
@@ -65,5 +73,5 @@ export function Text({ children, ...style }: TextProps): ReactNode {
   const blankLine = parts.length > 0 && parts.every((c) => c === '');
   // Renders to a flowtty-box whose paint pass reads these style props off inst.props.
   const props: TextProps & { minHeight?: number } = blankLine ? { ...style, minHeight: 1 } : style;
-  return createElement('flowtty-box', props, children);
+  return hostBox(props, children);
 }

@@ -19,6 +19,12 @@ export interface SubscribeOptions {
 
 export interface InputSource {
   subscribe(handler: KeySubscriber, options?: SubscribeOptions): () => void;
+  /** Whether keys are currently withheld from this scope (`inert`, the page
+   *  under an open dialog). Absent on a source that never mutes. The mouse
+   *  controller reads this through a box's `mouseScope` to skip a box under a
+   *  muted scope, the same rule a `useInput` subscription follows.
+   *  See docs/input.md (clicks and hover). */
+  isMuted?(): boolean;
 }
 
 /**
@@ -32,6 +38,7 @@ export interface InputSource {
 export function createMutedSource(outer: InputSource, isMuted: () => boolean): InputSource {
   return {
     subscribe: (handler, options) => outer.subscribe((key) => (isMuted() ? undefined : handler(key)), options),
+    isMuted: () => isMuted() || (outer.isMuted?.() ?? false),
   };
 }
 

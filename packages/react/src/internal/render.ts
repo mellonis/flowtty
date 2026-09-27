@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from 'react';
 import { UNKNOWN_COLOR_SCHEME, type Backend, type Buffer, type Key, type TerminalColorScheme } from '@flowtty/core';
-import { getYoga, computeLayout, contentHeight, paint, SelectionController, type Point } from '@flowtty/core/host';
+import { getYoga, computeLayout, contentHeight, paint, MouseController, SelectionController, type Point } from '@flowtty/core/host';
 import { createRoot, type Root } from './reconciler.js';
 import { InputContext, type InputSource, type KeySubscriber } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
@@ -22,15 +22,18 @@ import { ErrorBoundary, type ErrorSource } from '../components/ErrorBoundary.js'
 // The backend listener attaches on the first subscriber and detaches on the
 // last, preserving TtyBackend's lazy raw-mode claim and unmount cleanup.
 // `beforeDispatch` is the render root's own look at each key — the selection
-// controller — and runs first, outside flushSync: it is not React state, and
-// the key still goes on to every subscriber afterwards. `afterDispatch` runs
-// once the commit is done, which is where anything the key asked to be redrawn
-// belongs: by then React has queued its own paint (resetAfterCommit →
+// and mouse controllers — and runs first, outside flushSync: it is not React
+// state (selection), or is flushed synchronously itself (a click's `onClick`,
+// hover's `onHoverChange`), so the commit it causes is visible to every
+// subscriber afterwards. Returning `true` withholds the key entirely: a click
+// the mouse controller delivered is never seen by `useInput`. `afterDispatch`
+// runs once the commit is done, which is where anything the key asked to be
+// redrawn belongs: by then React has queued its own paint (resetAfterCommit →
 // queueMicrotask), so work queued there lands after it and can stand down.
 function makeKeySource(
   backend: Backend & { onKey: NonNullable<Backend['onKey']> },
   root: Root,
-  beforeDispatch?: (key: Key) => void,
+  beforeDispatch?: (key: Key) => boolean | void,
   afterDispatch?: () => void,
 ): InputSource {
   // Three phases: the capture handlers, then the ordinary ones, then the
@@ -46,7 +49,7 @@ function makeKeySource(
     subscribe(handler, options) {
       if (count() === 0) {
         detachBackend = backend.onKey((key) => {
-          beforeDispatch?.(key);
+          if (beforeDispatch?.(key) === true) { afterDispatch?.(); return true; }
           let consumed = false;
           root.flushSync(() => {
             for (const s of [...capture, ...bubble, ...fallback]) {
@@ -81,6 +84,11 @@ export interface RenderOptions {
    *  Set false to leave the frame entirely to the app.
    *  See docs/input.md (selection). */
   selection?: boolean;
+  /** Deliver clicks to `onClick` and hover to `onHoverChange` / `useHover`
+   *  from the committed frame. Default true, and inert until the backend
+   *  delivers mouse keys. Set false to leave the mouse entirely to
+   *  `useInput`. See docs/input.md (clicks and hover). */
+  mouse?: boolean;
   /** Put what a drag selected on the system clipboard when the button comes
    *  back up. Default true, and free where the backend has no clipboard — it
    *  simply reports that nothing was delivered. Set false to leave the
@@ -191,6 +199,7 @@ export async function render(
   // React work — and so the selection reads its text out of what is on screen.
   let lastPaint: Buffer | null = null;
   let selection: SelectionController | null = null;
+  let mouse: MouseController | null = null;
   // The highlight changed but the frame on screen does not show it yet. A paint
   // clears it, because a painted frame always carries the current highlight.
   let overlayStale = false;
@@ -208,6 +217,9 @@ export async function render(
     // A selection over text that changed is a lie — the controller checks this
     // frame's cells against the ones it highlighted and drops it if they moved.
     selection?.observe(frame);
+    // What is under the resting pointer may have moved with the content — a
+    // list scrolled, a row reordered — even though the pointer itself did not.
+    mouse?.observe();
     // decorate() hands the frame straight back when nothing is selected, so a
     // buffer is only ever copied for an actual highlight.
     backend.draw(selection === null ? frame : selection.decorate(frame));
@@ -275,6 +287,8 @@ export async function render(
     });
   }
 
+  if (options.mouse !== false) mouse = new MouseController({ container });
+
   // If the backend provides a key source, wrap the tree in an InputContext
   // provider so useInput subscribers receive its keys (see makeKeySource for
   // the dispatch semantics). Otherwise, the default no-op source in
@@ -322,6 +336,9 @@ export async function render(
     // unmount on this path is deferred to a microtask, so component cleanups
     // run late; the signal lets side effects stop before that.
     abortController.abort();
+    // dispose() may call an app's onHoverChange(false); that must not stop the
+    // terminal restore below, any more than backend.dispose() throwing would.
+    try { mouse?.dispose(); } catch { /* ignore — dispose must not mask the real error */ }
     // Restore terminal so any stderr that follows is readable.
     try { backend.dispose?.(); } catch { /* ignore — dispose must not mask the real error */ }
     resolveExit(exitResult);
@@ -344,6 +361,23 @@ export async function render(
   process.on('unhandledRejection', onUnhandledRejection);
   for (const sig of TERMINATION_SIGNALS) process.on(sig, onSignal);
 
+  // The selection and mouse controllers both get first look at a key, ahead of
+  // every `useInput` subscriber. Wrapped in one `root.flushSync`: `onClick` /
+  // `onHoverChange` may call `setState` (as `useHover` does), and flushing it
+  // here — rather than leaving it to React's own batching — is what lets a
+  // click or a hover change commit and repaint before the key that caused it
+  // finishes dispatching, the same guarantee a `useInput` handler gets.
+  const dispatchToControllers = (selection === null && mouse === null)
+    ? undefined
+    : (key: Key): boolean => {
+        let consumed = false;
+        root.flushSync(() => {
+          selection?.handleKey(key);
+          consumed = mouse?.handle(key) ?? false;
+        });
+        return consumed;
+      };
+
   const innerTree = backend.onKey
     ? createElement(
         InputContext.Provider,
@@ -351,7 +385,7 @@ export async function render(
           value: makeKeySource(
             backend as Backend & { onKey: NonNullable<Backend['onKey']> },
             root,
-            selection === null ? undefined : (key) => selection?.handleKey(key),
+            dispatchToControllers,
             selection === null ? undefined : () => { flushOverlay(); deliverCopy(); },
           ),
         },
@@ -488,6 +522,9 @@ export async function render(
       // abort() is the teardown trigger: it releases the listeners (via the
       // signal) and lets user async/timers bail before we unmount + dispose.
       abortController.abort();
+      // dispose() may call an app's onHoverChange(false); that must not stop
+      // the unmount + terminal restore that follow.
+      try { mouse?.dispose(); } catch { /* ignore — an app callback must not block teardown */ }
       root.unmount();
       backend.dispose?.();
       resolveExit(exitResult);
