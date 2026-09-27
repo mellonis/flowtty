@@ -1,7 +1,7 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import { takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme, setWidthPolicy, type WidthPolicy } from '@flowtty/core';
 import { detectWidthPolicy } from './widthPolicy.js';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, MOUSE_HOVER_OFF, MOUSE_HOVER_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, takeUnknownColors } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, MOUSE_HOVER_OFF, MOUSE_HOVER_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, stylesEqual, takeUnknownColors } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
 import { isInteractive, NotInteractiveError } from './interactive.js';
@@ -362,7 +362,7 @@ export class TtyBackend implements Backend {
         // The continuation of the wide glyph just written: the terminal
         // advanced over that column when it drew the lead.
         if (cell.char === '') continue;
-        if (JSON.stringify(cell.style) !== JSON.stringify(last)) {
+        if (last === null || !stylesEqual(cell.style, last)) {
           if (lineLink !== undefined && lineLink !== cell.style.link) line += OSC8_CLOSE;
           line += RESET + sgr(cell.style, this.sgrOptions);
           if (cell.style.link !== undefined && cell.style.link !== lineLink) line += osc8Open(cell.style.link);
@@ -409,7 +409,7 @@ export class TtyBackend implements Backend {
           out += cursorTo(x, y);
         }
         // Style change iff the pen's style doesn't already match.
-        if (JSON.stringify(b.style) !== JSON.stringify(penStyle)) {
+        if (!stylesEqual(b.style, penStyle)) {
           if (penLink !== undefined && penLink !== b.style.link) out += OSC8_CLOSE;
           out += RESET + sgr(b.style, this.sgrOptions);
           if (b.style.link !== undefined && b.style.link !== penLink) out += osc8Open(b.style.link);

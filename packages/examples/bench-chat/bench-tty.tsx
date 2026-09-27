@@ -3,7 +3,7 @@
 //   NODE_ENV=production npx tsx packages/examples/bench-chat/bench-tty.tsx
 import React, { useState, type ReactNode } from 'react';
 import { PassThrough, Writable } from 'node:stream';
-import { render, Box, Text, ScrollList, useInput, type ScrollMetrics } from '@flowtty/react';
+import { render, Box, Text, ScrollList, useInput, type FrameStats, type ScrollMetrics } from '@flowtty/react';
 import { TtyBackend } from '@flowtty/tty-backend';
 
 const N = Number(process.env.ROWS ?? 3000);
@@ -49,7 +49,8 @@ Object.assign(out, { columns: W, rows: H, isTTY: true });
 const input = new PassThrough() as unknown as NodeJS.ReadStream;
 Object.assign(input, { isTTY: false, setRawMode: () => input });
 const backend = new TtyBackend(out, input, { mouse: true, colorScheme: false, captureConsole: false });
-const app = await render(<App />, backend);
+const stats: FrameStats[] = [];
+const app = await render(<App />, backend, { onFrame: (f) => stats.push(f) });
 const nextWrite = () => new Promise<void>((r) => waiters.push(r));
 const settle = async () => { await new Promise((r) => setTimeout(r, 30)); };
 await settle();
@@ -72,7 +73,9 @@ for (const K of [1, 5, 10, 30]) {
     frames.push(writes - w0);
   }
   const avg = (xs: number[]) => (xs.reduce((s, x) => s + x, 0) / xs.length);
-  console.log(`chunk of ${String(K).padStart(2)} wheel steps: ${avg(times).toFixed(1)} ms to the next frame  · renders ${avg(renders).toFixed(0)}  · frames per chunk ${avg(frames).toFixed(1)}`);
+  const recent = stats.splice(0);
+  const ms = (k: 'layoutMs' | 'paintMs' | 'drawMs') => avg(recent.map((f) => f[k])).toFixed(1);
+  console.log(`chunk of ${String(K).padStart(2)} wheel steps: ${avg(times).toFixed(1)} ms to the next frame  · renders ${avg(renders).toFixed(0)}  · frames per chunk ${avg(frames).toFixed(1)}  · layout ${ms('layoutMs')} paint ${ms('paintMs')} draw ${ms('drawMs')} ms`);
 }
 app.unmount();
 process.exit(0);

@@ -203,11 +203,19 @@ export function cursorTo(x: number, y: number): string {
   return `\x1b[${y + 1};${x + 1}H`;
 }
 
+/**
+ * Whether two styles draw the same: every field equal, a field set to
+ * `undefined` the same as one left out. Field by field, allocating nothing —
+ * the diff asks this for every cell of every frame, and the pen compare for
+ * every cell it emits.
+ */
+export function stylesEqual(a: Style, b: Style): boolean {
+  return a.fg === b.fg && a.bg === b.bg && a.bold === b.bold && a.dim === b.dim
+    && a.underline === b.underline && a.inverse === b.inverse
+    && a.strikethrough === b.strikethrough && a.link === b.link;
+}
+
 /** True iff two cells have identical char AND identical style. */
 export function cellsEqual(a: Cell, b: Cell): boolean {
-  if (a.char !== b.char) return false;
-  // Style objects are small (~6 optional bool/string fields). JSON.stringify
-  // is correct + fast enough at this scale; matches the existing per-cell
-  // SGR change-detection pattern used in TtyBackend.draw.
-  return JSON.stringify(a.style) === JSON.stringify(b.style);
+  return a.char === b.char && stylesEqual(a.style, b.style);
 }

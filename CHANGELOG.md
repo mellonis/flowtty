@@ -20,6 +20,9 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
 
 ### Fixed
 
+- `TtyBackend` compares cell styles field by field instead of serializing
+  both to JSON — once per cell of every frame in the diff, and once per
+  emitted cell for the pen. Same bytes out, no allocation per compare.
 - **A re-render no longer re-applies every Yoga prop of every box it
   touches.** `applyProps` compares the new props with the ones the Yoga node
   was last configured from and runs the setters only when a value changed

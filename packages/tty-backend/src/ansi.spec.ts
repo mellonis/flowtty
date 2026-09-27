@@ -1,6 +1,6 @@
 import { expect, test, describe } from 'vitest';
 import { NAMED_COLORS } from '@flowtty/core';
-import { sgr, RESET, cursorTo, cellsEqual, parseColor, OSC8_CLOSE, osc8Open, takeUnknownColors, detectColorSupport } from './ansi.js';
+import { sgr, RESET, cursorTo, cellsEqual, stylesEqual, parseColor, OSC8_CLOSE, osc8Open, takeUnknownColors, detectColorSupport } from './ansi.js';
 
 describe('OSC 8 hyperlinks', () => {
   test('osc8Open wraps the URL in the OSC 8 open sequence with an ST terminator', () => {
@@ -198,3 +198,26 @@ test('detectColorSupport: NO_COLOR (any non-empty value) turns color off; FORCE_
   expect(detectColorSupport({ FORCE_COLOR: '0' })).toBe(false);
   expect(detectColorSupport({ NO_COLOR: '1', FORCE_COLOR: '0' })).toBe(false);
 });
+
+describe('stylesEqual', () => {
+  test('the same fields with the same values are equal, whatever their order', () => {
+    expect(stylesEqual({ fg: 'red', bold: true }, { bold: true, fg: 'red' })).toBe(true);
+    expect(stylesEqual({}, {})).toBe(true);
+  });
+  test('a field set to undefined is the same as a field left out', () => {
+    expect(stylesEqual({ bold: undefined }, {})).toBe(true);
+    expect(stylesEqual({ fg: 'red', dim: undefined }, { fg: 'red' })).toBe(true);
+  });
+  test('any differing field is a difference, the link included', () => {
+    expect(stylesEqual({ fg: 'red' }, { fg: 'blue' })).toBe(false);
+    expect(stylesEqual({ bold: true }, {})).toBe(false);
+    expect(stylesEqual({ bg: 'blue' }, { fg: 'blue' })).toBe(false);
+    expect(stylesEqual({ link: 'https://a' }, { link: 'https://b' })).toBe(false);
+    expect(stylesEqual({ inverse: true, strikethrough: true, underline: true }, { inverse: true, strikethrough: true })).toBe(false);
+  });
+  test('cellsEqual reads the style the same way', () => {
+    expect(cellsEqual({ char: 'a', style: { bold: undefined } }, { char: 'a', style: {} })).toBe(true);
+    expect(cellsEqual({ char: 'a', style: { bold: true } }, { char: 'a', style: {} })).toBe(false);
+  });
+});
+
