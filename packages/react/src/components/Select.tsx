@@ -7,7 +7,6 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
-import { useClick } from '../hooks/useClick.js';
 import { useDialog, useDialogHost } from '../hooks/useDialog.js';
 import { DialogHostPresentContext } from '../context/dialogContext.js';
 import { checkboxMarker, type CheckboxFrame } from './checkboxMarker.js';
@@ -156,7 +155,9 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
     ).then(() => setOpen(false));
   };
 
-  useClick(rectRef, () => { if (!open) { focus(); openPopup(); } }); // a click opens, and focuses
+  // A click opens, and focuses. While the popup is open the field is under a
+  // dialog and gets no click; the popup's own press handling takes over.
+  const onTriggerClick = () => { if (!open) { focus(); openPopup(); } };
   useInput((key: Key) => {
     if (!isFocused) return;
     if (key.name === 'return' || key.name === ' ' || key.name === 'down') {
@@ -188,6 +189,7 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
       backgroundColor={band ? FIELD_BG : undefined}
       inverse={open}
       onLayout={frame === 'border' ? undefined : (r) => { rectRef.current = r; }}
+      onClick={frame === 'border' ? undefined : onTriggerClick}
     >
       <Text color={fg} bold={isFocused} wrap="truncate">{text}</Text>
       <Box flexGrow={1} flexShrink={1} />
@@ -205,6 +207,7 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
       flexDirection="column"
       width={width} minWidth={minWidth} maxWidth={maxWidth} flexGrow={flexGrow} flexShrink={flexShrink}
       onLayout={(r) => { rectRef.current = r; }}
+      onClick={onTriggerClick}
     >
       {row}
     </Box>

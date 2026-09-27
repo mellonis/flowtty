@@ -7,9 +7,11 @@ import { useInput } from './useInput.js';
  * Act on a click inside a rect — the one `onLayout` hands the component: a
  * press and a release both on it, with no drag between (a drag that starts
  * on it is a selection, not a click). Both the press and the release are
- * consumed, so nothing behind sees them. The fields use it to take focus on a
- * click; any component can, to open a collapsed item or press a custom
- * button. See docs/input.md (the mouse).
+ * consumed, so nothing behind sees them. For a hit area that is a box of its
+ * own, `onClick` on the box is the simpler way and the one the built-in
+ * components use; this hook is for a region inside a bigger box. It listens
+ * through `useInput`, so a press an `onClick` box above it has taken never
+ * reaches it. See docs/input.md (clicks and hover).
  */
 export function useClick(rectRef: RefObject<Rect | null>, onClick: (key: Key) => void): void {
   // A press landed on the rect and nothing has moved since.

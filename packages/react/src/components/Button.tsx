@@ -1,10 +1,8 @@
 import React from "react";
-import { useRef, type ReactNode } from 'react';
-import type { Rect } from '@flowtty/core/host';
+import type { ReactNode } from 'react';
 import { Box } from './base/Box.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
-import { useClick } from '../hooks/useClick.js';
 
 export interface ButtonProps {
   /** Button label. */
@@ -20,8 +18,6 @@ export interface ButtonProps {
 
 export function Button({ label, shortcut, onPress }: ButtonProps): ReactNode {
   const { isFocused, focus } = useFocus();
-  const rectRef = useRef<Rect | null>(null);
-  useClick(rectRef, () => { focus(); onPress(); }); // a click presses, and focuses
 
   useInput((key) => {
     if ((isFocused && key.name === 'return') || (shortcut !== undefined && key.name === shortcut)) {
@@ -33,7 +29,7 @@ export function Button({ label, shortcut, onPress }: ButtonProps): ReactNode {
   // Visual: `[ label ]` plus dim `shortcut` after. Focused → inverse + bold.
   return (
     <Box flexDirection="row">
-      <Box bold={isFocused} inverse={isFocused} onLayout={(r) => { rectRef.current = r; }}>{`[ ${label} ]`}</Box>
+      <Box bold={isFocused} inverse={isFocused} onClick={() => { focus(); onPress(); }}>{`[ ${label} ]`}</Box>
       {shortcut ? <Box dim>{` (${shortcut})`}</Box> : null}
     </Box>
   );

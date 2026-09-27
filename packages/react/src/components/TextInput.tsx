@@ -4,7 +4,6 @@ import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
 import { useFocus } from '../hooks/useFocus.js';
-import { useClick } from '../hooks/useClick.js';
 import { DEFAULT_BORDER_STYLE, clusterWidth, editorReducer as reduce, graphemes, stringWidth, type BoxProps, type EditorState } from '@flowtty/core';
 import { type Rect } from '@flowtty/core/host';
 
@@ -60,8 +59,6 @@ export function TextInput(props: TextInputProps): ReactNode {
   const [error, setError] = useState<string | null>(null);
   const { isFocused: ctxFocused, focus } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
-  const rectRef = useRef<Rect | null>(null);
-  useClick(rectRef, focus); // a click on the field focuses it
   const [cursor, setCursor] = useState(value.length);
   const safeCursor = Math.max(0, Math.min(value.length, cursor));
   // Allocated cell width of the input's viewport — captured via onLayout. null
@@ -166,7 +163,6 @@ export function TextInput(props: TextInputProps): ReactNode {
  
 
   const onLayout = (r: Rect) => {
-    rectRef.current = r;
     const contentSized = r.width === renderedRef.current;
     if (layout === null || layout.width !== r.width || layout.contentSized !== contentSized) {
       setLayout({ width: r.width, contentSized });
@@ -189,13 +185,13 @@ export function TextInput(props: TextInputProps): ReactNode {
   if (!isFocused) {
     const flat = width === null || !band ? display : display + ' '.repeat(Math.max(0, width - total));
     row = (
-      <Box flexDirection="row" backgroundColor={bg} onLayout={onLayout}>
+      <Box flexDirection="row" backgroundColor={bg} onLayout={onLayout} onClick={focus}>
         <Text color={fg}>{flat}</Text>
       </Box>
     );
   } else {
     row = (
-      <Box flexDirection="row" backgroundColor={bg} onLayout={onLayout}>
+      <Box flexDirection="row" backgroundColor={bg} onLayout={onLayout} onClick={focus}>
         {before ? <Text color={fg}>{before}</Text> : null}
         <Text inverse color={fg}>{cursorChar}</Text>
         {after ? <Text color={fg}>{after}</Text> : null}

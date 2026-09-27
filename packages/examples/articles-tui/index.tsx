@@ -24,5 +24,5 @@ handle = await render(
   <DialogHost>
     <App onExit={() => handle?.unmount()} />
   </DialogHost>,
-  new TtyBackend(),
+  new TtyBackend(process.stdout, process.stdin, { mouse: true }),
 );

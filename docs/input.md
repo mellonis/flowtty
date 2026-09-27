@@ -190,16 +190,18 @@ function FoldLine({ title }) {
   app's own press/drag/release state machine over a clickable region must
   tolerate that orphan drag. A press that reaches no `onClick` up the chain
   goes on to subscribers as before. This also means an `onClick` ancestor
-  claims the press for every cell inside it: a `useClick` component nested
-  inside one (a `Button`, `Checkbox`, field or `Select` trigger) never sees the
-  `mousedown` its own click detection needs, and gets no click — put a field
-  or a button in a row with `onRowClick` only once it has moved to `onClick`
-  itself. A box with `onClick` or `onHoverChange` keeps a passive input
+  claims the press for every cell inside it that no nearer `onClick` takes:
+  the built-in fields, `Button`, `Checkbox`, the lists and the `Select`
+  trigger all declare `onClick` on their own box, so one of them inside a row
+  with `onRowClick` still takes its click, and the row gets the clicks beside
+  it. A component that detects clicks through `useInput` instead (its own
+  `mousedown` / `mouseup` bookkeeping, `useClick` included) never sees the
+  press under such an ancestor. A box with `onClick` or `onHoverChange` keeps a passive input
   subscription while it is mounted, so the backend feeds it keys even in an
   app with no `useInput` of its own. A click does not focus the box: call
   `focus()` in the handler when it should, as `Button` does.
-  `useClick(rectRef, handler)` still works for a component that wants its own
-  rect logic — as long as nothing between it and the pointer already claims
+  `useClick(rectRef, handler)` still works for a hit area that is not a box
+  of its own — as long as nothing between it and the pointer already claims
   `onClick`.
 - **The prop toggles, the key stays.** `onClick={disabled ? undefined : fn}`
   keeps the box's element type stable — the key is present either way, only
@@ -417,26 +419,24 @@ Components inside a `<FocusGroup>` can call `useFocus()` to know if they're the 
 `ListMultiSelect`, `Select`, `Checkbox`, `Button` — takes focus on a mouse click
 inside it; `Button` also presses, `Checkbox` toggles, `Select` opens. A click is
 a press and a release both on the field with no drag between: a drag that
-starts on a button is a selection, not a press. The pieces are public:
-`useFocus()` returns `focus()` for the calling component, and
-`useClick(rectRef, onClick)` acts on a click inside an `onLayout` rect and
-consumes it — any component can open a collapsed item on a click the same way:
+starts on a button is a selection, not a press. Each of them is an `onClick`
+on the component's own box (see [Clicks and hover](#clicks-and-hover)), so a
+field or a button inside a row with `onRowClick` (`Table`, `ScrollList`)
+takes its own click and the row gets the rest. The pieces are public:
+`useFocus()` returns `focus()` for the calling component, and `onClick` on a
+`Box` — any component can open a collapsed item on a click the same way:
 
 ```tsx
 function Collapsed({ children }: { children: ReactNode }) {
   const [open, setOpen] = useState(false);
-  const rect = useRef<Rect | null>(null);
-  useClick(rect, () => setOpen((o) => !o));
-  return <Box onLayout={(r) => { rect.current = r; }}>{open ? children : <Text dim>▸ …</Text>}</Box>;
+  return <Box onClick={() => setOpen((o) => !o)}>{open ? children : <Text dim>▸ …</Text>}</Box>;
 }
 ```
 
-A `useClick` component (so every field above, `Button` included) needs the
-`mousedown` that arms its click, and does not get it under a box that already
-claims `onClick`: that ancestor's `onClick` wins the press instead (see
-[Clicks and hover](#clicks-and-hover)). A row given `onRowClick` (`Table`,
-`ScrollList`) should not contain a `Button`, `Checkbox` or other field until
-that field moves to `onClick` itself.
+`useClick(rectRef, onClick)` remains for a hit area that is not a box of its
+own — a region measured by `onLayout` inside a bigger box. It detects the
+click through `useInput`, so it never sees a press that an `onClick` box
+above it has already taken.
 
 `<Button>` is focusable. Props:
 

@@ -28,6 +28,15 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
   `onRowClick(index, key)`, the `Select` popup picks and closes (toggles and
   stays open with `multiple`).
 
+### Changed
+
+- `Button`, `Checkbox`, `TextInput`, `TextArea`, `ListSelect`, `ListMultiSelect`
+  and the `Select` field detect their click through `onClick` on their own
+  box instead of `useClick` over an `onLayout` rect. Same behaviour on its
+  own; inside a row with `onRowClick` such a component now takes its click
+  where before the row took it. `useClick` stays exported for a hit area that
+  is not a box of its own.
+
 ### Fixed
 
 - A stdin chunk that ended exactly on the `ESC` of a mouse report or an

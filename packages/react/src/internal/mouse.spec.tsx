@@ -161,23 +161,13 @@ test('onClick flipping between a handler and undefined does not remount the box'
   r.unmount();
 });
 
-test('an onClick ancestor arms on the press and withholds it: a useClick component inside (Button) never sees it', async () => {
-  // Control: the same Button, at the same cell, with no onClick ancestor —
-  // it gets the click on its own. This is what tells the assertion below
-  // apart from a coordinate that simply missed the button.
-  const plain = new TestBackend(20, 4);
-  const plainSeen: string[] = [];
-  const rPlain = await render(<Button label="Go" onPress={() => plainSeen.push('button')} />, plain);
-  await flushAsync(plain);
-  plain.mouse('down', 1, 0); plain.mouse('up', 1, 0);
-  await flush();
-  expect(plainSeen).toEqual(['button']);
-  rPlain.unmount();
-
+test('a Button inside a box with onClick takes the click; the box gets only the clicks beside it', async () => {
+  // The button is the box painted on top, and its own onClick is the nearest
+  // handler — the ancestor's onClick never sees a click that lands on it.
   const backend = new TestBackend(20, 4);
   const seen: string[] = [];
   const r = await render(
-    <Box onClick={() => seen.push('box')}>
+    <Box onClick={() => seen.push('box')} width={20}>
       <Button label="Go" onPress={() => seen.push('button')} />
     </Box>,
     backend,
@@ -186,6 +176,10 @@ test('an onClick ancestor arms on the press and withholds it: a useClick compone
   // (1, 0) is inside the button's "[ Go ]" rect, itself inside the box.
   backend.mouse('down', 1, 0); backend.mouse('up', 1, 0);
   await flush();
-  expect(seen).toEqual(['box']);
+  expect(seen).toEqual(['button']);
+  // (15, 0) is in the box, beside the button.
+  backend.mouse('down', 15, 0); backend.mouse('up', 15, 0);
+  await flush();
+  expect(seen).toEqual(['button', 'box']);
   r.unmount();
 });
