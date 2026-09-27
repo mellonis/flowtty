@@ -54,7 +54,7 @@ terminal is back to normal — so the last line prints on the ordinary screen.
 |---|---|
 | **Layout** | flexbox via Yoga, borders with titles, padding / margin / gap, wrap, absolute positioning, `zIndex`, `overflow`, scroll viewports, a dimming backdrop — [docs/layout.md](docs/layout.md) |
 | **Components** | `ScrollBox`, `ScrollList`, `TextInput`, `TextArea`, `Select` (a dropdown), `ListSelect`, `ListMultiSelect`, `Checkbox`, `Table`, `Markdown` (GFM tables, nested lists, highlighted code), `Spinner`, `Shimmer`, `ProgressBar`, `TaskList`, `Link`, `Static` — [docs/components.md](docs/components.md) |
-| **Input, focus, forms** | keys with modifiers, bracketed paste as one event, the mouse wheel and buttons, drag-to-select with per-pane scopes, `FocusGroup` + `Button`, `Form` with validation (Zod-friendly) — [docs/input.md](docs/input.md) |
+| **Input, focus, forms** | keys with modifiers, bracketed paste as one event, the mouse wheel and buttons, `onClick` / `onHoverChange` / `useHover`, drag-to-select with per-pane scopes, `FocusGroup` + `Button`, `Form` with validation (Zod-friendly) — [docs/input.md](docs/input.md) |
 | **Copying out** | copy-on-select over the drawn frame, soft-wrapped paragraphs pasted as one line, `useApp().copy()`, OSC 52 with an `onCopy` fallback signal — [docs/input.md](docs/input.md#selection) |
 | **The app around them** | `render` / `waitUntilExit` / `useApp().exit`, `renderToString` for one-shot output, error handling, a root abort signal, a ticker for animation, `DialogHost` with stacked dialogs, `useApp().bell()` / `.notify()` for attention from another window, `useColorScheme()` to follow the terminal's light or dark scheme — [docs/app.md](docs/app.md) |
 | **Testing** | `TestBackend`: frames as strings, cells with styles, `press` / `paste` / `wheel` / `mouse`, a settable color scheme, recorded bells, notifications and clipboard writes; scripts that drive a whole app — [docs/testing.md](docs/testing.md) |
@@ -92,9 +92,7 @@ screen capture are involved.
 Alpha — `1.0.0-alpha.x` on npm. APIs can still change between alphas; each
 release's notes list what breaks. Runs on Node and Bun.
 
-Not there yet: an `onClick` prop on a box (today a component takes clicks
-through `useClick` and its own rect), a click that picks a list row, the Kitty
-keyboard protocol — see
+Not there yet: the Kitty keyboard protocol — see
 [what is deferred](docs/terminal.md#still-deferred-later-milestones).
 
 ## License

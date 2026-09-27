@@ -286,3 +286,20 @@ test('wide glyphs keep a row layout column-aligned end to end', async () => {
   expect(backend.lastBuffer!.get(6, 1).char).toBe('|');
   handle.unmount();
 });
+
+test('a click lands in the box painted on top where two onClick boxes overlap', async () => {
+  const backend = new TestBackend(12, 3);
+  const got: string[] = [];
+  const handle = await render(
+    createElement(Box, { width: 12, height: 3 },
+      createElement(Box, { position: 'absolute', left: 0, top: 0, width: 6, height: 1, onClick: () => got.push('under') }, createElement(Text, null, 'under')),
+      createElement(Box, { position: 'absolute', left: 0, top: 0, width: 6, height: 1, zIndex: 1, onClick: () => got.push('over') }, createElement(Text, null, 'over')),
+    ),
+    backend,
+  );
+  await flushAsync(backend);
+  backend.mouse('down', 1, 0); backend.mouse('up', 1, 0);
+  await flush();
+  expect(got).toEqual(['over']);
+  handle.unmount();
+});

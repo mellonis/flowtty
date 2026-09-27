@@ -9,6 +9,25 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
 
 ## Unreleased
 
+### Added
+
+- **Clicks and hover from the committed frame.** `onClick` on any box (the
+  box painted on top wins, the nearest handler up from it gets the click,
+  the press and release are withheld from `useInput`), `onHoverChange` and
+  `useHover()` (a component re-renders only when the pointer enters or leaves
+  its box), delivered by a `MouseController` in `@flowtty/core/host` next to
+  the selection controller. A box under `inert` or under an open dialog gets
+  neither. `render(…, { mouse: false })` turns it off. See docs/input.md
+  (clicks and hover).
+- `TtyBackend` `mouse: { hover: true }`: any-event tracking; motion with no
+  button held arrives as `mousemove`, coalesced to one per cell and at most
+  one per ~16 ms; a focus-out arrives as `mouseleave`. `TestBackend.mouse`
+  takes `'move'` and `'leave'`.
+- A click picks the row: `ListSelect` moves its highlight (`onChange`, never
+  `onSubmit`), `ListMultiSelect` toggles, `Table` and `ScrollList` report
+  `onRowClick(index, key)`, the `Select` popup picks and closes (toggles and
+  stays open with `multiple`).
+
 ### Fixed
 
 - A stdin chunk that ended exactly on the `ESC` of a mouse report or an

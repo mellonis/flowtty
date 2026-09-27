@@ -103,7 +103,13 @@ backend.wheel('down', 10, 4);          // a wheel step at cell (10, 4)
 backend.mouse('down', 4, 2);           // press the left button at cell (4, 2)
 backend.mouse('drag', 9, 2);           // …drag across to (9, 2)…
 backend.mouse('up', 9, 2);             // …and release
+backend.mouse('move', 6, 2);           // move with no button held (hover)
+backend.mouse('leave');                // the pointer leaves the window
 ```
+
+`backend.mouse('move', x, y)` moves the pointer with no button held (what
+`{ hover: true }` reports); `backend.mouse('leave')` takes it out of the
+window.
 
 `press()` returns whether a `useInput` handler consumed the key (returned
 `true`) — the answer a TTY backend acts on to skip its Ctrl+C / Ctrl+Z default;

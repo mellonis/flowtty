@@ -129,7 +129,9 @@ any dialog; without a host the field warns once and cannot open. In the popup
 ↑/↓ and the wheel move, typing narrows the list to labels containing what was
 typed (`filter={false}` turns that off; the filter shows as a row above the
 options while non-empty), Backspace widens, Enter picks and closes, Escape closes
-with nothing changed; a click on a row picks it, a click outside closes.
+with nothing changed; a click on a row picks it and closes the popup — with
+`multiple` it toggles the row instead and leaves the popup open (see below); a
+press outside the popup closes it without picking, reaching nothing else.
 
 With `multiple`, `value` is the array of chosen values in the order of `items`;
 Space (or a click) toggles a row and calls `onChange` at once, Enter closes.
@@ -160,7 +162,8 @@ Pick one of a list. The highlighted item *is* the value.
 ↑/↓ move and wrap around; typing narrows the list to labels containing what was
 typed (case-insensitive), Backspace widens it again; Enter calls `onSubmit`, Escape
 `onCancel`. Every printable key goes to the filter. The generic parameter is the value type —
-`<ListSelect<Plan> …>` in JSX keeps it, `createElement` loses it.
+`<ListSelect<Plan> …>` in JSX keeps it, `createElement` loses it. A click on a
+row moves the highlight there and reports `onChange`; it never submits.
 
 ## ListMultiSelect
 
@@ -179,7 +182,8 @@ after a sub-prompt in a dialog — and the component selects it and moves the cu
 onto it once it appears in `items` (adding it to `items` is the caller's job).
 Return `null` for a cancelled prompt. `checkboxFrame="none"` draws the
 checkboxes as glyphs (`☑` / `☐`) instead of `[x]` / `[ ]` — see
-[Checkbox](#checkbox).
+[Checkbox](#checkbox). A click on a row toggles it; a click on the add row is
+Enter on it.
 
 Both lists show focus: a colored, bold `▸` and a bold cursor row when focused, a
 dim marker when not.
@@ -310,6 +314,11 @@ optional `header` (defaults to the key), `align` (`'left'` | `'right'` |
 `border` (`'round'` default, `'single'`, `'double'`, `'bold'`, `'classic'`, or
 `'none'`), `borderColor`, `cellPadding` (default 1), `showHeader` (default
 `true`), `headerColor`, and `headerBold` (default `true`).
+
+`onRowClick(index, key)` — a click on a data row; the header and the
+horizontal rules report nothing. The table still handles no keys itself. A
+row's click box includes its own vertical border cells (the `│` at each edge
+and between columns).
 
 **Fit-to-width.** With no `width` prop the table measures its container (via
 `onLayout`, falling back to the terminal width before the first layout) and

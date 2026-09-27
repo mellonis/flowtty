@@ -4,6 +4,7 @@ How keys reach a component, how focus moves, and how forms validate.
 
 - [Keys and useInput](#keys-and-useinput)
 - [Paste and the mouse](#paste-and-the-mouse)
+- [Clicks and hover](#clicks-and-hover)
 - [Selection](#selection)
 - [Focus + Button](#focus--button)
 - [Form](#form)
@@ -89,6 +90,7 @@ useInput((key) => {
   if (key.name === 'mousedown') startAt(key.x!, key.y!);  // key.button = 'left' | 'middle' | 'right'
   if (key.name === 'mousedrag') extendTo(key.x!, key.y!);
   if (key.name === 'mouseup') commit();
+  if (key.name === 'mousemove') hoverAt(key.x!, key.y!);
 });
 ```
 
@@ -100,13 +102,18 @@ useInput((key) => {
 - **Wheel.** `wheelup` / `wheeldown`, one key per step.
 - **Buttons.** `mousedown` when a button goes down, `mousedrag` for every cell a
   held button crosses, `mouseup` when it comes back up. Motion with no button
-  held is never reported. `button` is `'left'`, `'middle'` or `'right'`; it is
+  held is reported as `mousemove` only when the backend was asked for hover
+  (`mouse: { hover: true }`), coalesced to one key per cell and at most one per
+  ~16 ms; the pointer leaving the window is `mouseleave`, with no coordinates.
+  `button` is `'left'`, `'middle'` or `'right'`; it is
   absent on the rare release whose report named no button, so test a release with
   `key.name === 'mouseup'` rather than with `button`, or a drag can stay open
   forever. The horizontal wheel and the extra buttons (8 and up) are dropped.
-- **Coordinates.** All five mouse keys carry `x` / `y`: the 0-based column and
-  row of the cell under the pointer, the same coordinates `onLayout` rects use.
-  `shift`, `meta` and `ctrl` come from the report, as for any other key.
+- **Coordinates.** `wheelup`, `wheeldown`, `mousedown`, `mousedrag`, `mouseup`
+  and `mousemove` all carry `x` / `y`: the 0-based column and row of the cell
+  under the pointer, the same coordinates `onLayout` rects use. `mouseleave`
+  carries neither — the pointer is outside the grid by then. `shift`, `meta`
+  and `ctrl` come from the report, as for any other key.
 
 All of it — wheel included — needs `new TtyBackend(stdout, stdin, { mouse: true })`.
 It is off by default, and the cost is real: see below. Inline mode
@@ -129,7 +136,7 @@ Turn `mouse` on when the app gives something back for it, and say so in the app'
 help.
 
 In tests, `TestBackend` has `paste(text)`, `wheel('up' | 'down', x?, y?)` and
-`mouse('down' | 'drag' | 'up', x?, y?, options?)` — see
+`mouse('down' | 'drag' | 'up' | 'move' | 'leave', x?, y?, options?)` — see
 [Sending input](testing.md#sending-input). Coordinates default to cell (0, 0),
 and a `<ScrollBox>` only reacts while the pointer is over it, so pass coordinates
 inside the box unless it sits at the origin.
@@ -142,7 +149,8 @@ component that does not act on it. A printable key is named by its character —
 and the rest come from a fixed list, exported as `NAMED_KEYS` (type `NamedKey`):
 `return`, `escape`, `tab`, `backspace`, `delete`, `insert`, the arrows, `home`,
 `end`, `pageup`, `pagedown`, `f1`–`f12`, `paste`, `wheelup`, `wheeldown`,
-`mousedown`, `mousedrag`, `mouseup`. There is no `'space'` or `'enter'`. The type
+`mousedown`, `mousedrag`, `mouseup`, `mousemove`, `mouseleave`. There is no
+`'space'` or `'enter'`. The type
 can't reject such a typo (any character is a valid name), so
 `TestBackend.press()` does: it throws on a name no terminal produces, which stops
 a test from blessing a branch real input never reaches.
@@ -155,6 +163,58 @@ Escape. Nothing else is delayed.
 A handler that matches on names it knows is unaffected by the mouse keys: their
 names are multi-character, so they are never mistaken for a printable character.
 `<TextInput>`, `<TextArea>`, `<ListSelect>` and `<ListMultiSelect>` ignore them.
+
+## Clicks and hover
+
+A box takes a click by declaring it, and a component asks whether the pointer
+is over it:
+
+```tsx
+<Text onClick={() => open(id)}>▸ {title}</Text>
+
+function FoldLine({ title }) {
+  const [hovered, hover] = useHover();
+  return <Text {...hover} dim={!hovered} onClick={toggle}>{title}</Text>;
+}
+```
+
+- **`onClick(key)`** fires on a left press and release in the same cell over
+  the box, with no drag between (a drag is a selection). The box painted on
+  top wins where boxes overlap, and the nearest box with a handler up from it
+  gets the click — once. Its press and release are withheld from `useInput`,
+  the way `useClick` consumes them; a press that reaches no handler goes on to
+  subscribers as before. A box with `onClick` or `onHoverChange` keeps a
+  passive input subscription while it is mounted, so the backend feeds it keys
+  even in an app with no `useInput` of its own. A click does not focus the
+  box: call `focus()` in the handler when it should, as `Button` does.
+  `useClick(rectRef, handler)` still works for a component that wants its own
+  rect logic.
+- **The prop toggles, the key stays.** `onClick={disabled ? undefined : fn}`
+  keeps the box's element type stable — the key is present either way, only
+  the value changes — so the subtree under it is never remounted for it.
+  Spreading the prop in and out (`{...(disabled ? {} : { onClick })}`) does
+  not get this for free: that removes the key rather than setting it to
+  `undefined`, and the subtree remounts each time the prop appears or
+  disappears. Keep the prop present and toggle its value instead.
+- **`useHover()`** returns `[hovered, props]`; spread the props on one box.
+  The component re-renders when the pointer enters or leaves that box, never
+  on a move inside it. Nested boxes can be hovered together. When the content
+  under a resting pointer changes — a list scrolled, a row appeared — the
+  hover follows without any motion. `onHoverChange(hovered)` is the prop the
+  hook wraps.
+- **`inert` and dialogs.** A box under an `inert` ancestor, or on the page
+  under an open dialog, gets neither clicks nor hover, and does not shield
+  what is under it: the click reaches nothing and the keys go on to
+  subscribers (which is how a `Select` popup closes on a press outside it).
+- **Hover needs asking for.** `new TtyBackend(stdout, stdin, { mouse:
+  { hover: true } })` turns on any-event tracking (`?1003h`): the terminal
+  reports every pointer move, which a slow SSH link feels. Without it
+  `useHover` stays false and `onHoverChange` never fires. `mouseleave` rides
+  on the window-focus reports the color-scheme tracker turns on: a terminal
+  that reports window focus (most do) clears the hover when the pointer
+  leaves the window, but `colorScheme: false` turns those reports off too, so
+  with it the pointer leaving is never reported and the hover clears only on
+  the next move. `render(…, { mouse: false })` turns the whole dispatch off.
 
 ## Selection
 
@@ -197,8 +257,12 @@ await render(<App />, backend, {
   its colors — so it reads as a hole in the band instead of vanishing into it.
 - **The keys still arrive.** `mousedown` / `mousedrag` / `mouseup` go on to every
   `useInput` subscriber as usual, so an app keeps its own press / drag / release
-  behaviour. Selection rides that same path: an app with no `useInput` subscriber
-  anywhere receives no keys at all, and so has no selection either.
+  behaviour — except the press and release of a click an `onClick` box takes,
+  which are withheld from `useInput` the way `useClick` withholds its own (see
+  [Clicks and hover](#clicks-and-hover)). Selection rides the same path: an app
+  with no `useInput` subscriber and no `onClick` / `onHoverChange` box anywhere
+  receives no keys at all, and so has no selection either — a box with either
+  prop keeps a passive subscription open even with no `useInput` of its own.
 - `render(…, { selection: false })` turns the whole thing off and leaves the
   frame to the app.
 
