@@ -7,6 +7,20 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Fixed
+
+- **A re-render no longer re-applies every Yoga prop of every box it
+  touches.** `applyProps` compares the new props with the ones the Yoga node
+  was last configured from and runs the setters only when a value changed
+  (`children` aside — those reach Yoga through the child operations, which
+  re-measure). On a chat-shaped `ScrollList` of 3000 rows the React part of a
+  keystroke or a wheel step drops from about 5 ms to about 1 ms, and a chunk
+  of 30 wheel steps from 165 ms to 30 ms to the next frame — which is what
+  made a flick fall behind and typing stutter. `Instance` (adapter-facing,
+  `@flowtty/core/host`) gains `applied`, the props last applied.
+
 ## 1.0.0-alpha.33 — 2026-09-28
 
 ### Added

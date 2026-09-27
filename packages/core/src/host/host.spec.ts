@@ -1,6 +1,6 @@
-import { expect, test } from 'vitest';
+import { expect, test, vi } from 'vitest';
 import { getYoga } from './yoga.js';
-import { createInstance, createTextInstance, appendChild, removeChild, measureText } from './host.js';
+import { createInstance, createTextInstance, appendChild, removeChild, measureText, applyProps, takeApplyCounts } from './host.js';
 
 test('box instance owns a yoga node; text instance carries text', async () => {
   const Yoga = await getYoga();
@@ -102,3 +102,50 @@ test('measureText measures in display columns', () => {
   expect(measureText('日本語')).toEqual({ width: 6, height: 1 });
   expect(measureText('ab\n🇯🇵')).toEqual({ width: 2, height: 2 });
 });
+
+// A re-render hands every host box a new props object; the Yoga setters must
+// run only when something in it changed.
+test('applyProps skips the Yoga setters when the props are the same', async () => {
+  const Yoga = await getYoga();
+  const inst = createInstance('flowtty-box', { width: 8, flexGrow: 1, bold: true }, Yoga);
+  const setWidth = vi.spyOn(inst.yogaNode, 'setWidth');
+  const setFlexGrow = vi.spyOn(inst.yogaNode, 'setFlexGrow');
+  const next = { width: 8, flexGrow: 1, bold: true };
+  applyProps(inst, next, Yoga);
+  expect(setWidth).not.toHaveBeenCalled();
+  expect(setFlexGrow).not.toHaveBeenCalled();
+  expect(inst.props).toBe(next); // paint reads the latest object all the same
+});
+
+test('applyProps ignores children when comparing: they reach Yoga on their own', async () => {
+  const Yoga = await getYoga();
+  const inst = createInstance('flowtty-box', { width: 8, children: 'a' } as never, Yoga);
+  const setWidth = vi.spyOn(inst.yogaNode, 'setWidth');
+  applyProps(inst, { width: 8, children: 'b' } as never, Yoga);
+  expect(setWidth).not.toHaveBeenCalled();
+});
+
+test('applyProps re-applies when a prop changed, appeared or went away', async () => {
+  const Yoga = await getYoga();
+  const inst = createInstance('flowtty-box', { width: 8 }, Yoga);
+  const setWidth = vi.spyOn(inst.yogaNode, 'setWidth');
+  const setFlexGrow = vi.spyOn(inst.yogaNode, 'setFlexGrow');
+  applyProps(inst, { width: 9 }, Yoga);
+  expect(setWidth).toHaveBeenCalledWith(9);
+  applyProps(inst, { width: 9, flexGrow: 1 }, Yoga);
+  expect(setFlexGrow).toHaveBeenLastCalledWith(1);
+  applyProps(inst, { width: 9 }, Yoga);
+  expect(setFlexGrow).toHaveBeenLastCalledWith(0);
+  expect(setWidth).toHaveBeenCalledTimes(3);
+});
+
+test('takeApplyCounts says how many boxes were applied and skipped since it was last read', async () => {
+  const Yoga = await getYoga();
+  takeApplyCounts();
+  const inst = createInstance('flowtty-box', { width: 8 }, Yoga); // applied once
+  applyProps(inst, { width: 8 }, Yoga); // skipped
+  applyProps(inst, { width: 9 }, Yoga); // applied
+  expect(takeApplyCounts()).toEqual({ applied: 2, skipped: 1 });
+  expect(takeApplyCounts()).toEqual({ applied: 0, skipped: 0 });
+});
+

@@ -235,6 +235,9 @@ export interface Instance {
   props: BoxProps;
   yogaNode: YogaNode;
   children: Array<Instance | TextInstance>;
+  /** The props the Yoga node was last configured from — what `applyProps`
+   *  compares the next ones against. Set by `applyProps` only. */
+  applied?: BoxProps;
 }
 
 export interface TextInstance {
@@ -266,9 +269,44 @@ export function createTextInstance(text: string, _Yoga: Yoga): TextInstance {
   return { type: 'text', text };
 }
 
+// Whether two props objects would configure the Yoga node the same way: the
+// same keys with the same values, `children` aside — a child text or box reaches
+// Yoga through appendChild / removeChild / commitTextUpdate, which re-measure.
+function sameProps(a: BoxProps, b: BoxProps): boolean {
+  const ka = Object.keys(a);
+  const kb = Object.keys(b);
+  if (ka.length !== kb.length) return false;
+  for (const k of ka) {
+    if (k === 'children') { if (!(k in b)) return false; continue; }
+    if (!Object.is((a as Record<string, unknown>)[k], (b as Record<string, unknown>)[k])) return false;
+  }
+  return true;
+}
+
+// How many boxes `applyProps` configured and how many it skipped since the
+// counts were last taken — process-wide, for a frame's statistics
+// (see docs/app.md, frame stats).
+let appliedCount = 0;
+let skippedCount = 0;
+
+/** Read and reset the counts of boxes applied and skipped by `applyProps`. */
+export function takeApplyCounts(): { applied: number; skipped: number } {
+  const counts = { applied: appliedCount, skipped: skippedCount };
+  appliedCount = 0;
+  skippedCount = 0;
+  return counts;
+}
+
 export function applyProps(inst: Instance, props: BoxProps, _Yoga: Yoga): void {
   const hadRuns = inst.props?.runs !== undefined;
   inst.props = props;
+  // A re-render hands every box a new props object with, almost always, the
+  // same values. Paint and the mouse controller read `inst.props`, so it is
+  // replaced above; the forty-odd Yoga setters below run only when a value
+  // changed — on a chat-shaped list they were most of a keystroke's cost.
+  if (inst.applied !== undefined && sameProps(inst.applied, props)) { skippedCount += 1; return; }
+  appliedCount += 1;
+  inst.applied = props;
   const n = inst.yogaNode;
 
   // Size — number OR percentage string ('50%', '100%').
