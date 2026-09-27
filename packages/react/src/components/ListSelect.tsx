@@ -59,6 +59,16 @@ export function ListSelect<T>(props: ListSelectProps<T>): ReactNode {
   const visible = visibleIndices(items, state.filter);
   const cursorClamped = Math.min(state.cursor, Math.max(0, visible.length - 1));
 
+  // A click on a row: the highlight moves there and the value follows, as an
+  // arrow key would. Confirming is not the list's business (Enter still is).
+  const pick = (row: number): void => {
+    focus();
+    if (row === cursorClamped) return;
+    setState({ cursor: row, filter: state.filter });
+    const item = items[visible[row]!]!;
+    if (item.value !== value) onChange(item.value);
+  };
+
   return (
     <Box onLayout={(r) => { rectRef.current = r; }}>
       {state.filter !== '' && <Text>{`filter: ${state.filter}`}</Text>}
@@ -67,7 +77,7 @@ export function ListSelect<T>(props: ListSelectProps<T>): ReactNode {
       {visible.map((origIdx, row) => {
         const isCursor = row === cursorClamped;
         return (
-          <Box key={origIdx} flexDirection="row">
+          <Box key={origIdx} flexDirection="row" onClick={() => pick(row)}>
             <Text color={isFocused && isCursor ? 'cyan' : undefined} bold={isFocused && isCursor} dim={!isFocused}>{isCursor ? '▸ ' : '  '}</Text>
             <Text bold={isFocused && isCursor}>{items[origIdx]!.label}</Text>
           </Box>

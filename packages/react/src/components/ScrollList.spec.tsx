@@ -367,4 +367,14 @@ describe('ScrollList', () => {
     expect(backend.clipboard).toEqual(['row 5000']);
     unmount();
   });
+
+  test('a click on a row reports the row index, scroll offset included', async () => {
+    const clicked: number[] = [];
+    const { backend, frame, unmount } = await mount(<ScrollList height={4} anchor="bottom" items={lines(10)} renderItem={row} onRowClick={(i) => clicked.push(i)} />);
+    expect(await frame()).toEqual(['row 6', 'row 7', 'row 8', 'row 9']);
+    backend.mouse('down', 1, 2); backend.mouse('up', 1, 2);
+    await frame();
+    expect(clicked).toEqual([8]);
+    unmount();
+  });
 });

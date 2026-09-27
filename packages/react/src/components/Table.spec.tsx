@@ -3,7 +3,7 @@ import { describe, test, expect } from 'vitest';
 import { render } from '../internal/render.js';
 import { Box } from './base/Box.js';
 import { Table, type TableColumn } from './Table.js';
-import { TestBackend, flushAsync } from '@flowtty/core/testing';
+import { TestBackend, flush, flushAsync } from '@flowtty/core/testing';
 import { stringWidth } from '@flowtty/core';
 
 interface Person { name: string; age: number; }
@@ -265,6 +265,23 @@ describe('Table', () => {
     const r = await render(<Table data={[{ name: '日本語' }]} columns={columns} width={20} border="none" />, backend);
     await flushAsync(backend);
     expect(backend.lastFrame).toContain('日…');
+    r.unmount();
+  });
+
+  test('a click on a data row reports its index; the header reports nothing', async () => {
+    const backend = new TestBackend(30, 8);
+    const clicked: number[] = [];
+    const columns: TableColumn<Person>[] = [{ accessor: 'name', header: 'Name' }, { accessor: 'age', header: 'Age' }];
+    const data: Person[] = [{ name: 'Ann', age: 30 }, { name: 'Bo', age: 7 }];
+    const r = await render(<Table data={data} columns={columns} width={30} onRowClick={(i) => clicked.push(i)} />, backend);
+    await flushAsync(backend);
+    const rows = backend.lastFrame.split('\n');
+    const bo = rows.findIndex((l) => l.includes('Bo'));
+    const header = rows.findIndex((l) => l.includes('Name'));
+    backend.mouse('down', 3, bo); backend.mouse('up', 3, bo);
+    backend.mouse('down', 3, header); backend.mouse('up', 3, header);
+    await flush();
+    expect(clicked).toEqual([1]);
     r.unmount();
   });
 });

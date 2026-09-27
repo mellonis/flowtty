@@ -66,6 +66,17 @@ export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
     });
   };
 
+  // Toggle one item row, in ORIGINAL item order so callers get a deterministic
+  // order. Shared by the keyboard (Space) and a click on the row.
+  const toggleAt = (index: number): void => {
+    const toggled = items[index]!.value;
+    const isOn = value.includes(toggled);
+    const next = items
+      .filter((it) => (it.value === toggled ? !isOn : value.includes(it.value)))
+      .map((it) => it.value);
+    onChange(next);
+  };
+
   useInput((key) => {
     // Enter on the "+ add new" row adds instead of submitting. Everything else —
     // navigation over that row, Space doing nothing on it — is the reducer's job:
@@ -76,13 +87,7 @@ export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
       setState(action.state);
     } else if (action.kind === 'toggle') {
       // Only fires for real item rows (the reducer never toggles an extra row).
-      const toggled = items[action.index]!.value;
-      const isOn = value.includes(toggled);
-      // Build next array in ORIGINAL item order so callers get a deterministic order:
-      const next = items
-        .filter((it) => (it.value === toggled ? !isOn : value.includes(it.value)))
-        .map((it) => it.value);
-      onChange(next);
+      toggleAt(action.index);
     } else if (action.kind === 'submit') {
       // Submit only fires when cursor is on a real item row (add-row Enter handled above).
       if (!onAddRow) {
@@ -102,16 +107,23 @@ export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
   // leaves the user lost. Focused → a colored, bold marker and a bold cursor
   // row; unfocused → the marker is still there (it marks the row) but dim. The
   // text is identical either way, so layouts don't shift.
-  const row = (isCursor: boolean, label: string, key: string | number) => (
-    <Box key={key} flexDirection="row">
+  const row = (isCursor: boolean, label: string, key: string | number, onClick?: () => void) => (
+    <Box key={key} flexDirection="row" onClick={onClick}>
       <Text color={isFocused && isCursor ? 'cyan' : undefined} bold={isFocused && isCursor} dim={!isFocused}>{isCursor ? '▸ ' : '  '}</Text>
       <Text bold={isFocused && isCursor}>{label}</Text>
     </Box>
   );
   return (
     <Box flexDirection="column" onLayout={(r) => { rectRef.current = r; }}>
-      {items.map((it, i) => row(i === cursor, `${checkboxMarker(value.includes(it.value), checkboxFrame).text} ${it.label}`, i))}
-      {onAddNew !== undefined && row(cursor === items.length, '+ add new', '__add__')}
+      {items.map((it, i) => row(
+        i === cursor,
+        `${checkboxMarker(value.includes(it.value), checkboxFrame).text} ${it.label}`,
+        i,
+        () => { focus(); setState({ cursor: i }); toggleAt(i); },
+      ))}
+      {onAddNew !== undefined && row(cursor === items.length, '+ add new', '__add__', () => {
+        focus(); setState({ cursor: items.length }); addNew();
+      })}
     </Box>
   );
 }

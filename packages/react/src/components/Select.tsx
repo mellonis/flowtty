@@ -284,10 +284,8 @@ function SelectPopup<T>({ store, multiple, filter, maxRows, hasAddRow, checkboxF
   useInput((key: Key) => {
     if (key.name === 'escape') { cancel(); return true; }
     if (key.name === 'mousedown') {
-      const r = rectRef.current;
-      if (!inside(r, key.x, key.y)) { cancel(); return true; }
-      const rowIndex = key.y! - r!.top - (query !== '' ? 1 : 0) + start;
-      if (rowIndex >= 0 && rowIndex < rows) { setCursor(rowIndex); choose(rowIndex); }
+      // Inside the popup a row's own onClick picks; a press anywhere else closes.
+      if (!inside(rectRef.current, key.x, key.y)) cancel();
       return true;
     }
     if (key.name === 'mouseup' || key.name === 'mousedrag') return true;
@@ -316,7 +314,10 @@ function SelectPopup<T>({ store, multiple, filter, maxRows, hasAddRow, checkboxF
         const item = isAdd ? null : items[visible[rowIndex]!]!;
         const label = isAdd ? '+ add new' : `${multiple ? `${checkboxMarker(picked.includes(item!.value), checkboxFrame).text} ` : ''}${item!.label}`;
         return (
-          <Box key={isAdd ? '__add__' : visible[rowIndex]!} flexDirection="row">
+          <Box
+            key={isAdd ? '__add__' : visible[rowIndex]!} flexDirection="row"
+            onClick={() => { setCursor(rowIndex); choose(rowIndex); }}
+          >
             <Text color={isCursor ? 'cyan' : undefined} bold={isCursor}>{isCursor ? '▸ ' : '  '}</Text>
             <Text bold={isCursor}>{label}</Text>
           </Box>

@@ -1,5 +1,5 @@
 import React, { useRef, useState, type ReactNode } from 'react';
-import type { ScrollMetrics } from '@flowtty/core';
+import type { Key, ScrollMetrics } from '@flowtty/core';
 import { Box } from './base/Box.js';
 import { ScrollBox, type ScrollBoxProps } from './ScrollBox.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
@@ -24,6 +24,8 @@ export interface ScrollListProps<T> extends Omit<ScrollBoxProps, 'children'> {
   /** Overlays only: `position="absolute"` children that stay put while the
    *  list scrolls, as in `<ScrollBox>`. Rows come from `items`. */
   children?: ReactNode;
+  /** A click on a row, with its index into `items`. */
+  onRowClick?: (index: number, key: Key) => void;
 }
 
 /** Rows `[start, end)` that cover `[top, top + viewportHeight)` widened by
@@ -62,7 +64,7 @@ interface View {
  * anchoring, metrics and scrollbar are exact. See docs/layout.md (ScrollList).
  */
 export function ScrollList<T>({
-  items, renderItem, keyOf, rowHeight = 1, overscan, children,
+  items, renderItem, keyOf, rowHeight = 1, overscan, children, onRowClick,
   anchor = 'top', offset, onScroll, onMetrics, ...scrollBoxProps
 }: ScrollListProps<T>): ReactNode {
   const terminal = useTerminalSize();
@@ -119,7 +121,11 @@ export function ScrollList<T>({
       // lies outside the box's clip, and under a one-row clip it always would
       // — a wrapped paragraph would copy as several lines. A taller item
       // spills under the next row, which paints over it.
-      <Box key={keyOf ? keyOf(item, i) : i} height={rowHeight} flexShrink={0} flexGrow={0}>
+      <Box
+        key={keyOf ? keyOf(item, i) : i}
+        height={rowHeight} flexShrink={0} flexGrow={0}
+        onClick={onRowClick === undefined ? undefined : (k) => onRowClick(i, k)}
+      >
         {renderItem(item, i)}
       </Box>,
     );

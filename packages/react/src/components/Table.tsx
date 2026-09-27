@@ -4,7 +4,7 @@ import { DEFAULT_BORDER_STYLE, GRID_CHARS, fitClusters, graphemes, stringWidth, 
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useTerminalSize } from '../hooks/useTerminalSize.js';
-import type { Color } from '@flowtty/core';
+import type { Color, Key } from '@flowtty/core';
 
 export type TableAlign = 'left' | 'right' | 'center';
 
@@ -69,6 +69,9 @@ export interface TableProps<T> {
    * handling and passes `selectedIndex`. Place inside a flex column with height.
    */
   scrollable?: boolean;
+  /** A click on a data row, with its index into `data`. The header and the
+   *  rules report nothing. */
+  onRowClick?: (index: number, key: Key) => void;
 }
 
 // Truncate to `width` display columns with a trailing ellipsis, then pad to
@@ -153,7 +156,7 @@ export function Table<T>({
   data, columns,
   border = DEFAULT_BORDER_STYLE, borderColor,
   cellPadding = 1, showHeader = true, headerColor, headerBold = true,
-  width, selectedIndex, scrollable = false,
+  width, selectedIndex, scrollable = false, onRowClick,
 }: TableProps<T>): ReactNode {
   const term = useTerminalSize();
   const [measured, setMeasured] = useState(0);
@@ -223,6 +226,7 @@ export function Table<T>({
   const renderRow = (
     cells: string[], header: boolean, selected = false,
     styles?: (TableCellStyle | undefined)[],
+    onClick?: (key: Key) => void,
   ) => {
     const spans: React.ReactNode[] = [];
     if (bordered) spans.push(<Text key="l" color={borderColor}>{chars!.v}</Text>);
@@ -244,7 +248,7 @@ export function Table<T>({
       );
       if (bordered) spans.push(<Text key={`v${c}`} color={borderColor} inverse={selected && c < ncols - 1}>{chars!.v}</Text>);
     }
-    return <Box flexDirection="row">{spans}</Box>;
+    return <Box flexDirection="row" onClick={onClick}>{spans}</Box>;
   };
 
   const headerCells = columns.map((col) => headerTextOf(col));
@@ -259,7 +263,7 @@ export function Table<T>({
         const styles = columns.map((col) => col.cellStyle?.(row, abs));
         return (
           <React.Fragment key={abs}>
-            {renderRow(cells, false, abs === selIdx, styles)}
+            {renderRow(cells, false, abs === selIdx, styles, onRowClick === undefined ? undefined : (k) => onRowClick(abs, k))}
           </React.Fragment>
         );
       })}

@@ -272,6 +272,40 @@ describe('Select — mouse', () => {
     expect(onChange).toHaveBeenCalledTimes(1);
     unmount();
   });
+
+  // Two fields, each with its own label so the second is findable by text (the
+  // file has no `label` prop on Select, unlike the two-field fixtures above).
+  // A spacer keeps the second field below where the popup will paint, so a
+  // press on it is unambiguously a press outside the popup, not on one of its
+  // rows.
+  function Pair(): ReactNode {
+    const [a, setA] = useState('hobby');
+    const [b, setB] = useState('hobby');
+    return (
+      <DialogHost>
+        <FocusGroup>
+          <Box flexDirection="column">
+            <Box flexDirection="row"><Text>First </Text><Select items={PLANS} value={a} onChange={setA} width={16} /></Box>
+            <Box height={6} />
+            <Box flexDirection="row"><Text>Second </Text><Select items={PLANS} value={b} onChange={setB} width={16} /></Box>
+          </Box>
+        </FocusGroup>
+      </DialogHost>
+    );
+  }
+
+  test('a press outside the open popup closes it without picking, and does not open the other Select', async () => {
+    const { backend, frame, unmount } = await mount(<Pair />, 40, 14);
+    backend.mouse('down', 8, 0); backend.mouse('up', 8, 0); // open the first
+    let lines = await frame();
+    expect(row(lines, 'Team')).toBeDefined();
+    const second = lines.findIndex((l) => l.includes('Second'));
+    backend.mouse('down', 8, second); backend.mouse('up', 8, second); // a press on the second field, outside the popup
+    lines = await frame();
+    expect(row(lines, 'Team')).toBeUndefined();               // the first popup closed…
+    expect(lines.filter((l) => l.includes('Business')).length).toBe(0); // …and no popup is open at all
+    unmount();
+  });
 });
 
 describe('Select multiple', () => {

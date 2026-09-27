@@ -4,7 +4,7 @@ import { createElement, useState } from 'react';
 import { render } from '../index.js';
 import { TestBackend, flush } from '@flowtty/core/testing';
 import { ListSelect, type ListSelectProps } from './ListSelect.js';
-import { ListMultiSelect } from './ListMultiSelect.js';
+import { ListMultiSelect, type ListMultiSelectProps } from './ListMultiSelect.js';
 import { Confirm } from './Confirm.js';
 
 test('ListSelect renders items with a cursor row marker', async () => {
@@ -189,4 +189,47 @@ test('a mouse button key neither filters nor moves the ListSelect cursor', async
   backend.mouse('up', 5, 1);
   await flush();
   expect(backend.lastFrame).toBe('filter: ba\n▸ banana');
+});
+
+test('a click on a row moves the highlight to it and reports onChange; nothing is submitted', async () => {
+  const changes: string[] = [];
+  const submits: string[] = [];
+  function App() {
+    const [v, setV] = useState('a');
+    return createElement<ListSelectProps<string>>(ListSelect, {
+      items: [{ label: 'apple', value: 'a' }, { label: 'banana', value: 'b' }, { label: 'cherry', value: 'c' }],
+      value: v,
+      onChange: (x: string) => { changes.push(x); setV(x); },
+      onSubmit: (x: string) => submits.push(x),
+    });
+  }
+  const backend = new TestBackend(20, 3);
+  await render(createElement(App), backend);
+  backend.mouse('down', 3, 2); backend.mouse('up', 3, 2);
+  await flush();
+  expect(changes).toEqual(['c']);
+  expect(submits).toEqual([]);
+  expect(backend.lastFrame).toBe('  apple\n  banana\n▸ cherry');
+});
+
+test('a click on a row toggles it', async () => {
+  const changes: string[][] = [];
+  function App() {
+    const [v, setV] = useState<string[]>([]);
+    return createElement<ListMultiSelectProps<string>>(ListMultiSelect, {
+      items: [{ label: 'apple', value: 'a' }, { label: 'banana', value: 'b' }],
+      value: v,
+      onChange: (x: string[]) => { changes.push(x); setV(x); },
+      onSubmit: () => {},
+      isFocused: true,
+    });
+  }
+  const backend = new TestBackend(20, 3);
+  await render(createElement(App), backend);
+  backend.mouse('down', 4, 1); backend.mouse('up', 4, 1);
+  await flush();
+  expect(changes).toEqual([['b']]);
+  backend.mouse('down', 4, 1); backend.mouse('up', 4, 1);
+  await flush();
+  expect(changes).toEqual([['b'], []]);
 });

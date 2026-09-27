@@ -90,10 +90,12 @@ describe('focus by click', () => {
     let lines = await frame();
     expect(lines[1]).toBe('[x] flag');
     expect(backend.lastBuffer!.get(0, 1).style.fg).toBe('cyan'); // focused
-    click(backend, 3, 3);                  // the list's second row
-    backend.press({ name: 'down' });       // the list has focus: the cursor moves
+    click(backend, 3, 3);                  // the list's second row: click picks it too
     lines = await frame();
     expect(lines[3]).toContain('▸ b');
+    backend.press({ name: 'down' });       // the list has focus: down wraps back to the first row
+    lines = await frame();
+    expect(lines[2]).toContain('▸ a');
     unmount();
   });
 
