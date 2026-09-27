@@ -2,7 +2,7 @@ import React from "react";
 import { Component, type ReactNode } from 'react';
 
 /** Where an error flowtty handled came from. `'callback'` is a function the app
- *  gave flowtty to call — `onCopy` — that threw: it is not a React error, and
+ *  gave flowtty to call — `onCopy`, `onFrame` — that threw: it is not a React error, and
  *  it must not be left to escape the key handler it was called from. */
 export type ErrorSource = 'react' | 'uncaughtException' | 'unhandledRejection' | 'callback';
 

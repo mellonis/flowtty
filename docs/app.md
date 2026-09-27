@@ -9,6 +9,7 @@ Starting and stopping, errors, cancellation, animation, dialogs.
 - [The clipboard](#the-clipboard)
 - [The color scheme](#the-color-scheme)
 - [Root abort signal](#root-abort-signal)
+- [Frame stats](#frame-stats)
 - [Ticker (animation clock)](#ticker-animation-clock)
 - [DialogHost (stack)](#dialoghost-stack)
 
@@ -124,7 +125,7 @@ await render(<App />, backend, {
 });
 ```
 
-`'callback'` is a function you gave flowtty to call — `onCopy` — that threw.
+`'callback'` is a function you gave flowtty to call — `onCopy`, `onFrame` — that threw.
 It is handled here rather than left to escape: it runs on the key path, and an
 exception there would leave the terminal in the alt screen with mouse reporting
 still on. The key is dispatched to your `useInput` subscribers BEFORE `onCopy`
@@ -491,6 +492,33 @@ collapsing the two-layer pattern above into one cancellation token. Mix in
 has no `.abort()` — only flowtty's private controller can fire it. A component
 deep in the tree can observe teardown (`.aborted`, `addEventListener('abort')`,
 `.throwIfAborted()`) or forward the signal, but it cannot abort the whole app.
+
+## Frame stats
+
+`render(…, { onFrame })` is called after every painted frame with what it
+cost, so an app can see why it feels slow without a profiler:
+
+```tsx
+const app = await render(<App />, backend, {
+  onFrame: (f) => log(`${f.commits} commits · ${f.applied} applied / ${f.skipped} skipped · layout ${f.layoutMs.toFixed(1)} paint ${f.paintMs.toFixed(1)} draw ${f.drawMs.toFixed(1)} ms`),
+});
+```
+
+| Field | |
+|---|---|
+| `commits` | React commits since the previous frame. Several keys in one stdin chunk each commit synchronously and share the frame after them, so a wheel flick shows up here as one frame with many commits. |
+| `applied` | Boxes whose layout props were re-applied to Yoga since the previous frame. |
+| `skipped` | Boxes a re-render touched whose props were unchanged, so their layout was left alone. A large `skipped` with a small `applied` is a tree re-rendering more than it changes. |
+| `layoutMs` | Time in the Yoga layout. |
+| `paintMs` | Time painting the cell buffer. |
+| `drawMs` | Time in `backend.draw` — on a TTY, the frame diff and the write. |
+
+A high `commits` count per frame says the keys are arriving faster than a
+render drains them; a high `applied` says the tree changes a lot per frame; a
+high `drawMs` says the terminal side is the cost. The counts are process-wide:
+two render roots in one process see each other's boxes. Without `onFrame` the
+clock is never read and a frame costs nothing extra. An `onFrame` that throws
+goes through `onError` as `'callback'`, like `onCopy`.
 
 ## Ticker (animation clock)
 

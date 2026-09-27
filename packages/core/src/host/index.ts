@@ -14,6 +14,7 @@ export {
   createInstance,
   createTextInstance,
   applyProps,
+  takeApplyCounts,
   appendChild,
   removeChild,
   insertBefore,

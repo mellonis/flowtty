@@ -39,7 +39,10 @@ type ReconcilerConfig = Parameters<
 
 function createReconciler(Yoga: Yoga, onCommit?: () => void) {
   let pending = false;
+  let commits = 0;
+  const takeCommits = () => { const n = commits; commits = 0; return n; };
   const schedulePaint = () => {
+    commits += 1;
     if (pending || !onCommit) return;
     pending = true;
     queueMicrotask(() => {
@@ -179,13 +182,15 @@ function createReconciler(Yoga: Yoga, onCommit?: () => void) {
     resolveEventTimeStamp: () => -1.1,
   };
 
-  return ReactReconciler(config);
+  return Object.assign(ReactReconciler(config), { takeCommits });
 }
 
 export interface Root {
   render(element: ReactNode): void;
   unmount(): void;
   flushSync(fn: () => void): void;
+  /** How many commits landed since this was last read — the count a frame reports. */
+  takeCommits(): number;
 }
 
 export function createRoot(Yoga: Yoga, onCommit?: () => void): { container: Container; root: Root } {
@@ -222,6 +227,7 @@ export function createRoot(Yoga: Yoga, onCommit?: () => void): { container: Cont
         reconciler.updateContainerSync(null, fiberRoot, null, null);
         reconciler.flushSyncWork();
       },
+      takeCommits: reconciler.takeCommits,
       flushSync(fn) {
         // Discrete-event semantics (mirrors react-dom's event dispatch):
         // pending passive effects from prior commits must land before a new

@@ -1,5 +1,5 @@
 export { render } from './internal/render.js';
-export type { RenderOptions, RenderHandle, CopyEvent } from './internal/render.js';
+export type { RenderOptions, RenderHandle, CopyEvent, FrameStats } from './internal/render.js';
 export { renderToString } from './internal/renderToString.js';
 export type { RenderToStringOptions } from './internal/renderToString.js';
 export { useApp } from './hooks/useApp.js';

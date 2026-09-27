@@ -9,6 +9,15 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
 
 ## Unreleased
 
+### Added
+
+- **`render(…, { onFrame })`**: called after every painted frame with what it
+  cost — React commits since the previous frame, boxes whose layout props were
+  re-applied or skipped, and the layout, paint and draw times. Nothing is
+  measured without it. `FrameStats` is exported; `takeApplyCounts()` in
+  `@flowtty/core/host` is the counter behind `applied` / `skipped`. See
+  docs/app.md (frame stats).
+
 ### Fixed
 
 - **A re-render no longer re-applies every Yoga prop of every box it

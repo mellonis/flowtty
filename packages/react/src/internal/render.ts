@@ -1,6 +1,6 @@
 import { createElement, type ReactNode } from 'react';
 import { UNKNOWN_COLOR_SCHEME, type Backend, type Buffer, type Key, type TerminalColorScheme } from '@flowtty/core';
-import { getYoga, computeLayout, contentHeight, paint, MouseController, SelectionController, type Point } from '@flowtty/core/host';
+import { getYoga, computeLayout, contentHeight, paint, takeApplyCounts, MouseController, SelectionController, type Point } from '@flowtty/core/host';
 import { createRoot, type Root } from './reconciler.js';
 import { InputContext, type InputSource, type KeySubscriber } from '../context/inputContext.js';
 import { BackendContext } from '../context/backendContext.js';
@@ -103,6 +103,29 @@ export interface RenderOptions {
    *  lets an app fall back on `pbcopy` / `wl-copy` / `clip.exe` of its own. An
    *  empty selection fires nothing at all. See docs/app.md (the clipboard). */
   onCopy?: (event: CopyEvent) => void;
+  /** Called after every painted frame with what it cost: the commits it
+   *  gathered, the boxes whose layout props were re-applied or skipped, and
+   *  the layout, paint and draw times. Costs nothing when unset.
+   *  See docs/app.md (frame stats). */
+  onFrame?: (frame: FrameStats) => void;
+}
+
+/** What `onFrame` is called with. See docs/app.md (frame stats). */
+export interface FrameStats {
+  /** React commits since the previous frame: several keys in one stdin chunk
+   *  each commit, and the frame after them reports them all. */
+  commits: number;
+  /** Boxes whose Yoga props were re-applied since the previous frame. */
+  applied: number;
+  /** Boxes a re-render touched whose props were unchanged, so their layout
+   *  was left alone. */
+  skipped: number;
+  /** Time in `computeLayout`, in milliseconds. */
+  layoutMs: number;
+  /** Time painting the cell buffer, in milliseconds. */
+  paintMs: number;
+  /** Time in `backend.draw` — on a TTY, the frame diff and the write. */
+  drawMs: number;
 }
 
 /** What `onCopy` is called with. See docs/app.md (the clipboard). */
@@ -203,6 +226,7 @@ export async function render(
   // The highlight changed but the frame on screen does not show it yet. A paint
   // clears it, because a painted frame always carries the current highlight.
   let overlayStale = false;
+  const onFrame = options.onFrame;
   const draw = () => {
     if (unmounted || suspended) return;
     const { width, height } = backend.size();
@@ -211,8 +235,12 @@ export async function render(
     // as tall as what came out. Infinity must never reach paint() — the buffer
     // allocates width × height cells.
     const bounded = Number.isFinite(height) ? height : undefined;
+    // The clock is read only for an `onFrame`; without one a frame costs nothing extra.
+    const t0 = onFrame ? performance.now() : 0;
     computeLayout(container, width, bounded);
+    const t1 = onFrame ? performance.now() : 0;
     const frame = paint(container, width, bounded ?? contentHeight(container));
+    const t2 = onFrame ? performance.now() : 0;
     lastPaint = frame;
     // A selection over text that changed is a lie — the controller checks this
     // frame's cells against the ones it highlighted and drops it if they moved.
@@ -225,6 +253,11 @@ export async function render(
     backend.draw(selection === null ? frame : selection.decorate(frame));
     paints += 1;
     overlayStale = false;
+    if (onFrame) {
+      const t3 = performance.now();
+      const stats: FrameStats = { commits: root.takeCommits(), ...takeApplyCounts(), layoutMs: t1 - t0, paintMs: t2 - t1, drawMs: t3 - t2 };
+      runCallback(() => onFrame(stats));
+    }
   };
 
   // Show a highlight that changed without one. Deferred to a microtask by
