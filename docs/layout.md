@@ -245,9 +245,10 @@ layout leaves, so the app never adds up sibling heights to know how many rows fi
 | `scrollbar` | Draw a thumb in the right-hand column while the content overflows. |
 | `ref` | `scrollTo(offset)`, `scrollToStart()`, `scrollToEnd()`. |
 
-A `<ScrollBox>` keeps the focused component in view: when a field inside it
-takes focus, the box scrolls the least it can to show the whole field, and
-follows it while focused if it moves or grows. See
+A `<ScrollBox>` keeps the focused component in view: when the user moves
+focus onto a field inside it, the box scrolls the least it can to show the
+whole field, and again while focused if it grows; the user can still scroll it
+away. See
 [Focus + Button](input.md#focus--button).
 
 Every child is laid out by Yoga (cleanly cached between frames), but only rows

@@ -12,7 +12,7 @@ export interface UseFocusResult {
   focus: () => void;
   /** Put this on the component's own box. The nearest `<ScrollBox>` then keeps
    *  the component in view: it scrolls to show it when it takes focus, and
-   *  again while it has focus if it moves or grows. Stable across renders;
+   *  again while it has focus if it grows. Stable across renders;
    *  compose it with the box's own `onLayout` when there is one. Outside a
    *  FocusGroup it only records the rect. See docs/input.md (focus + Button). */
   onLayout: (rect: Rect) => void;
@@ -39,26 +39,30 @@ export function useFocus(): UseFocusResult {
   const focus = useCallback(() => group.focus(id), [group, id]);
   const isFocused = group.isFocused(id);
 
-  // Keeping the focused component in view. Outside a group every component is
+  // Keeping the focused component in view: when the user moves focus onto
+  // it, and while it has focus if it grows. Not when the group placed the
+  // focus itself (the auto-focused first field must not move a view the app
+  // placed), and never because its rect moved — a wheel step moves every
+  // rect in the box, and the user must be able to scroll a focused field away. Outside a group every component is
   // "focused", and they would fight over the viewport — so nothing is revealed
   // there. The rect is the one the last paint reported: the component is still
   // where it was when focus reaches it.
   const reveal = useContext(ScrollRevealContext);
   const revealing = group !== noFocusGroup && isFocused;
   const rectRef = useRef<Rect | null>(null);
-  const revealingRef = useRef(false);
-  revealingRef.current = revealing;
+  const revealingRef = useRef(revealing);
   // A layout effect: it runs in the commit that gave the component focus, so
   // the scroll it asks for lands in the same frame as the focus look.
   useLayoutEffect(() => {
-    if (revealing && rectRef.current !== null) reveal(rectRef.current);
-  }, [revealing, reveal]);
+    const gained = revealing && !revealingRef.current;
+    revealingRef.current = revealing;
+    if (gained && group.focusedByUser() && rectRef.current !== null) reveal(rectRef.current);
+  }, [revealing, reveal, group]);
   const onLayout = useCallback((r: Rect) => {
     const prev = rectRef.current;
     rectRef.current = r;
-    // Fires every paint: only a rect that moved or grew asks again (the first
-    // one after mount too — the auto-focused field may start out of view).
-    if (revealingRef.current && (prev === null || prev.top !== r.top || prev.height !== r.height)) reveal(r);
+    // Fires every paint: only a change of height asks again.
+    if (revealingRef.current && prev !== null && prev.height !== r.height) reveal(r);
   }, [reveal]);
 
   return { isFocused, focus, onLayout };

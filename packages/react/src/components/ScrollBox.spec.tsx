@@ -326,15 +326,30 @@ describe('ScrollBox: focus into view', () => {
     unmount();
   });
 
-  test('a focusable taller than the viewport shows its top — at mount too, for the auto-focused one', async () => {
-    const { frame, unmount } = await mount(<FocusGroup><ScrollBox height={2}><Text>a</Text><Tall rows={4} /></ScrollBox></FocusGroup>, 8, 2);
+  test('a focusable taller than the viewport shows its top', async () => {
+    const { backend, frame, unmount } = await mount(
+      <FocusGroup><ScrollBox height={2}><Button label="0" onPress={() => {}} /><Text>a</Text><Tall rows={4} /></ScrollBox></FocusGroup>, 8, 2,
+    );
+    backend.press({ name: 'tab' });
     expect(await frame()).toEqual(['t0', 't1']);
     unmount();
   });
 
-  test('anchor="bottom": the auto-focused first field is brought into view', async () => {
+  test('nothing is revealed at mount: the auto-focused first field does not move a bottom-anchored view', async () => {
     const { frame, unmount } = await mount(<FocusGroup><ScrollBox height={2} anchor="bottom"><Buttons n={5} /></ScrollBox></FocusGroup>, 8, 2);
-    expect(await frame()).toEqual(['[ 0 ]', '[ 1 ]']);
+    expect(await frame()).toEqual(['[ 3 ]', '[ 4 ]']);
+    unmount();
+  });
+
+  test('the user can scroll the focused field out of view: a wheel step is not undone', async () => {
+    const { backend, frame, unmount } = await mount(
+      <FocusGroup><ScrollBox height={2}><Button label="0" onPress={() => {}} /><Text>a</Text><Text>b</Text><Text>c</Text></ScrollBox></FocusGroup>, 8, 2,
+    );
+    expect(await frame()).toEqual(['[ 0 ]', 'a']);
+    backend.wheel('down', 0, 0);
+    expect(await frame()).toEqual(['b', 'c']);
+    backend.press({ name: 'x' }); // any repaint: the view stays where the user put it
+    expect(await frame()).toEqual(['b', 'c']);
     unmount();
   });
 

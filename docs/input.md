@@ -486,10 +486,13 @@ function Collapsed({ children }: { children: ReactNode }) {
 
 **Focus stays in view.** `useFocus()` also returns an `onLayout` for the
 component's own box. With it on, the nearest `<ScrollBox>` scrolls the least it
-can to show the whole component when it takes focus — Tab into a long form
-never lands on a field the user cannot see — and again while it has focus if
-it moves or grows (a `TextArea` growing under the caret). A component taller
-than the viewport shows its top. The built-in fields and `Button` do this
+can to show the whole component when the user moves focus onto it — Tab into
+a long form never lands on a field the user cannot see — and again while it
+has focus if it grows (a `TextArea` growing under the caret). A component
+taller than the viewport shows its top. Focus the group places itself moves
+nothing: the auto-focused first field does not pull a bottom-anchored box to
+the top at mount. A wheel or page step is never undone either: the user can
+scroll a focused field out of view, and the next Tab brings it back. The built-in fields and `Button` do this
 already; a custom focusable puts the handler on its box, composing it with its
 own `onLayout` if it has one:
 

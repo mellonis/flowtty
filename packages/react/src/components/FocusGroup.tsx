@@ -21,12 +21,19 @@ export function FocusGroup({ isActive = true, children }: FocusGroupProps): Reac
   // read it without being a dep of the api memo.
   const focusedIdRef = useRef<string | null>(null);
   focusedIdRef.current = focusedId;
+  // Who moved the focus last: the user (Tab, a click) or the group itself
+  // (auto-focus, an unmount). Read through the api, see `focusedByUser`.
+  const byUserRef = useRef(false);
 
   const register = useCallback((id: string) => {
     if (idsRef.current.includes(id)) return;
     idsRef.current = [...idsRef.current, id];
     // Auto-focus the first registrant.
-    setFocusedId((current) => current ?? id);
+    setFocusedId((current) => {
+      if (current !== null) return current;
+      byUserRef.current = false;
+      return id;
+    });
   }, []);
 
   const unregister = useCallback((id: string) => {
@@ -39,6 +46,7 @@ export function FocusGroup({ isActive = true, children }: FocusGroupProps): Reac
       // vacated slot (the next one), not back to the first. If the removed item
       // was last, fall back to the new last item; if none remain, clear focus.
       const remaining = idsRef.current;
+      byUserRef.current = false;
       if (remaining.length === 0) return null;
       return remaining[Math.min(idx, remaining.length - 1)] ?? null;
     });
@@ -59,12 +67,15 @@ export function FocusGroup({ isActive = true, children }: FocusGroupProps): Reac
   // A click on a focusable asks for it by id; an id that never registered
   // (a component outside the group, a stale one) is ignored.
   const focus = useCallback((id: string) => {
-    if (idsRef.current.includes(id)) setFocusedId(id);
+    if (!idsRef.current.includes(id)) return;
+    byUserRef.current = true;
+    setFocusedId(id);
   }, []);
+  const focusedByUser = useCallback(() => byUserRef.current, []);
 
   const api = useMemo<FocusGroupApi>(
-    () => ({ register, unregister, isFocused, focus }),
-    [register, unregister, isFocused, focus],
+    () => ({ register, unregister, isFocused, focus, focusedByUser }),
+    [register, unregister, isFocused, focus, focusedByUser],
   );
 
   useInput((key) => {
@@ -72,6 +83,7 @@ export function FocusGroup({ isActive = true, children }: FocusGroupProps): Reac
     const ids = idsRef.current;
     // Nothing to move to — one focusable, or none — is not the group's Tab.
     if (ids.length < 2) return;
+    byUserRef.current = true;
     setFocusedId((current) => {
       const idx = current ? ids.indexOf(current) : 0;
       const next = key.shift

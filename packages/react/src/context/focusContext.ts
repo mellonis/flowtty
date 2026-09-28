@@ -12,6 +12,11 @@ export interface FocusGroupApi {
   /** Make the focusable with this id the focused one — a click on it. An id
    *  that is not registered is ignored. */
   focus(id: string): void;
+  /** Whether the current focus was placed by the user — Tab, or a click
+   *  through `focus()` — rather than by the group itself (the auto-focused
+   *  first registrant, the neighbour that takes over when the focused one
+   *  unmounts). What decides whether a scroll box reveals the focused field. */
+  focusedByUser(): boolean;
 }
 
 /** Sentinel singleton used outside a FocusGroup. Stable reference — `useFocus`
@@ -23,6 +28,7 @@ export const noFocusGroup: FocusGroupApi = {
   // components outside a FocusGroup still receive input (backward compat).
   isFocused: () => true,
   focus: () => {},
+  focusedByUser: () => false,
 };
 
 /** Outside a FocusGroup, useFocus() reads from this default → always focused

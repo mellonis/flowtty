@@ -7,6 +7,19 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Fixed
+
+- **A focused field no longer pins its scroll box.** Since alpha.36 a
+  `ScrollBox` holding the focused field snapped back to it on every wheel
+  step, and a bottom-anchored box jumped to its first field at mount: the
+  reveal ran whenever the field's rect moved, and a scroll moves every rect.
+  The box now reveals a field when the user moves focus onto it — Tab or a
+  click — and while it grows; the focus the group places itself (the
+  auto-focused first field, the neighbour after an unmount) moves nothing.
+  See docs/input.md (focus + Button).
+
 ## 1.0.0-alpha.36 — 2026-09-28
 
 ### Added
