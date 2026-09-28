@@ -31,8 +31,9 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
   main keys, F1, F2 and F4 are read in the bare `CSI P` / `Q` / `S` form the
   protocol sends them in, and a private-use key with no name (`csi-u-57358`)
   is never printable. A terminal without the protocol ignores the request and is read
-  as before. `{ kittyKeyboard: false }` never asks. See docs/input.md (the
-  kitty keyboard protocol).
+  as before. `InlineTtyBackend` asks for the same flag on the main screen.
+  `{ kittyKeyboard: false }`, on either backend, never asks. See
+  docs/input.md (the kitty keyboard protocol).
 
 ## 1.0.0-alpha.35 — 2026-09-28
 

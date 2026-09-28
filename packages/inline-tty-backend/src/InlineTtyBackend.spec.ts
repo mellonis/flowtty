@@ -189,6 +189,25 @@ describe('InlineTtyBackend', () => {
     expect(out.captured()).toContain('\x1b[?2004l');
   });
 
+  test('asks for the kitty keyboard protocol with the first key subscription, after paste, and pops it first on dispose', () => {
+    const out = mockStdout();
+    const b = new InlineTtyBackend({ out, in: mockStdin(), colorScheme: false });
+    expect(out.captured()).not.toContain('\x1b[>1u'); // passive backend: untouched
+    b.onKey(() => {});
+    expect(out.writes.at(-1)).toBe('\x1b[?2004h\x1b[>1u');
+    b.dispose();
+    expect(out.captured()).toContain('\x1b[<u\x1b[?2004l');
+  });
+
+  test('kittyKeyboard: false neither pushes nor pops the flag, and log-only mode never does', () => {
+    const out = mockStdout();
+    const b = new InlineTtyBackend({ out, in: mockStdin(), colorScheme: false, kittyKeyboard: false });
+    b.onKey(() => {});
+    b.dispose();
+    expect(out.captured()).not.toContain('\x1b[>1u');
+    expect(out.captured()).not.toContain('\x1b[<u');
+  });
+
   test('color: false drops color codes and keeps bold', () => {
     const out = mockStdout();
     const b = new InlineTtyBackend({ out, in: mockStdin(), liveHeight: 1, color: false });
@@ -327,6 +346,8 @@ describe('light and dark', () => {
 describe('InlineTtyBackend suspend / resume', () => {
   const PASTE_ON = '\x1b[?2004h';
   const PASTE_OFF = '\x1b[?2004l';
+  const KITTY_ON = '\x1b[>1u';
+  const KITTY_OFF = '\x1b[<u';
   const HIDE = '\x1b[?25l';
   const SHOW = '\x1b[?25h';
   const RESET = '\x1b[0m';
@@ -343,14 +364,14 @@ describe('InlineTtyBackend suspend / resume', () => {
     out.writes.length = 0;
 
     b.suspend();
-    expect(out.writes).toEqual([PASTE_OFF, '\r\x1b[1A\x1b[J' + SHOW + RESET]);
+    expect(out.writes).toEqual([KITTY_OFF + PASTE_OFF, '\r\x1b[1A\x1b[J' + SHOW + RESET]);
     expect(input.listenerCount('data')).toBe(0);
     input.emit('data', 'q'); // typed into the child, not into the app
     expect(keys).toEqual([]);
 
     out.writes.length = 0;
     b.resume();
-    expect(out.writes).toEqual([PASTE_ON]);
+    expect(out.writes).toEqual([PASTE_ON + KITTY_ON]);
     expect(input.listenerCount('data')).toBe(1);
     expect(resized).toHaveBeenCalledTimes(1);
     input.emit('data', 'q');
@@ -408,7 +429,7 @@ describe('InlineTtyBackend suspend / resume', () => {
 
       out.writes.length = 0;
       onCont!();
-      expect(out.writes).toEqual([PASTE_ON]);
+      expect(out.writes).toEqual([PASTE_ON + KITTY_ON]);
       expect(input.listenerCount('data')).toBe(1);
       const before = process.listenerCount('SIGCONT');
       b.dispose();

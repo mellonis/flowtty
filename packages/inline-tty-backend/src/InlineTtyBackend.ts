@@ -9,6 +9,7 @@ import {
   isInteractive,
   RESET, HIDE_CURSOR, SHOW_CURSOR,
   BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF,
+  KITTY_KEYBOARD_ON, KITTY_KEYBOARD_OFF,
   OSC8_CLOSE, osc8Open,
   sgr,
   createAttention, type Attention, type NotificationProtocol,
@@ -42,6 +43,11 @@ export interface InlineTtyBackendOptions {
    *  `TtyBackend` does. On by default; `false` asks nothing. Nothing is asked
    *  in log-only mode either way. See docs/terminal.md (light and dark). */
   colorScheme?: boolean;
+  /** Ask for the kitty keyboard protocol's first flag once keys are read, as
+   *  `TtyBackend` does: Shift+Enter is not Enter, Escape arrives at once. On
+   *  by default; `false` never asks, and log-only mode asks nothing either
+   *  way. See docs/input.md (the kitty keyboard protocol). */
+  kittyKeyboard?: boolean;
   /** Emit color. Default: from the environment — off when `NO_COLOR` is set,
    *  `FORCE_COLOR` overriding it. Bold, dim, underline and inverse are emitted
    *  either way. */
@@ -302,8 +308,9 @@ export class InlineTtyBackend implements Backend {
       this.inputAttached = true;
       // Lazy like raw mode: a passive view never stops or continues.
       process.on('SIGCONT', this.onContinue);
-      // Only a backend that reads keys asks for bracketed paste; dispose() undoes it.
-      this.out.write(BRACKETED_PASTE_ON);
+      // Only a backend that reads keys asks for bracketed paste and the kitty
+      // flag; dispose() undoes both.
+      this.out.write(BRACKETED_PASTE_ON + this.kittySequence(true));
       if (this.followsScheme) this.scheme.start();
     }
     this.subscribers.add(handler);
@@ -338,7 +345,7 @@ export class InlineTtyBackend implements Backend {
       if (this.input.isTTY) this.input.setRawMode(true);
       this.input.on('data', this.inputDataHandler);
       this.input.resume();
-      this.out.write(BRACKETED_PASTE_ON);
+      this.out.write(BRACKETED_PASTE_ON + this.kittySequence(true));
       if (this.followsScheme) this.scheme.start();
     }
     for (const h of [...this.resizeSubscribers]) h();
@@ -351,6 +358,11 @@ export class InlineTtyBackend implements Backend {
   // leaves the last frame in the scrollback and ends the line instead.
   // `inputAttached` is left as it is: it says a subscriber holds the input,
   // which `resume()` reads to know whether to take it back.
+  private kittySequence(on: boolean): string {
+    if (this.options.kittyKeyboard === false) return '';
+    return on ? KITTY_KEYBOARD_ON : KITTY_KEYBOARD_OFF;
+  }
+
   private leaveTerminal(erase: boolean): void {
     if (this.inputAttached) {
       this.input.removeListener('data', this.inputDataHandler);
@@ -358,7 +370,9 @@ export class InlineTtyBackend implements Backend {
       this.input.pause();
       this.pendingInput = '';
       this.scheme.stop();
-      this.out.write(BRACKETED_PASTE_OFF);
+      // The flag came on last, so it goes off first. This backend runs on the
+      // main screen, where the pop is what keeps the shell out of the mode.
+      this.out.write(this.kittySequence(false) + BRACKETED_PASTE_OFF);
     }
     if (this.cursorHidden) {
       // Show cursor + drop the pen to default. On dispose, a trailing newline

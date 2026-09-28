@@ -180,11 +180,12 @@ names are multi-character, so they are never mistaken for a printable character.
 
 The legacy key encoding cannot tell Shift+Enter from Enter, Ctrl+I from Tab,
 Ctrl+M from Enter, or a lone Escape from the start of an Alt sequence. The
-kitty keyboard protocol can, and `TtyBackend` asks for its first flag
+kitty keyboard protocol can, and both TTY backends ask for its first flag
 (*disambiguate escape codes*) as soon as keys are read: pushed onto the
 terminal's mode stack after the alt screen, popped off it before the alt screen
 goes — on unmount, on `suspend()`, on Ctrl+C, on a signal, on an uncaught
-error. Nothing changes for a handler: keys arrive with the same names and
+error. `InlineTtyBackend` does the same on the main screen, where the pop is
+what hands the shell back its own keys. Nothing changes for a handler: keys arrive with the same names and
 modifiers, only more of them are told apart.
 
 - **Shift+Enter** is `{ name: 'return', shift: true }`. `<TextArea>` inserts a
@@ -202,8 +203,8 @@ A terminal without the protocol ignores the request and keeps sending legacy
 codes, which are read as before: nothing to detect, nothing to configure. In
 such a terminal `<TextArea>` still takes backslash then Enter for a line break.
 Only the first flag is asked for — release and repeat events, alternate keys
-and the text a key would insert are not, since no component needs them. `new
-TtyBackend(out, input, { kittyKeyboard: false })` never asks. Which terminals
+and the text a key would insert are not, since no component needs them.
+`kittyKeyboard: false`, an option of both backends, never asks. Which terminals
 have the protocol is in [Terminal specifics](terminal.md#the-kitty-keyboard-protocol).
 
 ## Clicks and hover

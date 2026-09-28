@@ -394,7 +394,7 @@ hit the screen. Keep them out of a running app, or write to a file.
 
 ## The kitty keyboard protocol
 
-`TtyBackend` asks for the protocol's first flag once keys are read; what that
+Both TTY backends ask for the protocol's first flag once keys are read; what that
 changes for an app is in [Input](input.md#the-kitty-keyboard-protocol). What
 the terminal makes of the request:
 
