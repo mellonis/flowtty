@@ -57,7 +57,7 @@ export function TextInput(props: TextInputProps): ReactNode {
   const [ownValue, setOwnValue] = useState(props.defaultValue ?? '');
   const value = props.value ?? ownValue;
   const [error, setError] = useState<string | null>(null);
-  const { isFocused: ctxFocused, focus } = useFocus();
+  const { isFocused: ctxFocused, focus, onLayout: focusLayout } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   const [cursor, setCursor] = useState(value.length);
   const safeCursor = Math.max(0, Math.min(value.length, cursor));
@@ -198,7 +198,7 @@ export function TextInput(props: TextInputProps): ReactNode {
       </Box>
     );
   }
-  const outer = { width: widthProp, flexGrow, flexShrink };
+  const outer = { width: widthProp, flexGrow, flexShrink, onLayout: focusLayout };
   if (frame === 'none') {
     // In a row of its own, so the field sizes to its text instead of
     // stretching across a column.

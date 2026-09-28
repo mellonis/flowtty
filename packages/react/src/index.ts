@@ -62,6 +62,8 @@ export { FocusGroup } from './components/FocusGroup.js';
 export type { FocusGroupProps } from './components/FocusGroup.js';
 export { useFocus } from './hooks/useFocus.js';
 export type { UseFocusResult } from './hooks/useFocus.js';
+export { ScrollRevealContext } from './context/scrollContext.js';
+export type { RevealRect } from './context/scrollContext.js';
 export { Button } from './components/Button.js';
 export type { ButtonProps } from './components/Button.js';
 export { windowAround } from '@flowtty/core';

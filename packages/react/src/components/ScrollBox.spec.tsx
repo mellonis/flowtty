@@ -4,6 +4,9 @@ import { render } from '../internal/render.js';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { ScrollBox, type ScrollBoxHandle } from './ScrollBox.js';
+import { FocusGroup } from './FocusGroup.js';
+import { Button } from './Button.js';
+import { useFocus } from '../hooks/useFocus.js';
 import { TestBackend, flushAsync } from '@flowtty/core/testing';
 
 const lines = (n: number, from = 0) => Array.from({ length: n }, (_, i) => `row ${from + i}`);
@@ -263,6 +266,81 @@ describe('ScrollBox', () => {
     // 12 wide − 1 padding each side = columns 1‥10; the bar sits in column 10.
     // 20 rows in a 4-row viewport → a one-cell thumb, at the bottom while pinned.
     expect(await frame()).toEqual(['', ' TOP 16   │', ' row 17   │', ' row 18   │', ' row 19   █']);
+    unmount();
+  });
+});
+
+// ─── focus into view ─────────────────────────────────────────────────────────
+// The nearest ScrollBox keeps the focused component in view: on focus, and
+// while focused when its rect moves or grows. See docs/input.md (focus + Button).
+
+const Buttons = ({ n }: { n: number }) => <>{Array.from({ length: n }, (_, i) => <Button key={i} label={String(i)} onPress={() => {}} />)}</>;
+
+function Tall({ rows }: { rows: number }) {
+  const { onLayout } = useFocus();
+  return <Box flexDirection="column" onLayout={onLayout}>{Array.from({ length: rows }, (_, i) => <Text key={i}>{`t${i}`}</Text>)}</Box>;
+}
+
+describe('ScrollBox: focus into view', () => {
+  test('Tab to a focusable below the viewport scrolls the least that shows it; Shift+Tab back scrolls up', async () => {
+    const { backend, frame, unmount } = await mount(<FocusGroup><ScrollBox height={2}><Buttons n={5} /></ScrollBox></FocusGroup>, 8, 2);
+    expect(await frame()).toEqual(['[ 0 ]', '[ 1 ]']);
+    backend.press({ name: 'tab' });
+    expect(await frame()).toEqual(['[ 0 ]', '[ 1 ]']); // 1 is in view already: nothing moves
+    backend.press({ name: 'tab' });
+    expect(await frame()).toEqual(['[ 1 ]', '[ 2 ]']);
+    backend.press({ name: 'tab' });
+    backend.press({ name: 'tab' });
+    expect(await frame()).toEqual(['[ 3 ]', '[ 4 ]']);
+    backend.press({ name: 'tab' }); // wraps to the first
+    expect(await frame()).toEqual(['[ 0 ]', '[ 1 ]']);
+    backend.press({ name: 'tab', shift: true });
+    expect(await frame()).toEqual(['[ 3 ]', '[ 4 ]']);
+    unmount();
+  });
+
+  test('the viewport is the content rect: a border and padding are not part of it', async () => {
+    const { backend, frame, unmount } = await mount(
+      <FocusGroup><ScrollBox height={5} border="single" paddingTop={1}><Buttons n={5} /></ScrollBox></FocusGroup>, 9, 5,
+    );
+    backend.press({ name: 'tab' });
+    backend.press({ name: 'tab' });
+    backend.press({ name: 'tab' });
+    const rows = await frame();
+    expect(rows[2]).toContain('[ 2 ]');
+    expect(rows[3]).toContain('[ 3 ]');
+    unmount();
+  });
+
+  test('a focused component that grows stays in view', async () => {
+    let grow: (n: number) => void = () => {};
+    function App() {
+      const [rows, setRows] = useState(1);
+      grow = setRows;
+      return <FocusGroup><ScrollBox height={3}><Text>a</Text><Text>b</Text><Tall rows={rows} /></ScrollBox></FocusGroup>;
+    }
+    const { frame, unmount } = await mount(<App />, 8, 3);
+    expect(await frame()).toEqual(['a', 'b', 't0']);
+    grow(3);
+    expect(await frame()).toEqual(['t0', 't1', 't2']);
+    unmount();
+  });
+
+  test('a focusable taller than the viewport shows its top — at mount too, for the auto-focused one', async () => {
+    const { frame, unmount } = await mount(<FocusGroup><ScrollBox height={2}><Text>a</Text><Tall rows={4} /></ScrollBox></FocusGroup>, 8, 2);
+    expect(await frame()).toEqual(['t0', 't1']);
+    unmount();
+  });
+
+  test('anchor="bottom": the auto-focused first field is brought into view', async () => {
+    const { frame, unmount } = await mount(<FocusGroup><ScrollBox height={2} anchor="bottom"><Buttons n={5} /></ScrollBox></FocusGroup>, 8, 2);
+    expect(await frame()).toEqual(['[ 0 ]', '[ 1 ]']);
+    unmount();
+  });
+
+  test('outside a FocusGroup nothing is revealed — every component counts as focused there', async () => {
+    const { frame, unmount } = await mount(<ScrollBox height={2}><Text>a</Text><Text>b</Text><Tall rows={1} /></ScrollBox>, 8, 2);
+    expect(await frame()).toEqual(['a', 'b']);
     unmount();
   });
 });

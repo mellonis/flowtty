@@ -14,8 +14,9 @@ export interface FocusGroupApi {
   focus(id: string): void;
 }
 
-/** Sentinel singleton used outside a FocusGroup. Stable reference. */
-const noop: FocusGroupApi = {
+/** Sentinel singleton used outside a FocusGroup. Stable reference — `useFocus`
+ *  compares against it to know whether there is a group at all. */
+export const noFocusGroup: FocusGroupApi = {
   register: () => {},
   unregister: () => {},
   // Outside a FocusGroup, "always focused" so default behavior works —
@@ -26,7 +27,7 @@ const noop: FocusGroupApi = {
 
 /** Outside a FocusGroup, useFocus() reads from this default → always focused
  *  (preserves backward-compat for components used without a FocusGroup). */
-export const FocusContext: Context<FocusGroupApi> = createContext<FocusGroupApi>(noop);
+export const FocusContext: Context<FocusGroupApi> = createContext<FocusGroupApi>(noFocusGroup);
 
 /** Carries the currently-focused id so consumers re-render when focus changes.
  *  Kept separate from FocusContext so the stable api object doesn't need to

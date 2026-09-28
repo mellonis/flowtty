@@ -33,7 +33,7 @@ export interface ListMultiSelectProps<T> {
 
 export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
   const { items, value, onChange, onSubmit, onCancel, onAddNew, isFocused: explicitFocus, checkboxFrame = 'brackets' } = props;
-  const { isFocused: ctxFocused, focus } = useFocus();
+  const { isFocused: ctxFocused, focus, onLayout } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   const totalRows = items.length + (onAddNew ? 1 : 0);
   const [state, setState] = useState<MultiSelectState>({ cursor: 0 });
@@ -103,7 +103,7 @@ export function ListMultiSelect<T>(props: ListMultiSelectProps<T>): ReactNode {
     <ListRow key={key} isCursor={isCursor} isFocused={isFocused} label={label} onClick={onClick} />
   );
   return (
-    <Box flexDirection="column" onClick={focus}>{/* blank space focuses; a row's own onClick is nearer and toggles */}
+    <Box flexDirection="column" onClick={focus} onLayout={onLayout}>{/* blank space focuses; a row's own onClick is nearer and toggles */}
       {items.map((it, i) => row(
         i === cursor,
         `${checkboxMarker(value.includes(it.value), checkboxFrame).text} ${it.label}`,

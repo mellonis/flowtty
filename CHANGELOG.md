@@ -11,6 +11,15 @@ the project is still on `1.0.0-alpha`, so any release may change an API.
 
 ### Added
 
+- **Focus stays in view.** `useFocus()` returns an `onLayout` for the
+  component's own box; the built-in fields and `Button` put it there. The
+  nearest `<ScrollBox>` scrolls the least it can to show the focused
+  component whole when it takes focus, and again while focused if it moves
+  or grows; a component taller than the viewport shows its top. Tab into a
+  form inside a `ScrollBox` no longer lands on a field the user cannot see.
+  Outside a `FocusGroup` nothing is revealed. See docs/input.md (focus +
+  Button).
+
 - **The kitty keyboard protocol, first flag.** `TtyBackend` pushes
   *disambiguate escape codes* onto the terminal's mode stack once keys are
   read, and pops it before the alt screen goes — on unmount, `suspend()`,

@@ -33,7 +33,7 @@ export interface CheckboxProps {
  * alone — in a form it is the submit. See docs/components.md (Checkbox).
  */
 export function Checkbox({ checked, onChange, label, frame = 'brackets', isFocused: explicitFocus }: CheckboxProps): ReactNode {
-  const { isFocused: ctxFocused, focus } = useFocus();
+  const { isFocused: ctxFocused, focus, onLayout } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   const [hovered, hover] = useHover();
   const toggle = () => onChange(checked === 'mixed' ? true : !checked);
@@ -52,7 +52,7 @@ export function Checkbox({ checked, onChange, label, frame = 'brackets', isFocus
   // (Checkbox).
   const marker = checkboxMarker(checked, frame);
   return (
-    <Box flexDirection="row" {...hover} onClick={() => { focus(); toggle(); }}>
+    <Box flexDirection="row" {...hover} onClick={() => { focus(); toggle(); }} onLayout={onLayout}>
       <Text color={isFocused ? 'cyan' : marker.color} bold={isFocused} dim={!isFocused && marker.color === undefined} underline={hovered && label === undefined}>{marker.text}</Text>
       {label !== undefined ? <Text bold={isFocused} underline={hovered}>{` ${label}`}</Text> : null}
     </Box>

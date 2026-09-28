@@ -483,6 +483,25 @@ function Collapsed({ children }: { children: ReactNode }) {
 }
 ```
 
+**Focus stays in view.** `useFocus()` also returns an `onLayout` for the
+component's own box. With it on, the nearest `<ScrollBox>` scrolls the least it
+can to show the whole component when it takes focus — Tab into a long form
+never lands on a field the user cannot see — and again while it has focus if
+it moves or grows (a `TextArea` growing under the caret). A component taller
+than the viewport shows its top. The built-in fields and `Button` do this
+already; a custom focusable puts the handler on its box, composing it with its
+own `onLayout` if it has one:
+
+```tsx
+function Card() {
+  const { isFocused, focus, onLayout } = useFocus();
+  return <Box border="round" onLayout={onLayout} onClick={focus} bold={isFocused}>…</Box>;
+}
+```
+
+Outside a `FocusGroup` nothing is revealed: every component counts as focused
+there, and they would fight over the viewport.
+
 `useClick(rectRef, onClick)` remains for a hit area that is not a box of its
 own — a region measured by `onLayout` inside a bigger box. It detects the
 click through `useInput`, so it never sees a press that an `onClick` box

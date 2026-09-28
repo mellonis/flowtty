@@ -113,7 +113,7 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
     items, placeholder = '—', frame = 'field', filter = true, maxRows = 8, isFocused: explicitFocus,
     width, minWidth, maxWidth, flexGrow, flexShrink,
   } = props;
-  const { isFocused: ctxFocused, focus } = useFocus();
+  const { isFocused: ctxFocused, focus, onLayout: focusLayout } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
   // Under the pointer the value is underlined (the arrow is not). The hover
   // props ride on whichever box takes the click. See docs/components.md (Select).
@@ -193,7 +193,7 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
       overflow="hidden"
       backgroundColor={band ? FIELD_BG : undefined}
       inverse={open}
-      onLayout={frame === 'border' ? undefined : (r) => { rectRef.current = r; }}
+      onLayout={frame === 'border' ? undefined : (r) => { rectRef.current = r; focusLayout(r); }}
       onClick={frame === 'border' ? undefined : onTriggerClick}
       onHoverChange={frame === 'border' ? undefined : hover.onHoverChange}
     >
@@ -212,7 +212,7 @@ export function Select<T>(props: SelectProps<T>): ReactNode {
       border={DEFAULT_BORDER_STYLE}
       flexDirection="column"
       width={width} minWidth={minWidth} maxWidth={maxWidth} flexGrow={flexGrow} flexShrink={flexShrink}
-      onLayout={(r) => { rectRef.current = r; }}
+      onLayout={(r) => { rectRef.current = r; focusLayout(r); }}
       onClick={onTriggerClick}
       {...hover}
     >

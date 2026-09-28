@@ -27,7 +27,7 @@ export interface ListSelectProps<T> {
 
 export function ListSelect<T>(props: ListSelectProps<T>): ReactNode {
   const { items, value, onChange, onSubmit, onCancel, isFocused: explicitFocus } = props;
-  const { isFocused: ctxFocused, focus } = useFocus();
+  const { isFocused: ctxFocused, focus, onLayout } = useFocus();
   const isFocused = explicitFocus !== undefined ? explicitFocus : ctxFocused;
 
   // Initial cursor: position of the controlled value in the (unfiltered) item list.
@@ -67,7 +67,7 @@ export function ListSelect<T>(props: ListSelectProps<T>): ReactNode {
   };
 
   return (
-    <Box onClick={focus}>{/* blank space focuses; a row's own onClick is nearer and picks */}
+    <Box onClick={focus} onLayout={onLayout}>{/* blank space focuses; a row's own onClick is nearer and picks */}
       {state.filter !== '' && <Text>{`filter: ${state.filter}`}</Text>}
       {visible.map((origIdx, row) => (
         <ListRow key={origIdx} isCursor={row === cursorClamped} isFocused={isFocused} label={items[origIdx]!.label} onClick={() => pick(row)} />

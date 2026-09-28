@@ -18,7 +18,7 @@ export interface ButtonProps {
 }
 
 export function Button({ label, shortcut, onPress }: ButtonProps): ReactNode {
-  const { isFocused, focus } = useFocus();
+  const { isFocused, focus, onLayout } = useFocus();
   const [hovered, hover] = useHover();
 
   useInput((key) => {
@@ -33,7 +33,7 @@ export function Button({ label, shortcut, onPress }: ButtonProps): ReactNode {
   // hover props ride on the box that already takes the click. See
   // docs/input.md (clicks and hover).
   return (
-    <Box flexDirection="row">
+    <Box flexDirection="row" onLayout={onLayout}>
       <Box bold={isFocused} inverse={isFocused} underline={hovered} {...hover} onClick={() => { focus(); onPress(); }}>{`[ ${label} ]`}</Box>
       {shortcut ? <Box dim>{` (${shortcut})`}</Box> : null}
     </Box>

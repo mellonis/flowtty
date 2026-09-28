@@ -1,5 +1,7 @@
-import React, { useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
+import React, { useCallback, useImperativeHandle, useRef, useState, type ReactNode, type Ref } from 'react';
 import type { BoxProps, Key, ScrollMetrics } from '@flowtty/core';
+import type { Rect } from '@flowtty/core/host';
+import { ScrollRevealContext } from '../context/scrollContext.js';
 import { Box } from './base/Box.js';
 import { Text } from './base/Text.js';
 import { useInput } from '../hooks/useInput.js';
@@ -73,6 +75,9 @@ export function ScrollBox({
   // (a wheel burst arrives as one stdin chunk) before paint refreshes the
   // metrics; each step builds on the previous one instead of on a stale scrollTop.
   const pendingTopRef = useRef<number | null>(null);
+  // The scrollTop the last paint used — what every rect reported by that
+  // paint was measured with, whatever has been asked for since.
+  const paintedTopRef = useRef(0);
 
   const controlled = offset !== undefined;
   const fromBottom = anchor === 'bottom';
@@ -94,6 +99,30 @@ export function ScrollBox({
     if (!controlled) setTop(fromBottom ? (next >= max ? null : next) : next);
     if (onScroll && m) onScroll(fromBottom ? max - next : next, { ...m, scrollTop: next });
   };
+
+  // Bring a descendant's rect into view — what the focused component asks
+  // for through `useFocus`. The least scroll that shows it whole; its top when
+  // it is taller than the viewport. Rects are frame cells, so the viewport's
+  // own top is its box top plus border and padding, and a rect is translated
+  // with the scrollTop of the paint that measured it — several reveals can
+  // land between two paints (Tab held down), each building on the last one
+  // asked for. Reads refs only, so the callback is stable and the context
+  // never re-renders the children. See docs/input.md (focus + Button).
+  const goToRef = useRef(goTo);
+  goToRef.current = goTo;
+  const insetRef = useRef(0);
+  insetRef.current = (boxProps.border ? 1 : 0) + (boxProps.paddingTop ?? boxProps.paddingY ?? boxProps.padding ?? 0);
+  const reveal = useCallback((rect: Rect) => {
+    const m = metricsRef.current;
+    const r = rectRef.current;
+    if (m === null || r === null) return;
+    const row = rect.top - (r.top + insetRef.current) + paintedTopRef.current;
+    const from = pendingTopRef.current ?? m.scrollTop;
+    let wanted = from;
+    if (row + rect.height > from + m.viewportHeight) wanted = row + rect.height - m.viewportHeight;
+    if (row < wanted) wanted = row;
+    if (wanted !== from) goToRef.current(wanted);
+  }, []);
 
   useImperativeHandle(ref, () => ({
     scrollTo: (o) => goTo(fromBottom ? (metricsRef.current?.maxScrollTop ?? 0) - o : o),
@@ -143,13 +172,14 @@ export function ScrollBox({
       onScrollMetrics={(m) => {
         const changed = !sameMetrics(metricsRef.current, m);
         metricsRef.current = m;
+        paintedTopRef.current = m.scrollTop;
         pendingTopRef.current = null;
         if (!changed) return;
         onMetrics?.(m);
         if (scrollbar) setBarMetrics(m);
       }}
     >
-      {children}
+      <ScrollRevealContext.Provider value={reveal}>{children}</ScrollRevealContext.Provider>
       {showBar ? <Scrollbar metrics={barMetrics} /> : null}
     </Box>
   );
