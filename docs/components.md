@@ -271,9 +271,11 @@ bookkeeping.
 />
 ```
 
-- **Line breaks.** Enter submits. Shift+Enter, Alt+Enter and **backslash then
-  Enter** insert a line break — the last one works in every terminal (without the
-  Kitty protocol many terminals send plain Enter for Shift+Enter).
+- **Line breaks.** Enter submits; Shift+Enter and Alt+Enter insert a line
+  break, the way every composer works — the TTY backend asks the terminal for
+  the [kitty keyboard protocol](input.md#the-kitty-keyboard-protocol), which
+  tells Shift+Enter from Enter. In a terminal without it, **backslash then
+  Enter** inserts one too.
 - **`onKey(key)`** runs before the field's own handling; return `true` to consume
   the key. That is how a host owns Enter, Tab, Escape, or history on up/down.
 - **Caret.** Uncontrolled by default; a value replaced from outside (history,

@@ -8,6 +8,7 @@ Color, glyph width, and what the renderer does not do yet.
 - [Notifications](#notifications)
 - [The clipboard](#the-clipboard)
 - [Light and dark](#light-and-dark)
+- [The kitty keyboard protocol](#the-kitty-keyboard-protocol)
 - [Still deferred (later milestones)](#still-deferred-later-milestones)
 
 ## Truecolor
@@ -391,9 +392,24 @@ backend releases the console.
 Direct writes to `process.stdout` / `process.stderr` are not covered: they still
 hit the screen. Keep them out of a running app, or write to a file.
 
+## The kitty keyboard protocol
+
+`TtyBackend` asks for the protocol's first flag once keys are read; what that
+changes for an app is in [Input](input.md#the-kitty-keyboard-protocol). What
+the terminal makes of the request:
+
+| Terminal | The first flag |
+| --- | --- |
+| kitty, Ghostty, WezTerm, foot, Alacritty, iTerm2 3.5+ | honored |
+| tmux | with `set -s extended-keys on`, and an outer terminal that honors it |
+| Terminal.app (macOS) | ignored — legacy codes, read as before |
+
+The request is one sequence, which a terminal without the protocol ignores, so
+nothing is detected up front. An app that must know can ask the terminal
+itself (`CSI ? u`, answered with the flags in force); flowtty does not.
+
 ## Still deferred (later milestones)
 
 - Scrolling-region optimization for log-stream apps.
 - Column-only cursor moves (`CSI <col>G`) when row is unchanged — small extra perf nibble.
 - `position: 'relative'`.
-- Kitty keyboard protocol.

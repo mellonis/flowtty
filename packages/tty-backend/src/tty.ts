@@ -1,7 +1,7 @@
 import { Buffer as NodeBuffer } from 'node:buffer';
 import { takeWarnings, type Buffer, type Style, type Backend, type Key, type TerminalColorScheme, setWidthPolicy, type WidthPolicy } from '@flowtty/core';
 import { detectWidthPolicy } from './widthPolicy.js';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, MOUSE_OFF, MOUSE_ON, MOUSE_HOVER_OFF, MOUSE_HOVER_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, stylesEqual, takeUnknownColors } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, BRACKETED_PASTE_OFF, BRACKETED_PASTE_ON, CLEAR, KITTY_KEYBOARD_OFF, KITTY_KEYBOARD_ON, MOUSE_OFF, MOUSE_ON, MOUSE_HOVER_OFF, MOUSE_HOVER_ON, HIDE_CURSOR, OSC8_CLOSE, RESET, SHOW_CURSOR, cellsEqual, cursorTo, detectColorSupport, osc8Open, sgr, stylesEqual, takeUnknownColors } from './ansi.js';
 import { detectHyperlinkSupport } from './hyperlinks.js';
 import { decodeKeys } from './key-parser.js';
 import { isInteractive, NotInteractiveError } from './interactive.js';
@@ -38,6 +38,13 @@ export interface TtyBackendOptions {
    * the next move. See docs/input.md (clicks and hover).
    */
   mouse?: boolean | { hover?: boolean };
+  /** Ask the terminal for the kitty keyboard protocol's first flag once keys
+   *  are read, so Shift+Enter is not Enter, Ctrl+I is not Tab, and Escape
+   *  arrives at once instead of after the wait a lone ESC byte gets. On by
+   *  default; a terminal without the protocol ignores the request and keeps
+   *  sending legacy codes, which are read as before. `false` never asks.
+   *  See docs/input.md (the kitty keyboard protocol). */
+  kittyKeyboard?: boolean;
   /** Follow the terminal's light / dark scheme: ask for its background once
    *  keys are read, and listen for a change (DEC mode 2031, or a focus-in where
    *  the terminal has no 2031). On by default; `false` asks nothing and
@@ -285,6 +292,13 @@ export class TtyBackend implements Backend {
     if (!this.mouseOn) return '';
     if (on) return MOUSE_ON + (this.hoverOn ? MOUSE_HOVER_ON : '');
     return (this.hoverOn ? MOUSE_HOVER_OFF : '') + MOUSE_OFF;
+  }
+
+  // The kitty flag is pushed last and popped first: the terminal keeps a stack
+  // per screen, and the pop must land while the alt screen is still ours.
+  private kittySequence(on: boolean): string {
+    if (this.options.kittyKeyboard === false) return '';
+    return on ? KITTY_KEYBOARD_ON : KITTY_KEYBOARD_OFF;
   }
 
   private inputAttached = false;
@@ -543,7 +557,7 @@ export class TtyBackend implements Backend {
       // Lazy like raw mode: a passive view never stops or continues.
       process.on('SIGCONT', this.onContinue);
       // Only a backend that reads keys asks for bracketed paste; dispose() undoes it.
-      this.out.write(BRACKETED_PASTE_ON + this.mouseSequence(true));
+      this.out.write(BRACKETED_PASTE_ON + this.mouseSequence(true) + this.kittySequence(true));
       // Same for the scheme: its answer arrives as input, so it is only asked
       // for once input is read.
       if (this.options.colorScheme !== false) this.scheme.start();
@@ -590,7 +604,7 @@ export class TtyBackend implements Backend {
       if (this.input.isTTY) this.input.setRawMode(true);
       this.input.on('data', this.inputDataHandler);
       this.input.resume();
-      this.out.write(BRACKETED_PASTE_ON + this.mouseSequence(true));
+      this.out.write(BRACKETED_PASTE_ON + this.mouseSequence(true) + this.kittySequence(true));
       if (this.options.colorScheme !== false) this.scheme.start();
     }
     this.previousBuffer = null;
@@ -615,7 +629,7 @@ export class TtyBackend implements Backend {
       this.lastMoveCell = null;
       // Reports off first — they were turned on last.
       this.scheme.stop();
-      this.out.write(this.mouseSequence(false) + BRACKETED_PASTE_OFF);
+      this.out.write(this.kittySequence(false) + this.mouseSequence(false) + BRACKETED_PASTE_OFF);
     }
     if (this.terminalEntered) {
       // Show cursor + reset SGR while still in alt-screen, then exit alt-screen

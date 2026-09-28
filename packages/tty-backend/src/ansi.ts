@@ -23,6 +23,15 @@ export const MOUSE_OFF = '\x1b[?1006l\x1b[?1002l\x1b[?1000l';
 export const MOUSE_HOVER_ON = '\x1b[?1003h';
 export const MOUSE_HOVER_OFF = '\x1b[?1003l';
 
+// The kitty keyboard protocol, first flag only (disambiguate escape codes):
+// Esc, Ctrl+key and Alt+key arrive as `CSI code ; modifiers u`, so Shift+Enter
+// is not Enter and Ctrl+I is not Tab. The flag is pushed onto the terminal's
+// stack and popped off it — a stack per screen, so the alt screen's push never
+// touches the shell's mode. A terminal without the protocol ignores both.
+// See docs/input.md (the kitty keyboard protocol).
+export const KITTY_KEYBOARD_ON = '\x1b[>1u';
+export const KITTY_KEYBOARD_OFF = '\x1b[<u';
+
 // Following the terminal's light / dark scheme (docs/terminal.md, light and
 // dark). OSC 11 with `?` asks for the default background, answered as
 // `OSC 11 ; rgb:rrrr/gggg/bbbb ST`. DEC mode 2031 asks to be told when the

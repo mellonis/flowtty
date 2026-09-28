@@ -50,8 +50,9 @@ function wordRight(value: string, cursor: number): number {
 }
 
 export interface EditorOptions {
-  /** Multi-line editing: line breaks are part of the value. Shift+Enter,
-   *  Alt+Enter and backslash-then-Enter insert one (plain Enter still submits),
+  /** Multi-line editing: line breaks are part of the value. Shift+Enter
+   *  and Alt+Enter insert one, as does backslash-then-Enter where the terminal
+   *  lacks the kitty keyboard protocol (plain Enter still submits),
    *  up/down move between visual rows, Home/End and the kill bindings work
    *  within the current line, and a paste keeps its line breaks. */
   multiline?: boolean;
@@ -95,8 +96,9 @@ export function reduce(state: EditorState, key: Key, opts: EditorOptions = {}): 
   }
 
   if (multiline) {
-    // Line breaks. Backslash-then-Enter is the one form every terminal delivers:
-    // Shift+Enter is often indistinguishable from Enter without the Kitty protocol.
+    // Line breaks. Backslash-then-Enter is for a terminal without the kitty
+    // keyboard protocol, where Shift+Enter arrives as plain Enter. See
+    // docs/input.md (the kitty keyboard protocol).
     if (key.name === 'return' && (key.shift || key.meta)) return insert('\n');
     if (key.name === 'return' && cursor > 0 && value[cursor - 1] === '\\') {
       return { kind: 'edit', state: { value: value.slice(0, cursor - 1) + '\n' + value.slice(cursor), cursor } };

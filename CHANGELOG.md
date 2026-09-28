@@ -7,6 +7,24 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Added
+
+- **The kitty keyboard protocol, first flag.** `TtyBackend` pushes
+  *disambiguate escape codes* onto the terminal's mode stack once keys are
+  read, and pops it before the alt screen goes — on unmount, `suspend()`,
+  Ctrl+C, a signal, an uncaught error. Shift+Enter is `return` + `shift`
+  rather than plain Enter, so `<TextArea>` breaks the line on it and submits
+  on Enter in every terminal that has the protocol; Ctrl+I, Ctrl+M and Ctrl+[
+  are the letters, not Tab, Enter and Escape; Escape arrives at once instead
+  of after the wait a bare `ESC` byte gets; the keypad is named after the
+  main keys, F1, F2 and F4 are read in the bare `CSI P` / `Q` / `S` form the
+  protocol sends them in, and a private-use key with no name (`csi-u-57358`)
+  is never printable. A terminal without the protocol ignores the request and is read
+  as before. `{ kittyKeyboard: false }` never asks. See docs/input.md (the
+  kitty keyboard protocol).
+
 ## 1.0.0-alpha.35 — 2026-09-28
 
 ### Changed

@@ -1,4 +1,5 @@
 import { expect, test } from 'vitest';
+import { isPrintable } from '@flowtty/core';
 import { decodeKeys, parseKeypress } from './key-parser.js';
 
 test('printable ASCII becomes one key per char (name === char, no modifiers)', () => {
@@ -133,8 +134,9 @@ test('cursor-position report (ESC[<row>;<col>R) is not misread as F3', () => {
   // Row 1 col 1: first param is "1" but the modifier slot is 1 (= no modifier),
   // which is never a real function-key encoding.
   expect(parseKeypress('\x1b[1;1R')[0]!.name).toBe('csi-R');
-  // Bare CSI R (no params) is not a function key in any scheme either.
-  expect(parseKeypress('\x1b[R')[0]!.name).toBe('csi-R');
+  // Bare CSI R (no params) is F3 — the kitty form before it moved to CSI 13~;
+  // a DSR reply always carries row;col, so nothing is lost.
+  expect(parseKeypress('\x1b[R')[0]!.name).toBe('f3');
   // The genuine modified-F3 form still resolves. Same guard applies to P/Q/S.
   expect(parseKeypress('\x1b[1;5R')[0]).toMatchObject({ name: 'f3', ctrl: true });
   expect(parseKeypress('\x1b[1;1P')[0]!.name).toBe('csi-P');
@@ -371,6 +373,57 @@ test('CSI-u / modifyOtherKeys forms of Tab, Escape, Backspace and printable keys
     ['a', false, true, false],
     ['a', false, true, false],
   ]);
+});
+
+// ─── the kitty keyboard protocol, flag 1 ─────────────────────────────────────
+// What a terminal sends once the backend has pushed `CSI > 1 u`: the keys the
+// legacy encoding cannot tell apart come as `CSI code ; modifiers u`, the
+// keypad by its own code points. See docs/input.md (the kitty keyboard protocol).
+
+test('kitty: Esc is CSI 27 u, and Ctrl+I, Ctrl+M, Ctrl+[ are the letters, no longer Tab, Enter and Escape', () => {
+  const { keys } = decodeKeys('\x1b[27u\x1b[105;5u\x1b[109;5u\x1b[91;5u\x1b[99;5u\x1b[32;5u');
+  expect(keys.map((k) => [k.name, k.shift, k.ctrl, k.meta])).toEqual([
+    ['escape', false, false, false],
+    ['i', false, true, false],
+    ['m', false, true, false],
+    ['[', false, true, false],
+    ['c', false, true, false],
+    [' ', false, true, false],
+  ]);
+});
+
+test('kitty: alt+key, ctrl+shift+key and a super-only chord carry the modifier bits the spec assigns', () => {
+  const { keys } = decodeKeys('\x1b[97;3u\x1b[97;6u\x1b[97;4u\x1b[97;9u');
+  expect(keys.map((k) => [k.name, k.shift, k.ctrl, k.meta])).toEqual([
+    ['a', false, false, true],
+    ['a', true, true, false],
+    ['a', true, false, true],
+    ['a', false, false, false],
+  ]);
+});
+
+test('kitty: the keypad keys take the names of their non-keypad twins', () => {
+  const codes = [57399, 57408, 57409, 57410, 57411, 57412, 57413, 57414, 57415, 57416, 57417, 57418, 57419, 57420, 57421, 57422, 57423, 57424, 57425, 57426];
+  const { keys } = decodeKeys(codes.map((c) => `\x1b[${c}u`).join(''));
+  expect(keys.map((k) => k.name)).toEqual([
+    '0', '9', '.', '/', '*', '-', '+', 'return', '=', ',',
+    'left', 'right', 'up', 'down', 'pageup', 'pagedown', 'home', 'end', 'insert', 'delete',
+  ]);
+  const shifted = decodeKeys('\x1b[57413;2u\x1b[57414;5u').keys;
+  expect(shifted.map((k) => [k.name, k.shift, k.ctrl])).toEqual([['+', true, false], ['return', false, true]]);
+});
+
+test('kitty: unmodified F1, F2 and F4 arrive as bare CSI P / Q / S, and F3 as CSI 13~', () => {
+  expect(parseKeypress('\x1b[P\x1b[Q\x1b[S\x1b[13~').map((k) => k.name)).toEqual(['f1', 'f2', 'f4', 'f3']);
+  // A bare CSI R is F3 too: a cursor-position report always carries row;col.
+  expect(parseKeypress('\x1b[R').map((k) => k.name)).toEqual(['f3']);
+  expect(parseKeypress('\x1b[13;2~')[0]).toMatchObject({ name: 'f3', shift: true });
+});
+
+test('kitty: a private-use key flowtty has no name for is named by its code, never a printable character', () => {
+  const { keys } = decodeKeys('\x1b[57358u\x1b[57428;5u');
+  expect(keys.map((k) => [k.name, k.ctrl])).toEqual([['csi-u-57358', false], ['csi-u-57428', true]]);
+  expect(keys.map(isPrintable)).toEqual([false, false]);
 });
 
 // ─── terminal reports ────────────────────────────────────────────────────────

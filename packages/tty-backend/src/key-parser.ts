@@ -30,8 +30,9 @@ export type TerminalReport =
  *  - control bytes: Tab, Return (CR/LF), Backspace (DEL/BS), Escape, Ctrl-A..Z
  *  - CSI sequences: ESC [ <params> <final> (arrows, Home, End, Delete, PageUp/Down, Insert)
  *  - SS3 sequences: ESC O <letter> (alternate arrow/Home/End encoding)
- *  - Function keys F1..F12: SS3 (ESC O P..S) for unmodified F1–F4, CSI letter
- *    (ESC[1;<mod>P..S) for modified F1–F4, and tilde form (ESC[11~..[24~) for all
+ *  - Function keys F1..F12: SS3 (ESC O P..S) or bare CSI letter (ESC[P..S, the
+ *    kitty form) for unmodified F1–F4, CSI letter (ESC[1;<mod>P..S) for modified
+ *    F1–F4, and tilde form (ESC[11~..[24~) for all
  *  - Mac Option-as-Meta: ESC <char> → {name: <char>, meta: true}
  *
  *  - Bracketed paste: ESC[200~ … ESC[201~ → ONE key {name: 'paste', text}. The
@@ -47,15 +48,18 @@ export type TerminalReport =
  *
  *  - Keys reported by code point: CSI-u (ESC[13;2u) and xterm modifyOtherKeys
  *    (ESC[27;2;13~) → the usual name plus modifiers, e.g. Shift+Enter =
- *    {name: 'return', shift: true}. Decoded whenever a terminal sends them;
- *    flowtty does not yet ask terminals to (that is the Kitty protocol).
+ *    {name: 'return', shift: true}. The TTY backend asks for them with the
+ *    kitty keyboard protocol's first flag; a terminal that sends them unasked
+ *    is read the same way. The keypad's private-use code points take the
+ *    names of the main keys; any other private-use key is `csi-u-<code>`.
+ *    See docs/input.md (the kitty keyboard protocol).
  *
  *  - Terminal reports — an OSC 11 background reply, a DEC 2031 scheme change
  *    (`CSI ? 997 ; 1|2 n`), focus in / out (`CSI I` / `CSI O`) — come back as
  *    `reports`, never as keys. Any other OSC is swallowed.
  *
- * NOT handled (later): hit-testing a click against the laid-out tree, enabling
- * the Kitty protocol, F13+.
+ * NOT handled (later): hit-testing a click against the laid-out tree, names
+ * for F13 and up.
  */
 // SGR mouse report params: "<b;col;row", coordinates 1-based, final 'M' for a
 // press or motion and 'm' for a release. In `b`, bits 4/8/16 are Shift/Meta/Ctrl
@@ -104,6 +108,24 @@ function decodeSgrMouse(params: string, final: string): Omit<Key, 'sequence'> | 
   return { name: motion ? 'mousedrag' : 'mousedown', button, ...at };
 }
 
+// The keypad under the kitty protocol's first flag: reported by code points of
+// its own (Unicode private use), named here after the non-keypad twins so a
+// field types a keypad digit and a list takes a keypad arrow. Any other
+// private-use key — a lock key, a media key, F13 and up — is named by its code
+// (`csi-u-57358`): a multi-character name is never printable, so it is never
+// typed. See docs/input.md (the kitty keyboard protocol).
+const KEYPAD_NAMES: Record<number, string> = {
+  57399: '0', 57400: '1', 57401: '2', 57402: '3', 57403: '4',
+  57404: '5', 57405: '6', 57406: '7', 57407: '8', 57408: '9',
+  57409: '.', 57410: '/', 57411: '*', 57412: '-', 57413: '+',
+  57414: 'return', 57415: '=', 57416: ',',
+  57417: 'left', 57418: 'right', 57419: 'up', 57420: 'down',
+  57421: 'pageup', 57422: 'pagedown', 57423: 'home', 57424: 'end',
+  57425: 'insert', 57426: 'delete',
+};
+const PRIVATE_USE_FIRST = 0xe000;
+const PRIVATE_USE_LAST = 0xf8ff;
+
 function decodeKeyByCodePoint(final: string, params: string): Omit<Key, 'sequence'> | null {
   const parts = params.split(';');
   let code: number;
@@ -117,7 +139,9 @@ function decodeKeyByCodePoint(final: string, params: string): Omit<Key, 'sequenc
   // Name it the way the plain byte would be named (13 → return, 9 → tab, …), but
   // take the modifiers from the report: parseChar would read 0x01–0x1A as Ctrl+letter.
   const base = code < 0x20 || code === 0x7f ? parseChar(String.fromCodePoint(code)) : null;
-  const name = base && !base.ctrl ? base.name : String.fromCodePoint(code);
+  const name = base && !base.ctrl ? base.name
+    : code >= PRIVATE_USE_FIRST && code <= PRIVATE_USE_LAST ? (KEYPAD_NAMES[code] ?? `csi-u-${code}`)
+    : String.fromCodePoint(code);
   return { name, ctrl: mod.ctrl, meta: mod.meta, shift: mod.shift };
 }
 
@@ -373,12 +397,13 @@ function csiFinalName(final: string, parts: string[]): string {
     case 'D': return 'left';
     case 'H': return 'home';
     case 'F': return 'end';
-    // vt220-style F1–F4 arrive ONLY as CSI 1;<mod> P/Q/R/S with mod ≥ 2 (e.g.
-    // Ctrl+F1 = ESC[1;5P); unmodified F1–F4 use the SS3 form (ESC O P..S). The
-    // 1;<mod> guard is what stops a cursor-position report (ESC[<row>;<col>R,
-    // the DSR reply) from being misread as F3 — its params are coordinates, not
-    // "1;<modifier>". flowtty never issues DSR, so the residual ESC[1;{2..16}R
-    // overlap with modified F3 is unreachable in practice.
+    // F1–F4 by letter: modified as CSI 1;<mod> P/Q/R/S (Ctrl+F1 = ESC[1;5P),
+    // unmodified as the SS3 form (ESC O P..S) in legacy encodings and as a bare
+    // CSI P/Q/S under the kitty keyboard protocol (its F3 is CSI 13~). The
+    // guard is what stops a cursor-position report (ESC[<row>;<col>R, the DSR
+    // reply) from being misread as F3 — its params are coordinates, never
+    // empty and never "1;<modifier>". flowtty never issues DSR, so the residual
+    // ESC[1;{2..16}R overlap with modified F3 is unreachable in practice.
     case 'P': case 'Q': case 'R': case 'S':
       if (!isVt220FunctionForm(parts)) return `csi-${final}`;
       return final === 'P' ? 'f1' : final === 'Q' ? 'f2' : final === 'R' ? 'f3' : 'f4';
@@ -386,8 +411,10 @@ function csiFinalName(final: string, parts: string[]): string {
   }
 }
 
-/** True for the vt220 modified-F1–F4 param form: exactly "1;<mod>" with mod ≥ 2. */
+/** True for the F1–F4 param forms: none at all (kitty's bare CSI P), or
+ *  exactly "1;<mod>" with mod ≥ 2 (the vt220 modified form). */
 function isVt220FunctionForm(parts: string[]): boolean {
+  if (parts.length === 1 && parts[0] === '') return true;
   return parts.length === 2 && parts[0] === '1' && Number(parts[1]) >= 2;
 }
 

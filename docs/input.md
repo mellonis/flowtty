@@ -4,6 +4,7 @@ How keys reach a component, how focus moves, and how forms validate.
 
 - [Keys and useInput](#keys-and-useinput)
 - [Paste and the mouse](#paste-and-the-mouse)
+- [The kitty keyboard protocol](#the-kitty-keyboard-protocol)
 - [Clicks and hover](#clicks-and-hover)
 - [Selection](#selection)
 - [Focus + Button](#focus--button)
@@ -164,14 +165,46 @@ can't reject such a typo (any character is a valid name), so
 `TestBackend.press()` does: it throws on a name no terminal produces, which stops
 a test from blessing a branch real input never reaches.
 
-`escape` arrives about 30 ms after the key: a lone `ESC` byte at the end of a
-read may be the start of a sequence whose rest is still on its way (a mouse
-report the OS split), so the TTY backend waits that long before calling it
-Escape. Nothing else is delayed.
+`escape` arrives about 30 ms after the key where the terminal sends a bare
+`ESC` byte: at the end of a read it may be the start of a sequence whose rest
+is still on its way (a mouse report the OS split), so the TTY backend waits
+that long before calling it Escape. Under the kitty keyboard protocol (next
+section) Escape is a sequence of its own and arrives at once. Nothing else is
+delayed.
 
 A handler that matches on names it knows is unaffected by the mouse keys: their
 names are multi-character, so they are never mistaken for a printable character.
 `<TextInput>`, `<TextArea>`, `<ListSelect>` and `<ListMultiSelect>` ignore them.
+
+## The kitty keyboard protocol
+
+The legacy key encoding cannot tell Shift+Enter from Enter, Ctrl+I from Tab,
+Ctrl+M from Enter, or a lone Escape from the start of an Alt sequence. The
+kitty keyboard protocol can, and `TtyBackend` asks for its first flag
+(*disambiguate escape codes*) as soon as keys are read: pushed onto the
+terminal's mode stack after the alt screen, popped off it before the alt screen
+goes — on unmount, on `suspend()`, on Ctrl+C, on a signal, on an uncaught
+error. Nothing changes for a handler: keys arrive with the same names and
+modifiers, only more of them are told apart.
+
+- **Shift+Enter** is `{ name: 'return', shift: true }`. `<TextArea>` inserts a
+  line break on it and submits on Enter, the way every composer works.
+- **Ctrl+I, Ctrl+M and Ctrl+[** are `i`, `m` and `[` with `ctrl`, no longer
+  Tab, Enter and Escape.
+- **Escape** arrives at once, not after the wait a bare `ESC` byte gets.
+- **Alt+key** is `{ name, meta: true }` with no `ESC` prefix to mistake.
+- **The keypad** is told from the main keys and named after them: a keypad
+  digit types, keypad Enter is `return`, a keypad arrow is `left` … `down`. A
+  private-use key flowtty has no name for — a lock key, a media key, F13 and
+  up — is named by its code (`csi-u-57358`), which no field types.
+
+A terminal without the protocol ignores the request and keeps sending legacy
+codes, which are read as before: nothing to detect, nothing to configure. In
+such a terminal `<TextArea>` still takes backslash then Enter for a line break.
+Only the first flag is asked for — release and repeat events, alternate keys
+and the text a key would insert are not, since no component needs them. `new
+TtyBackend(out, input, { kittyKeyboard: false })` never asks. Which terminals
+have the protocol is in [Terminal specifics](terminal.md#the-kitty-keyboard-protocol).
 
 ## Clicks and hover
 

@@ -11,8 +11,9 @@ export interface TextAreaProps {
   value: string;
   /** Called on every edit. */
   onChange: (value: string) => void;
-  /** Enter. Shift+Enter, Alt+Enter and backslash-then-Enter insert a line break
-   *  instead (the last is the one every terminal delivers). */
+  /** Enter. Shift+Enter and Alt+Enter insert a line break instead, and so
+   *  does backslash-then-Enter, for a terminal without the kitty keyboard
+   *  protocol (see docs/input.md, the kitty keyboard protocol). */
   onSubmit?: (value: string) => void;
   /** Escape. */
   onCancel?: () => void;
@@ -65,7 +66,7 @@ export function TextArea(props: TextAreaProps): ReactNode {
     value, onChange, onSubmit, onCancel, onKey, onCursorChange, maxRows,
     prefix, continuationPrefix, ghost, suffix, placeholder, backgroundColor = FIELD_BG,
   } = props;
-  const { isFocused: ctxFocused, focus } = useFocus();
+  const { isFocused: ctxFocused, focus, onLayout } = useFocus();
   const isFocused = props.isFocused !== undefined ? props.isFocused : ctxFocused;
 
   const [ownCursor, setOwnCursor] = useState(value.length);
@@ -132,7 +133,7 @@ export function TextArea(props: TextAreaProps): ReactNode {
   const faded = onDefaultField ? { color: FIELD_FADED } : { dim: true };
 
   return (
-    <Box flexDirection="row" backgroundColor={backgroundColor} onClick={focus}>
+    <Box flexDirection="row" backgroundColor={backgroundColor} onClick={focus} onLayout={onLayout}>
       {hasGutter ? (
         <Box flexDirection="column" flexShrink={0}>
           {rows.slice(first, first + visible).map((_, i) => (

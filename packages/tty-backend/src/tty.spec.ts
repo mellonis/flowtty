@@ -3,7 +3,7 @@ import { EventEmitter } from 'node:events';
 import { Buffer, type Key } from '@flowtty/core';
 import { TtyBackend } from './tty.js';
 import { isInteractive, NotInteractiveError } from './interactive.js';
-import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open, MOUSE_ON, MOUSE_OFF, MOUSE_HOVER_ON, MOUSE_HOVER_OFF, BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF, cursorTo } from './ansi.js';
+import { ALT_SCREEN_OFF, ALT_SCREEN_ON, HIDE_CURSOR, SHOW_CURSOR, CLEAR, RESET, OSC8_CLOSE, osc8Open, MOUSE_ON, MOUSE_OFF, MOUSE_HOVER_ON, MOUSE_HOVER_OFF, BRACKETED_PASTE_ON, BRACKETED_PASTE_OFF, KITTY_KEYBOARD_ON, KITTY_KEYBOARD_OFF, cursorTo } from './ansi.js';
 
 function makeStdinStub() {
   const emitter = new EventEmitter() as EventEmitter & {
@@ -909,7 +909,7 @@ test('suspend() hands the terminal back: input off, cursor shown, alt screen lef
   b.suspend();
   expect(stdin.__rawMode()).toBe(false);
   expect(stdin.listenerCount('data')).toBe(0);
-  expect(writes).toEqual([MOUSE_OFF + BRACKETED_PASTE_OFF, SHOW_CURSOR + RESET + ALT_SCREEN_OFF]);
+  expect(writes).toEqual([KITTY_KEYBOARD_OFF + MOUSE_OFF + BRACKETED_PASTE_OFF, SHOW_CURSOR + RESET + ALT_SCREEN_OFF]);
   stdin.emit('data', 'a'); // typed into the child, not into the app
   expect(keys).toEqual([]);
 
@@ -917,7 +917,7 @@ test('suspend() hands the terminal back: input off, cursor shown, alt screen lef
   b.resume();
   expect(stdin.__rawMode()).toBe(true);
   expect(stdin.listenerCount('data')).toBe(1);
-  expect(writes).toEqual([ALT_SCREEN_ON + HIDE_CURSOR, BRACKETED_PASTE_ON + MOUSE_ON]);
+  expect(writes).toEqual([ALT_SCREEN_ON + HIDE_CURSOR, BRACKETED_PASTE_ON + MOUSE_ON + KITTY_KEYBOARD_ON]);
   expect(resized).toHaveBeenCalledTimes(1);
   stdin.emit('data', 'a');
   expect(keys).toEqual(['a']);
@@ -1356,4 +1356,45 @@ test('TtyBackend: a run of identical wheel reports in one chunk is one key with 
     ['up', undefined, undefined, undefined], ['wheelup', 7, 2, 1],
   ]);
   back.dispose();
+});
+
+// ─── the kitty keyboard protocol ─────────────────────────────────────────────
+
+test('TtyBackend pushes the kitty keyboard flag with the first key subscription, after paste and mouse, and pops it before the alt screen goes', () => {
+  const { stub: out, writes } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin, { mouse: true, colorScheme: false });
+  expect(writes.join('')).not.toContain(KITTY_KEYBOARD_ON); // passive backend: untouched
+  back.onKey(() => {});
+  // One write, in the order the modes come off again: the flag is the last on.
+  expect(writes.at(-1)).toBe(BRACKETED_PASTE_ON + MOUSE_ON + KITTY_KEYBOARD_ON);
+  back.dispose();
+  const all = writes.join('');
+  expect(all).toContain(KITTY_KEYBOARD_OFF + MOUSE_OFF + BRACKETED_PASTE_OFF);
+  // The terminal keeps a stack per screen: the pop must land while the alt
+  // screen is still ours, or it pops the shell's own mode.
+  expect(all.indexOf(KITTY_KEYBOARD_OFF)).toBeLessThan(all.indexOf(ALT_SCREEN_OFF));
+});
+
+test('TtyBackend { kittyKeyboard: false } neither pushes nor pops the flag', () => {
+  const { stub: out, writes } = makeStub();
+  const back = new TtyBackend(out, makeStdinStub(), { kittyKeyboard: false, colorScheme: false });
+  back.onKey(() => {});
+  back.dispose();
+  expect(writes.join('')).not.toContain('\x1b[>1u');
+  expect(writes.join('')).not.toContain('\x1b[<u');
+});
+
+test('TtyBackend: Escape reported as CSI 27 u arrives at once, without the wait a lone ESC byte gets', () => {
+  vi.useFakeTimers();
+  try {
+    const { stub: out } = makeStub();
+    const stdin = makeStdinStub();
+    const back = new TtyBackend(out, stdin);
+    const seen: string[] = [];
+    back.onKey((k) => seen.push(k.name));
+    stdin.emit('data', '\x1b[27u');
+    expect(seen).toEqual(['escape']);
+    back.dispose();
+  } finally { vi.useRealTimers(); }
 });
