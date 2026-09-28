@@ -24,7 +24,8 @@ export interface TtyBackendOptions {
   /** The environment `widths: 'auto'` detects from. Default `process.env`. */
   env?: NodeJS.ProcessEnv;
   /**
-   * Report the mouse: the wheel as 'wheelup' / 'wheeldown', buttons as
+   * Report the mouse: the wheel as 'wheelup' / 'wheeldown' (a run of
+   * identical notches in one read is one key with a `count`), buttons as
    * 'mousedown' / 'mousedrag' / 'mouseup'. `{ hover: true }` also reports
    * motion with no button held, as 'mousemove' (coalesced: one per cell, at
    * most one per ~16 ms) and the pointer leaving the window as 'mouseleave'.
@@ -85,6 +86,12 @@ export interface TtyBackendOptions {
   /** See each captured console line as it happens — to show it in a log pane.
    *  With this set, nothing is printed at exit: the lines are the app's. */
   onConsole?: (entry: ConsoleEntry) => void;
+}
+
+// Two wheel reports that continue one run: the same notch direction, under
+// the same cell, with the same modifiers held.
+function sameWheel(a: Key, b: Key): boolean {
+  return a.name === b.name && a.x === b.x && a.y === b.y && a.shift === b.shift && a.meta === b.meta && a.ctrl === b.ctrl;
 }
 
 export class TtyBackend implements Backend {
@@ -159,15 +166,39 @@ export class TtyBackend implements Backend {
     // an app that never asked for one. A non-move key flushes the pending
     // move first, so a click never precedes its position, in one chunk or across two.
     let lastMove: Key | null = null;
+    // A run of identical wheel reports — same direction, cell and modifiers —
+    // is one key carrying the run length: a flick lands as one chunk of them,
+    // and delivered one by one each would be a synchronous render of its own
+    // ahead of the single frame that follows. Any other key ends the run, so
+    // the order of everything is kept. See docs/input.md (the wheel).
+    let run: Key | null = null;
+    const before = (): void => {
+      if (lastMove !== null) { this.move(lastMove); lastMove = null; }
+      this.flushHeldMove();
+    };
+    const endRun = (): void => {
+      if (run === null) return;
+      const key = run;
+      run = null;
+      before();
+      this.deliver(key);
+    };
     for (const raw of keys) {
       if (raw.name === 'mousemove') {
         if (this.hoverOn) lastMove = raw;
         continue;
       }
-      if (lastMove !== null) { this.move(lastMove); lastMove = null; }
-      this.flushHeldMove();
+      if (raw.name === 'wheelup' || raw.name === 'wheeldown') {
+        if (run !== null && sameWheel(run, raw)) { run.count! += 1; continue; }
+        endRun();
+        run = { ...raw, count: 1 };
+        continue;
+      }
+      endRun();
+      before();
       this.deliver(raw);
     }
+    endRun();
     if (leaving) {
       this.dropHeldMove();
       this.lastMoveCell = null;

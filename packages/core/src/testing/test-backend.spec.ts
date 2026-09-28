@@ -54,13 +54,14 @@ test('TestBackend.paste delivers the text as ONE paste key, not a key per charac
   expect(got).toEqual([['paste', 'a\nb']]);
 });
 
-test('TestBackend.wheel delivers a wheelup / wheeldown key at the given cell', () => {
+test('TestBackend.wheel delivers a wheelup / wheeldown key at the given cell, with the count (1 unless given)', () => {
   const b = new TestBackend(10, 4);
-  const got: Array<[string, number | undefined, number | undefined]> = [];
-  b.onKey((k) => got.push([k.name, k.x, k.y]));
+  const got: Array<[string, number | undefined, number | undefined, number | undefined]> = [];
+  b.onKey((k) => got.push([k.name, k.x, k.y, k.count]));
   b.wheel('down', 3, 2);
   b.wheel('up');
-  expect(got).toEqual([['wheeldown', 3, 2], ['wheelup', 0, 0]]);
+  b.wheel('up', 1, 1, 4);
+  expect(got).toEqual([['wheeldown', 3, 2, 1], ['wheelup', 0, 0, 1], ['wheelup', 1, 1, 4]]);
 });
 
 test('TestBackend.mouse delivers a press / drag / release at the given cell, left button by default', () => {

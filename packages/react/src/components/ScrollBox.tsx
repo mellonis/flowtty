@@ -35,7 +35,7 @@ export interface ScrollBoxProps
   /** Handle PgUp / PgDn and the mouse wheel. Default true. Set false when the
    *  host drives `offset` itself, or to park a box that is not the active view. */
   isActive?: boolean;
-  /** Rows per wheel step. Default 3. */
+  /** Rows per wheel notch; a flick's key scrolls that many per notch it carries. Default 3. */
   wheelStep?: number;
   /** Rows per PgUp / PgDn. Default: the viewport height minus one, so one row
    *  of context carries over between pages. */
@@ -113,7 +113,8 @@ export function ScrollBox({
       const inside = key.x === undefined || key.y === undefined || r === null
         || (key.x >= r.left && key.x < r.left + r.width && key.y >= r.top && key.y < r.top + r.height);
       if (!inside) return;
-      goTo(from + (key.name === 'wheelup' ? -wheelStep : wheelStep));
+      // A flick arrives as one key with the run length, not one per notch.
+      goTo(from + (key.name === 'wheelup' ? -wheelStep : wheelStep) * (key.count ?? 1));
       return true; // scrolled: nobody behind the box sees the step
     }
   }, { isActive });

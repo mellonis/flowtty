@@ -86,6 +86,7 @@ export class TestBackend implements Backend {
       ...(key.y !== undefined ? { y: key.y } : {}),
       ...(key.button !== undefined ? { button: key.button } : {}),
       ...(key.clicks !== undefined ? { clicks: key.clicks } : {}),
+      ...(key.count !== undefined ? { count: key.count } : {}),
       sequence: key.sequence ?? '',
       ctrl: key.ctrl ?? false,
       meta: key.meta ?? false,
@@ -142,9 +143,13 @@ export class TestBackend implements Backend {
     this.suspended = false;
   }
 
-  /** Deliver one mouse-wheel step at cell (x, y) — what a TTY backend with `mouse` on emits. */
-  wheel(direction: 'up' | 'down', x = 0, y = 0): void {
-    this.press({ name: direction === 'up' ? 'wheelup' : 'wheeldown', x, y });
+  /**
+   * Deliver a mouse-wheel key at cell (x, y) — what a TTY backend with `mouse`
+   * on emits. `count` is the number of notches it stands for: a TTY backend
+   * hands a flick over as one key with the run length. Default 1.
+   */
+  wheel(direction: 'up' | 'down', x = 0, y = 0, count = 1): void {
+    this.press({ name: direction === 'up' ? 'wheelup' : 'wheeldown', x, y, count });
   }
 
   /**

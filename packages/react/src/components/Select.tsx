@@ -299,8 +299,10 @@ function SelectPopup<T>({ store, multiple, filter, maxRows, hasAddRow, checkboxF
       return true;
     }
     if (key.name === 'mouseup' || key.name === 'mousedrag') return true;
-    if (key.name === 'down' || key.name === 'wheeldown') { if (rows > 0) setCursor((at + 1) % rows); return true; }
-    if (key.name === 'up' || key.name === 'wheelup') { if (rows > 0) setCursor((at - 1 + rows) % rows); return true; }
+    // A wheel key carries the notches a flick stands for; the arrows carry none, so 1.
+    const by = key.count ?? 1;
+    if (key.name === 'down' || key.name === 'wheeldown') { if (rows > 0) setCursor((at + by) % rows); return true; }
+    if (key.name === 'up' || key.name === 'wheelup') { if (rows > 0) setCursor((((at - by) % rows) + rows) % rows); return true; }
     if (key.name === 'return') {
       if (onAddRow) { choose(at); return true; }
       if (multiple) { done(undefined); return true; }

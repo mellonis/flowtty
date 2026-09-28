@@ -7,6 +7,22 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Changed
+
+- **A wheel flick is one key.** `TtyBackend` collapses a run of identical
+  wheel reports in one read — same direction, cell and modifiers, nothing
+  else in between — into one `wheelup` / `wheeldown` key whose new `count`
+  is the run length (a lone notch has 1). One render per flick instead of
+  one per notch: on the chat-shaped bench a chunk of 30 notches goes from 30
+  renders and 30 ms to one render and 15 ms before the next frame.
+  `ScrollBox` scrolls `wheelStep × count` and the `Select` popup moves its
+  cursor by `count`, so nothing changes for them. An app that counts
+  notches through `useInput` now sees fewer keys and adds `key.count ?? 1`.
+  `TestBackend.wheel(direction, x, y, count)` takes the count. See
+  docs/input.md (the wheel).
+
 ## 1.0.0-alpha.34 — 2026-09-28
 
 ### Added

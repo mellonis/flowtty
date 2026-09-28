@@ -192,6 +192,15 @@ describe('ScrollBox', () => {
     unmount();
   });
 
+  test('a wheel key with a count scrolls that many notches at once, clamped at the ends', async () => {
+    const { backend, frame, unmount } = await mount(<ScrollBox height={3}><Rows items={lines(10)} /></ScrollBox>, 12, 3);
+    backend.wheel('down', 0, 0, 2);
+    expect(await frame()).toEqual(['row 6', 'row 7', 'row 8']);
+    backend.wheel('up', 0, 0, 5);
+    expect(await frame()).toEqual(['row 0', 'row 1', 'row 2']);
+    unmount();
+  });
+
   test('anchor="bottom" with content shorter than the viewport starts at the top, not hanging at the bottom edge', async () => {
     const { frame, unmount } = await mount(<ScrollBox height={4} anchor="bottom"><Rows items={lines(2)} /></ScrollBox>);
     expect(await frame()).toEqual(['row 0', 'row 1']);

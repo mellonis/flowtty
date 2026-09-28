@@ -506,7 +506,7 @@ const app = await render(<App />, backend, {
 
 | Field | |
 |---|---|
-| `commits` | React commits since the previous frame. Several keys in one stdin chunk each commit synchronously and share the frame after them, so a wheel flick shows up here as one frame with many commits. |
+| `commits` | React commits since the previous frame. Several keys in one stdin chunk each commit synchronously and share the frame after them, so a burst of typed keys shows up here as one frame with several commits (a wheel flick is one key with a `count`, so one commit). |
 | `applied` | Boxes whose layout props were re-applied to Yoga since the previous frame. |
 | `skipped` | Boxes a re-render touched whose props were unchanged, so their layout was left alone. A large `skipped` with a small `applied` is a tree re-rendering more than it changes. |
 | `layoutMs` | Time in the Yoga layout. |

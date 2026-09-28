@@ -133,6 +133,18 @@ describe('Select — the popup', () => {
     unmount();
   });
 
+  test('a wheel key with a count moves the cursor that many rows', async () => {
+    const onChange = vi.fn();
+    const { backend, frame, unmount } = await mount(<Single initial="hobby" onChange={onChange} />);
+    backend.press({ name: 'return' });
+    await frame();
+    backend.wheel('down', 2, 2, 2);
+    backend.press({ name: 'return' });
+    await frame();
+    expect(onChange).toHaveBeenCalledWith('business');
+    unmount();
+  });
+
   test('typing narrows the list and shows the filter; Backspace widens; filter={false} ignores letters', async () => {
     const { backend, frame, unmount } = await mount(<Single />);
     backend.press({ name: 'return' });

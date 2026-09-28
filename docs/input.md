@@ -99,7 +99,14 @@ useInput((key) => {
   of a run of keystrokes. A pasted newline is therefore text, never Enter, and
   pasted letters never fire single-letter bindings. `<TextInput>` inserts a paste
   at the caret and, being single-line, turns its line breaks into spaces.
-- **Wheel.** `wheelup` / `wheeldown`, one key per step.
+- **Wheel.** `wheelup` / `wheeldown`, with `count`: how many notches the key
+  stands for. A flick lands as a run of reports in one read, and the TTY
+  backend hands a run of identical ones — same direction, cell and modifiers,
+  nothing else in between — over as ONE key with the run length, so the app
+  renders once for the flick instead of once per notch; a lone notch has
+  `count: 1`, and any other key ends a run, so nothing is reordered. A handler
+  that counts notches adds `key.count ?? 1` (a backend that does not collapse
+  sets nothing). `<ScrollBox>` scrolls `wheelStep × count`.
 - **Buttons.** `mousedown` when a button goes down, `mousedrag` for every cell a
   held button crosses, `mouseup` when it comes back up. Motion with no button
   held is reported as `mousemove` only when the backend was asked for hover
@@ -137,7 +144,7 @@ the ones verified by hand:
 Turn `mouse` on when the app gives something back for it, and say so in the app's
 help.
 
-In tests, `TestBackend` has `paste(text)`, `wheel('up' | 'down', x?, y?)` and
+In tests, `TestBackend` has `paste(text)`, `wheel('up' | 'down', x?, y?, count?)` and
 `mouse('down' | 'drag' | 'up' | 'move' | 'leave', x?, y?, options?)` — see
 [Sending input](testing.md#sending-input). Coordinates default to cell (0, 0),
 and a `<ScrollBox>` only reacts while the pointer is over it, so pass coordinates

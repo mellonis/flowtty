@@ -99,7 +99,8 @@ backend.press({ name: 'return' });
 backend.press({ name: 'c', ctrl: true });
 backend.type('hello');                 // one key per character
 backend.paste('two\nlines');           // ONE 'paste' key, as a terminal delivers it
-backend.wheel('down', 10, 4);          // a wheel step at cell (10, 4)
+backend.wheel('down', 10, 4);          // a wheel notch at cell (10, 4)
+backend.wheel('down', 10, 4, 3);       // a flick: three notches as ONE key, as a TTY backend hands them over
 backend.mouse('down', 4, 2);           // press the left button at cell (4, 2)
 backend.mouse('drag', 9, 2);           // …drag across to (9, 2)…
 backend.mouse('up', 9, 2);             // …and release
@@ -120,7 +121,8 @@ impossible name exercises a branch real input never reaches, and would pass.
 
 `wheel()` and `mouse()` default to cell (0, 0). A `<ScrollBox>` only reacts while
 the pointer is over it, so pass coordinates inside the box unless it sits at the
-origin. `mouse()` takes a fourth argument, `{ button, shift, meta, ctrl, clicks }` —
+origin. `wheel()` takes a fourth argument, the `count` of notches the key stands
+for (default 1). `mouse()` takes a fourth argument, `{ button, shift, meta, ctrl, clicks }` —
 `button` defaults to `'left'`, and `clicks: 2` (or `3`) on a `'down'` is the
 double-click (triple-click) a TTY backend would have counted. A drag is a `'down'`, one `'drag'` per cell
 crossed and an `'up'`, which is how a terminal reports one; see

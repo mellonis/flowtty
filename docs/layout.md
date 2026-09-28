@@ -241,7 +241,7 @@ layout leaves, so the app never adds up sibling heights to know how many rows fi
 | `offset` / `onScroll` | Controlled position, in rows from the anchored edge (0 = at that edge). When `offset` is set the box never moves on its own; keys and the wheel only report through `onScroll(offset, metrics)`. |
 | `onMetrics` | Content / viewport heights changed — for a "↑ more" hint, or a host that clamps its own `offset`. |
 | `isActive` | Handle PgUp / PgDn and the wheel (default `true`). The wheel only counts while the pointer is over the box. |
-| `wheelStep`, `pageStep` | Rows per wheel notch (default 3) and per PgUp/PgDn (default: viewport height − 1). |
+| `wheelStep`, `pageStep` | Rows per wheel notch (default 3; a flick's key carries a `count` of notches and scrolls that many at once) and per PgUp/PgDn (default: viewport height − 1). |
 | `scrollbar` | Draw a thumb in the right-hand column while the content overflows. |
 | `ref` | `scrollTo(offset)`, `scrollToStart()`, `scrollToEnd()`. |
 

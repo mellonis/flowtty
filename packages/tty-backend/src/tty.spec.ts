@@ -1334,3 +1334,26 @@ test('suspend() gives the console back to the child; resume() captures again', (
     log.mockRestore();
   }
 });
+
+// A flick lands as a run of wheel reports in one stdin chunk. Delivered one by
+// one, each would be a synchronous render of its own before the single frame
+// that follows; as one key carrying the run length, the chunk is one render.
+// See docs/input.md (the wheel).
+test('TtyBackend: a run of identical wheel reports in one chunk is one key with the count', () => {
+  const { stub: out } = makeStub();
+  const stdin = makeStdinStub();
+  const back = new TtyBackend(out, stdin, { mouse: true });
+  const seen: Array<[string, number | undefined, number | undefined, number | undefined]> = [];
+  back.onKey((k) => seen.push([k.name, k.x, k.y, k.count]));
+  stdin.emit('data', '\x1b[<65;7;3M'.repeat(30));
+  expect(seen).toEqual([['wheeldown', 6, 2, 30]]);
+  seen.length = 0;
+  // A lone step counts 1. A new cell, the other direction, a modifier, or any
+  // other key in between ends the run; the order of everything is kept.
+  stdin.emit('data', '\x1b[<65;7;3M\x1b[<65;8;3M\x1b[<64;8;3M\x1b[<64;8;3M\x1b[<68;8;3M\x1b[A\x1b[<68;8;3M');
+  expect(seen).toEqual([
+    ['wheeldown', 6, 2, 1], ['wheeldown', 7, 2, 1], ['wheelup', 7, 2, 2], ['wheelup', 7, 2, 1],
+    ['up', undefined, undefined, undefined], ['wheelup', 7, 2, 1],
+  ]);
+  back.dispose();
+});

@@ -72,6 +72,15 @@ export interface Key {
    * as 1. Undefined for every other key. See docs/input.md (selection).
    */
   clicks?: number;
+  /**
+   * How many notches a 'wheelup' / 'wheeldown' stands for. The TTY backend
+   * collapses a run of identical wheel reports in one read — same direction,
+   * cell and modifiers, nothing else in between — into one key carrying the
+   * run length, so a flick is one key rather than one per notch; a lone
+   * notch has 1. A backend that does not collapse sets nothing, which reads
+   * as 1. Undefined for every other key. See docs/input.md (the wheel).
+   */
+  count?: number;
   /** Raw byte sequence as received from the source (empty for synthetic keys). */
   sequence: string;
   ctrl: boolean;
