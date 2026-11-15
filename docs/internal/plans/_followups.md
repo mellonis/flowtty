@@ -203,15 +203,3 @@ Checked on 2026-09-25 with the bare probes in
 in every panel (found while testing CJK labels; the same on Latin ones).
 
 **Action:** widen `panelWidth` by one and pin the marker column in `Menu.spec`.
-
-## flow-assist: driving the host from outside the TUI (2026-11)
-
-### No way to reach a session the TUI does not draw
-
-`flow-assist` keeps a session's turn, its subagents and its background shell jobs alive after the chat is left — `/new`, the session picker, a collapsed chat: the session goes headless, keeps its lock, and goes on working. Nothing outside the TUI can then stop it, or answer it: every lever (`Esc`, `/subagent stop`, `x`/`y` in the tree, `shell_kill`) lives in the chat's key path, and the menu-bar watcher is read-only by design. The only external lever is killing the process, which stops every session at once.
-
-The pieces a control surface needs are already in the host: the plugin protocol is JSON-RPC over a unix socket under `hostStateDir()`, taken with a `<name>.lock` holding a pid (`src/remote/sockets.ts`), with pid-based staleness; the state file the watcher reads (`<id>.state.json`, contract v1) already says what runs and what waits.
-
-**Hit when:** a hypothetical raised while installing the menu-bar watcher (2026-11-15); nothing had needed it yet.
-
-**Action:** revisit when someone really needs it. Two shapes, far apart in cost: a control socket on the running host plus `flow-assist status` and `flow-assist stop [--session|--job|--all]` — small, since keys and the socket can share one dispatcher; or a full daemon with an attachable client — large, because a screen's state lives in the React tree today, so the host would have to be split into a brain process and a thin view. Take the socket if the need is stopping work and answering a y/n from the menu bar.
