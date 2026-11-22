@@ -107,7 +107,7 @@ describe('TextArea', () => {
     backend.press({ name: 'home' });
     expect(await caret()).toEqual({ x: 0, y: 0 });
     seen.set('history entry');
-    expect(await caret()).toEqual({ x: 1, y: 1 }); // width 12: "history entr" / "y" + caret
+    expect(await caret()).toEqual({ x: 5, y: 1 }); // width 12, wrapping at words: "history" / "entry" + caret
     unmount();
   });
 

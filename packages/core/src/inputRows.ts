@@ -16,6 +16,7 @@
 //    yet, so one is added for it — pass `cursor` to inputRows to get that row.
 
 import { clusterWidth, fitClusters, graphemes, stringWidth } from './graphemes.js';
+import { wrapTextLines } from './wrap.js';
 
 export interface InputRow {
   /** Text of this visual row (no line break). */
@@ -31,27 +32,26 @@ export function inputRows(value: string, width: number, cursor?: number): InputR
   const rows: InputRow[] = [];
   let lineStart = 0;
   for (const line of value.split('\n')) {
-    const clusters = graphemes(line);
-    if (clusters.length === 0) {
-      rows.push({ text: '', start: lineStart, continuation: false });
-    } else {
-      let start = lineStart;
-      let at = 0;
-      let lastRowFull = false;
-      while (at < clusters.length) {
-        const take = Math.max(1, fitClusters(clusters, w, at));
-        const text = clusters.slice(at, at + take).join('');
-        rows.push({ text, start, continuation: at > 0 });
-        start += text.length;
-        at += take;
-        lastRowFull = stringWidth(text) >= w;
-      }
-      // The caret parked after a line that exactly fills its last row needs a row.
-      if (cursor === lineStart + line.length && lastRowFull) {
-        rows.push({ text: '', start: cursor, continuation: true });
-      }
+    // One breaking algorithm with the output: a source line breaks into field rows
+    // exactly where `wrapTextLines` would print them — at words, a word wider than
+    // the width hard-broken at clusters. What the wrap dropped (only spaces, only at
+    // a break) is carried in `continues`, so the rows' `start` stays true to the
+    // source and the caret can walk it.
+    const pieces = wrapTextLines(line, w, 'wrap');
+    let at = lineStart;
+    pieces.forEach((piece, index) => {
+      rows.push({ text: piece.text, start: at, continuation: index > 0 });
+      at += piece.text.length + (piece.continues?.length ?? 0);
+    });
+    // The caret parked after a row that exactly fills the width, or in a run of
+    // spaces the wrap dropped at the value's end, needs a row to stand on.
+    const lineEnd = lineStart + line.length;
+    const last = rows[rows.length - 1]!;
+    const droppedTail = lineEnd - (last.start + last.text.length);
+    if (cursor === lineEnd && (droppedTail > 0 || stringWidth(last.text) >= w && last.start + last.text.length === lineEnd)) {
+      rows.push({ text: '', start: cursor, continuation: true });
     }
-    lineStart += line.length + 1;
+    lineStart = lineEnd + 1;
   }
   return rows;
 }
@@ -72,11 +72,16 @@ export function caretPosition(value: string, cursor: number, width: number): { r
   const c = Math.max(0, Math.min(value.length, cursor));
   const rows = inputRows(value, width, c);
   // The LAST row that starts at or before the caret and can hold it. Scanning
-  // from the end makes a soft-wrap boundary resolve to the next row's col 0.
+  // from the end makes a soft-wrap boundary resolve to the next row's col 0. A row
+  // holds the caret through the run of spaces the wrap dropped before the next row
+  // — the caret stands at the end of the words the row shows (2026-11-22).
   for (let r = rows.length - 1; r >= 0; r--) {
     const row = rows[r]!;
-    if (row.start <= c && c <= row.start + row.text.length) {
-      return { row: r, col: stringWidth(value.slice(row.start, c)) };
+    const end = row.start + row.text.length;
+    const next = rows[r + 1];
+    const holdEnd = next && next.continuation ? next.start : end;
+    if (row.start <= c && c <= holdEnd) {
+      return { row: r, col: stringWidth(value.slice(row.start, Math.min(c, end))) };
     }
   }
   return { row: 0, col: 0 };

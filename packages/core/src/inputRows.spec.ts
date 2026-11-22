@@ -1,5 +1,6 @@
 import { expect, test } from 'vitest';
 import { inputRows, caretPosition, rowIndexAt } from './inputRows.js';
+import { wrapText } from './wrap.js';
 
 test('each source line is a row; a blank line is a row of its own', () => {
   expect(inputRows('one\n\ntwo', 10).map((r) => [r.text, r.start])).toEqual([['one', 0], ['', 4], ['two', 5]]);
@@ -37,6 +38,54 @@ test('rows break by column: an emoji is one cluster of two columns, never split 
   const rows = inputRows('😀😀😀😀😀', 4);
   expect(rows.map((r) => [r.text, r.start])).toEqual([['😀😀', 0], ['😀😀', 4], ['😀', 8]]);
   expect(inputRows('😀😀', 2).map((r) => [r.text, r.start])).toEqual([['😀', 0], ['😀', 2]]);
+});
+
+// The field breaks at words — the same break the output prints — so what is typed
+// reads as what is shown. It used to pack clusters to the width, cutting words
+// mid-way (2026-11-22).
+test('a source line breaks into the rows wrapText prints, at words', () => {
+  const line = 'see the quick brown fox jump over the lazy dog';
+  for (const width of [5, 7, 10, 12, 20, 44, 45, 46]) {
+    expect(inputRows(line, width).map((r) => r.text)).toEqual(wrapText(line, width, 'wrap'));
+  }
+});
+
+test('a word wider than the width hard-breaks at clusters — the same rows as the output', () => {
+  for (const width of [2, 3, 4, 5]) {
+    expect(inputRows('ab 🙂🙂🙂🙂 cd', width).map((r) => r.text)).toEqual(wrapText('ab 🙂🙂🙂🙂 cd', width, 'wrap'));
+  }
+});
+
+test('at a word wrap the caret opens the next row, and stands at the row end before the break', () => {
+  // 'aa bb' at width 3: rows 'aa' | 'bb', the break consuming the space at 2.
+  expect(inputRows('aa bb', 3).map((r) => [r.text, r.start])).toEqual([['aa', 0], ['bb', 3]]);
+  expect(caretPosition('aa bb', 2, 3)).toEqual({ row: 0, col: 2 }); // before the break: that row's end
+  expect(caretPosition('aa bb', 3, 3)).toEqual({ row: 1, col: 0 }); // after it: the next row opens
+  expect(caretPosition('aa bb', 5, 3)).toEqual({ row: 1, col: 2 });
+});
+
+test('every cursor round-trips through rowIndexAt on the row that shows it', () => {
+  const value = 'see the quick brown fox\nand a second line that wraps too';
+  for (const width of [6, 11, 17]) {
+    const rows = inputRows(value, width);
+    for (let cursor = 0; cursor <= value.length; cursor++) {
+      const at = caretPosition(value, cursor, width);
+      expect(rowIndexAt(rows[at.row]!, at.col)).toBe(cursor);
+    }
+  }
+});
+
+test('a caret in a dropped run of spaces stands at the row end before it, and gets a row at the value end', () => {
+  // 'aa   bb' at width 3: the rows are 'aa ' | 'bb' — the first row keeps what fits
+  // and the wrap drops '  ' before the next word; the caret inside the dropped run
+  // stands at the end of the row before it (its trailing space shown).
+  expect(inputRows('aa   bb', 3).map((r) => [r.text, r.start])).toEqual([['aa ', 0], ['bb', 5]]);
+  expect(caretPosition('aa   bb', 3, 3)).toEqual({ row: 0, col: 3 });
+  expect(caretPosition('aa   bb', 4, 3)).toEqual({ row: 0, col: 3 });
+  // A caret past the last row's end has a row to stand on (the "exactly fills" rule,
+  // generalised to a break the value ends on).
+  expect(inputRows('aa   bb ', 3, 8).map((r) => r.text)).toEqual(['aa ', 'bb ', '']);
+  expect(caretPosition('aa   bb ', 8, 3)).toEqual({ row: 2, col: 0 });
 });
 
 test('caretPosition reports the column in display columns; `start` and `cursor` stay UTF-16 indices', () => {

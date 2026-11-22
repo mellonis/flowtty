@@ -7,6 +7,19 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Fixed
+
+- **A text field wraps at words.** The field's rows broke mid-word and only the
+  printed output broke at spaces, so what was typed read as puzzle cuts until it
+  was sent. `inputRows` now breaks a line exactly where `wrapTextLines` prints
+  it — one algorithm for both — while a word wider than the field still
+  hard-breaks at clusters and a wide cluster is never split. The caret rules are
+  unchanged (a wrap opens the next row at column 0; a caret past the last row's
+  end gets a row of its own), and `inputRows`/`caretPosition`/`rowIndexAt` keep
+  their signatures.
+
 ## 1.0.0-alpha.37 — 2026-09-28
 
 ### Fixed
