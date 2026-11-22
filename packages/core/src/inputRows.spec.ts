@@ -1,6 +1,6 @@
 import { expect, test } from 'vitest';
 import { inputRows, caretPosition, rowIndexAt } from './inputRows.js';
-import { wrapText } from './wrap.js';
+import { wrapText, wrapTextLines } from './wrap.js';
 
 test('each source line is a row; a blank line is a row of its own', () => {
   expect(inputRows('one\n\ntwo', 10).map((r) => [r.text, r.start])).toEqual([['one', 0], ['', 4], ['two', 5]]);
@@ -117,4 +117,27 @@ test('rowIndexAt converts a column back to an index; a column inside a wide clus
   expect(rowIndexAt(row, 2)).toBe(2);
   expect(rowIndexAt(row, 3)).toBe(2);
   expect(rowIndexAt(row, 4)).toBe(3);
+});
+
+test('the FIELD keeps a leading run of spaces where the OUTPUT trims it', () => {
+  // Two worlds, both pinned: the printed rows are `asPainted` (line-outer spaces
+  // trimmed, a line of only separators collapsed — wrap.spec, selection.spec),
+  // while the field must not lose what was typed: the indent is content there
+  // and every source line has a row ("as typed" copy).
+  expect(wrapTextLines('  npm test', 90, 'wrap')).toEqual([{ text: 'npm test' }]);
+  expect(wrapTextLines('   ', 5, 'wrap')).toEqual([{ text: '' }]);
+  expect(wrapTextLines('  ab cd', 4, 'wrap')).toEqual([
+    { text: 'ab', continues: ' ' },
+    { text: 'cd' },
+  ]);
+  // The field's rows hold the indent and a spaces-only line — and the caret walks
+  // the indent, not past it.
+  expect(inputRows('run\n   \n  npm test', 90).map((row) => row.text)).toEqual(['run', '   ', '  npm test']);
+  expect(inputRows('run\n  npm test', 90).map((row) => row.text)).toEqual(['run', '  npm test']);
+  expect(inputRows('  npm', 20)).toEqual([{ text: '  npm', start: 0, continuation: false }]);
+  expect(caretPosition('  npm', 4, 20)).toEqual({ row: 0, col: 4 });
+  // A wrapped row's text is a contiguous source slice, so a copy that joins rows
+  // with `next.start − (start + text.length)` rejoins the line as typed.
+  const rows = inputRows('run\n  ab   cd', 4);
+  expect(rows.map((row) => [row.text, row.start])).toEqual([['run', 0], ['  ab', 4], ['cd', 11]]);
 });

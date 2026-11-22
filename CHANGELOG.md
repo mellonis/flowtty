@@ -7,6 +7,20 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## Unreleased
+
+### Fixed
+
+- **The field keeps its typed spaces where the printed rows trim them.** The
+  word wrap of `1.0.0-alpha.38` cut a typed indent away (`  npm test` showed as
+  `npm test`) and swallowed a line of only spaces. The printed output is
+  unchanged — its rows stay `asPainted` (line-outer spaces trimmed, a line of
+  only separators collapsed, NBSP content) — while the field's rows are its
+  own literal laying-out now: every row is a contiguous slice of the value with
+  its `start` true to the source, so the indent is drawn, a spaces-only line
+  has its row, and a copy that joins rows with the gaps between them rejoins
+  the line exactly as typed.
+
 ## 1.0.0-alpha.38 — 2026-11-22
 
 ### Fixed

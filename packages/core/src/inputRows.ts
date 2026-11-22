@@ -4,10 +4,11 @@
 //
 // Units: `cursor` and `InputRow.start` are UTF-16 indices into the value (so
 // `value.slice(0, cursor)` works), while widths and the caret's `col` are
-// display COLUMNS (`stringWidth`) — the grid's unit. Rows break by cluster, so
-// a wide cluster (an ideograph, an emoji with its modifiers) is never split
-// across rows; one that does not fit the row's last column moves whole to the
-// next row. A cursor is always on a cluster boundary (the editor keeps it so).
+// display COLUMNS (`stringWidth`) — the grid's unit. Rows break at words, the
+// way the output prints them, but keep what was typed: only a word wider than
+// the width is cut, at clusters, and a wide cluster (an ideograph, an emoji
+// with its modifiers) is never split across rows. A cursor is always on a
+// cluster boundary (the editor keeps it so).
 // Caret rules:
 //  - at the end of a line that is followed by a line break, it stays on that line;
 //  - on a blank line it has a row to stand on;
@@ -16,7 +17,6 @@
 //    yet, so one is added for it — pass `cursor` to inputRows to get that row.
 
 import { clusterWidth, fitClusters, graphemes, stringWidth } from './graphemes.js';
-import { wrapTextLines } from './wrap.js';
 
 export interface InputRow {
   /** Text of this visual row (no line break). */
@@ -27,21 +27,90 @@ export interface InputRow {
   continuation: boolean;
 }
 
+// One source line broken at words, the positions kept true to the source. The
+// breaks are the ones the output wrap makes, but what a row SHOWS is what was
+// typed: a source line's leading run of spaces is content (the break before it
+// is the author's `\n`), and a run of spaces within the line stays with the rows
+// as far as it fits, the rest belonging to the break before the next row.
+//
+// Every row's text is a contiguous slice of the source starting at `start`, so
+// the spaces a break swallowed are exactly `next.start − (start + text.length)`
+// — a copy that joins rows with those gaps rejoins the line as typed. A word
+// wider than the width is cut at clusters and a wide cluster is never split.
+function wrapLineRows(line: string, width: number): InputRow[] {
+  if (line === '') return [{ text: '', start: 0, continuation: false }];
+  const rows: InputRow[] = [];
+  let current: string | undefined;
+  let currentWidth = 0;
+  let rowStart = 0;
+  // A soft break drops the run of spaces it lands in: their empties go with the
+  // break and the next word opens its row bare (2026-11-22).
+  let droppedRun = false;
+  let pos = 0;
+  const words = line.split(' ');
+  for (const [index, word] of words.entries()) {
+    const wordWidth = stringWidth(word);
+    const wordStart = pos;
+    pos += word.length + 1;
+    if (droppedRun && word === '') continue;
+    if (current !== undefined) {
+      const candidateWidth = currentWidth + 1 + wordWidth;
+      if (candidateWidth <= width) {
+        current = current + ' ' + word;
+        currentWidth = candidateWidth;
+        continue;
+      }
+      rows.push({ text: current, start: rowStart, continuation: rows.length > 0 });
+      current = undefined;
+      currentWidth = 0;
+      droppedRun = true;
+      // The overflow is itself a space of the run: it goes with the break.
+      if (word === '') continue;
+      droppedRun = false;
+    }
+    // A fresh row opens with the word bare, empty at the line's own start —
+    // or hard-cut, a word wider than the width.
+    if (index === 0 || word !== '') {
+      if (wordWidth > width) {
+        const clusters = graphemes(word);
+        let at = 0;
+        let pieceStart = wordStart;
+        while (at < clusters.length) {
+          const take = Math.max(1, fitClusters(clusters, width, at));
+          const piece = clusters.slice(at, at + take).join('');
+          at += take;
+          if (at < clusters.length) {
+            rows.push({ text: piece, start: pieceStart, continuation: rows.length > 0 });
+            pieceStart += piece.length;
+          } else {
+            current = piece;
+            currentWidth = stringWidth(piece);
+            rowStart = pieceStart;
+            droppedRun = false;
+          }
+        }
+      } else {
+        current = word;
+        currentWidth = wordWidth;
+        rowStart = wordStart;
+        droppedRun = false;
+      }
+    }
+  }
+  if (current !== undefined) rows.push({ text: current, start: rowStart, continuation: rows.length > 0 });
+  return rows;
+}
+
 export function inputRows(value: string, width: number, cursor?: number): InputRow[] {
   const w = Math.max(1, Math.floor(width));
   const rows: InputRow[] = [];
   let lineStart = 0;
   for (const line of value.split('\n')) {
-    // One breaking algorithm with the output: a source line breaks into field rows
-    // exactly where `wrapTextLines` would print them — at words, a word wider than
-    // the width hard-broken at clusters. What the wrap dropped (only spaces, only at
-    // a break) is carried in `continues`, so the rows' `start` stays true to the
-    // source and the caret can walk it.
-    const pieces = wrapTextLines(line, w, 'wrap');
-    let at = lineStart;
+    // The field's own breaking of a source line — at words like the output
+    // prints them, but the rows keep what was typed (wrapLineRows).
+    const pieces = wrapLineRows(line, w);
     pieces.forEach((piece, index) => {
-      rows.push({ text: piece.text, start: at, continuation: index > 0 });
-      at += piece.text.length + (piece.continues?.length ?? 0);
+      rows.push({ text: piece.text, start: lineStart + piece.start, continuation: index > 0 });
     });
     // The caret parked after a row that exactly fills the width, or in a run of
     // spaces the wrap dropped at the value's end, needs a row to stand on.
