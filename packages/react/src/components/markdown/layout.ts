@@ -10,6 +10,8 @@ import {
   detectLanguage, highlightBlock, hunkNumbers, resolveLanguage,
   type CodeLine, type CodeLineKind,
 } from './highlight/index.js';
+import { resolvePalette } from './highlight/tokenColors.js';
+import type { TokenColors, TokenPalette } from './highlight/types.js';
 import { clusterWidth, graphemes, stringWidth } from '@flowtty/core';
 import type { Color, WrapContinuation } from '@flowtty/core';
 
@@ -34,6 +36,12 @@ export interface MarkdownOptions {
    *  Turn it off where the band cannot say what it means — a 16-color terminal
    *  has no faint green (see docs/components.md — diff blocks). */
   diffBackground?: boolean;
+  /** Per-token styles for a fenced block, merged over the defaults. A bare
+   *  Color is that token's `color`; a field left out keeps the default. Names
+   *  the ink of every language token AND a diff row's band (`added` /
+   *  `removed`, `background`) — the one thing besides `diffBackground` that
+   *  decides what a changed row looks like. */
+  tokenColors?: TokenColors;
 }
 
 /** One fenced block of a laid-out document, reported by
@@ -412,8 +420,12 @@ const CODE_BAR = '│ ';
 const ADDED_BG = '#003b00';
 const REMOVED_BG = '#3b0000';
 
-function rowBackground(kind: CodeLineKind): Color | undefined {
-  return kind === 'added' ? ADDED_BG : kind === 'removed' ? REMOVED_BG : undefined;
+function rowBackground(kind: CodeLineKind, palette: TokenPalette): Color | undefined {
+  const token = kind === 'added' ? 'added' : kind === 'removed' ? 'removed' : undefined;
+  if (token === undefined) return undefined;
+  // A palette that names a band for this kind wins; one that names none takes
+  // the defaults above.
+  return palette[token].background ?? (token === 'added' ? ADDED_BG : REMOVED_BG);
 }
 
 /**
@@ -495,8 +507,11 @@ function layoutCode(b: CodeBlockSrc, width: number, opts: MarkdownOptions, out: 
   const bar = (opts.codeFence ?? 'bar') === 'bar';
   // The whole block at once, so a construct that spans lines (a block comment, a
   // triple-quoted string) keeps its state. The RAW label goes in: an unlabeled
-  // block is where the highlighter looks for a diff by itself.
-  const code = highlightBlock(b.lines, b.lang);
+  // block is where the highlighter looks for a diff by itself. The palette is
+  // resolved once per block — the ink the rows merge on AND the bands are the one
+  // resolved table.
+  const palette = resolvePalette(opts.tokenColors);
+  const code = highlightBlock(b.lines, b.lang, palette);
   const detected = b.lang.trim() === '' ? detectLanguage(b.lines) : undefined;
   const isDiff = (b.lang.trim() === '' ? detected : resolveLanguage(b.lang)) === 'diff';
   const numbers = opts.lineNumbers ? sourceLineNumbers(b.lines, code, isDiff) : null;
@@ -543,7 +558,7 @@ function layoutCode(b: CodeBlockSrc, width: number, opts: MarkdownOptions, out: 
   }[] = [];
   b.lines.forEach((_cl, si) => {
     const hl = code[si]!;
-    const background = bands ? rowBackground(hl.kind) : undefined;
+    const background = bands ? rowBackground(hl.kind, palette) : undefined;
     const chars: StyledChar[] = hl.segs.flatMap((cs) => graphemes(cs.text).map((ch) => ({
       ch,
       style: { color: cs.color, dim: cs.dim, bold: cs.bold, background },

@@ -579,6 +579,7 @@ closes a block only when it uses the same character and is at least as long.
 | `maxCodeRows` | `number`                | unset    | Caps the **rendered** rows of one block. Past the cap the block ends with a dim `… N more lines` row (behind the gutter), where N counts the **source** lines left out |
 | `lineNumbers` | `boolean`               | `false`  | Dim, right-aligned source line numbers between the gutter and the code (`│  7 code`). The gutter sizes itself from the largest number and takes that width off the code; a wrapped continuation row keeps the bar and leaves the number blank. A diff is numbered from its hunk headers — see [Diff blocks](#diff-blocks) |
 | `diffBackground` | `boolean`            | `true`   | Faint green / red bands behind a diff's added / removed rows. Off, those rows are exactly as they would be with no bands — see [Diff blocks](#diff-blocks) |
+| `tokenColors` | `MarkdownTokenColors`  | unset    | Per-token styles for a fenced block, merged over the defaults: a token left out keeps what it has. Names the colors above **and** a diff row's ink and band (`added` / `removed`, `color` / `background`) — see [Diff blocks](#diff-blocks) |
 
 ```tsx
 <Markdown codeWrap="truncate" maxCodeRows={20} lineNumbers>{reply}</Markdown>
@@ -622,6 +623,13 @@ Because a 16-color terminal has no faint green, the bands there become plain
 black: invisible on a black background, a dark stripe on a light one. Set
 `diffBackground={false}` when that is the wrong trade — the rows are then exactly
 as they would be with no bands at all.
+
+**Own colors.** The two inks and the two bands are the defaults: `tokenColors`
+recolors them per call — `added` / `removed`, each with its `color` and
+`background` — so a host with a palette of its own draws a diff with it. On a
+light terminal the dark bands are what a palette replaces, under the same inks.
+A token that names no `background` keeps the band above, and
+`diffBackground={false}` still removes every band whatever the palette says.
 
 **Line numbers.** With `lineNumbers`, a diff is numbered the way the patch
 numbers it rather than 1..n: each `@@ -a,b +c,d @@` header restarts the count, a

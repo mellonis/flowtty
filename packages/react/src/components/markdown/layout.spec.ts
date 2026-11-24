@@ -582,3 +582,46 @@ describe('continuation marks', () => {
     expect(rows).toEqual(['│ 👩‍👧👩‍👧👩‍👧']);
   });
 });
+
+describe('a fenced block drawn with a caller\'s palette', () => {
+  test('tokenColors recolours a diff fence and its band', () => {
+    const lines = layoutMarkdown(fence('diff', '@@ -1 +1 @@', '-gone', '+new'), 20, {
+      tokenColors: { removed: { color: 'magenta', background: '#220000' }, added: 'blue' },
+    });
+    const removed = lines[2]!;
+    const added = lines[3]!;
+    const removeSpan = removed.spans.find((s) => s.text.startsWith('-gone'));
+    expect(removeSpan?.color).toBe('magenta');
+    expect(removeSpan?.background).toBe('#220000');
+    expect(new Set(removed.spans.filter((s) => s.background !== undefined).map((s) => s.background))).toEqual(new Set(['#220000']));
+    const addSpan = added.spans.find((s) => s.text.startsWith('+new'));
+    expect(addSpan?.color).toBe('blue');
+    // Only the ink was overridden: the default band is still there.
+    expect(new Set(added.spans.filter((s) => s.background !== undefined).map((s) => s.background))).toEqual(new Set([ADDED_BG]));
+  });
+
+  // Review Focus: a palette never rewrites a row — what a `+`/`-` glyph says survives
+  // NO_COLOR and a 16-colour terminal unchanged.
+  test('a palette changes no character of the block', () => {
+    const src = fence('diff', '@@ -3,2 +3,3 @@', ' keep', '-gone', '+new');
+    const plain = layoutMarkdown(src, 20).map(text);
+    const painted = layoutMarkdown(src, 20, { tokenColors: { added: 'redBright', removed: 'red' } }).map(text);
+    expect(painted).toEqual(plain);
+  });
+
+  // Review Focus: a band from the palette still ends flush on a wrapped row.
+  test('a palette band fills a wrapped continuation row', () => {
+    const lines = layoutMarkdown(fence('diff', '+aaaaaaaaaaaa'), 10, { tokenColors: { added: { background: '#113311' } } });
+    expect(lines.length).toBe(3);
+    for (const l of lines.slice(1)) {
+      expect(l.spans.filter((s) => s.background === '#113311').map((s) => s.text).join('').length).toBe(8);
+    }
+  });
+
+  test('diffBackground: false still wins over a palette band', () => {
+    const lines = layoutMarkdown(fence('diff', '+new'), 20, {
+      diffBackground: false, tokenColors: { added: { background: '#113311' } },
+    });
+    expect(lines.every((l) => l.spans.every((s) => s.background === undefined))).toBe(true);
+  });
+});

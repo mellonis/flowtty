@@ -72,16 +72,17 @@ export function Markdown({
   codeWrap,
   maxCodeRows,
   lineNumbers,
+  tokenColors,
   onCodeBlocks,
 }: MarkdownProps): ReactNode {
   const [measured, setMeasured] = useState<number | null>(null);
   const w = width ?? measured;
   const { lines, blocksKey, blocks } = useMemo(() => {
     if (w == null) return { lines: [] as StyledLine[], blocksKey: null, blocks: [] as MarkdownCodeBlock[] };
-    const opts: MarkdownOptions = { codeFence, codeWrap, maxCodeRows, lineNumbers };
+    const opts: MarkdownOptions = { codeFence, codeWrap, maxCodeRows, lineNumbers, tokenColors };
     const laid = layoutMarkdownDetailed(children, w, opts);
     return { lines: laid.lines, blocksKey: JSON.stringify(laid.codeBlocks), blocks: laid.codeBlocks };
-  }, [children, w, codeFence, codeWrap, maxCodeRows, lineNumbers]);
+  }, [children, w, codeFence, codeWrap, maxCodeRows, lineNumbers, tokenColors]);
 
   // Report the blocks from an effect, never during render, and key the effect on
   // the serialized list — a re-render that produces an equal list must not fire

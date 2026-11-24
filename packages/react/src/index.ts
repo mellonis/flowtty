@@ -86,6 +86,11 @@ export { layoutMarkdown, layoutMarkdownDetailed, type StyledLine, type StyledSpa
 export type {
   MarkdownOptions, MarkdownLayout, MarkdownCodeBlock, MarkdownCodeFence, MarkdownCodeWrap,
 } from './components/markdown/layout.js';
+export type {
+  TokenColors as MarkdownTokenColors,
+  TokenStyle as MarkdownTokenStyle,
+  TokenType as MarkdownToken,
+} from './components/markdown/highlight/types.js';
 export { highlightMarkdownSource, type SourceLine } from './components/markdown/source.js';
 export { parseMarkdown, parseInline } from './components/markdown/parse.js';
 export type { MdBlock, MdList, MdListItem, MdAlign, InlineSeg } from './components/markdown/parse.js';
