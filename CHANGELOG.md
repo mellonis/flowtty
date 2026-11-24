@@ -7,6 +7,18 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## 1.0.0-alpha.40 — 2026-11-24
+
+### Added
+
+- **A fenced block's colours are the caller's to set.** `MarkdownOptions.tokenColors`
+  (and the same prop on `<Markdown>`) takes a partial map of token → style or colour,
+  merged over the defaults and resolved once per block, so a row's ink is settled
+  before neighbouring runs merge. A diff's row bands follow the palette when it names
+  a `background`; `diffBackground: false` still removes them all. The same palette
+  reaches `layoutMarkdown`, `layoutMarkdownDetailed`, `<Markdown>` and
+  `highlightMarkdownSource`. With no overrides the output is unchanged.
+
 ## 1.0.0-alpha.39 — 2026-11-22
 
 ### Fixed
