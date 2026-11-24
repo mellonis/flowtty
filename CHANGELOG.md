@@ -7,6 +7,21 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## 1.0.0-alpha.41 — 2026-11-24
+
+### Fixed
+
+- **A diff row's band stays off its run.** `highlightDiff` laid the palette's
+  whole style on the row's segment, so an overridden `background` was on the
+  run — where a layout never reads it and a consumer of `CodeLine` should not
+  find it. A run now carries the ink alone (`inkOf`), as the builder's runs
+  already did.
+
+- **A field left `undefined` in a partial token style keeps the default.**
+  `{ added: { color: maybeUndefined, background: … } }` used to erase the
+  default ink; a field left out is now the field left alone, at every level.
+  A whole token left `undefined` is still "no override".
+
 ## 1.0.0-alpha.40 — 2026-11-24
 
 ### Added
