@@ -40,3 +40,19 @@ describe('the token palette', () => {
     expect(resolvePalette()).toBe(DEFAULT_TOKEN_COLORS);
   });
 });
+
+describe('what a palette may not leak', () => {
+  // The band is the layout's, not a run's: `CodeSeg` keeps the ink fields only.
+  test('a band never rides on a run', () => {
+    const palette = resolvePalette({ removed: { background: '#220000' } });
+    const lines = highlightBlock(['-gone'], 'diff', palette);
+    expect(lines[0]!.segs[0]).toEqual({ text: '-gone', color: 'red' });
+  });
+
+  // A field left undefined inside a partial style is the field left out — the
+  // default stands. Only a whole-token `undefined` is "no override".
+  test('a field left undefined in a partial style keeps the default', () => {
+    const palette = resolvePalette({ added: { color: undefined, background: '#113311' } });
+    expect(palette.added).toEqual({ color: 'green', background: '#113311' });
+  });
+});

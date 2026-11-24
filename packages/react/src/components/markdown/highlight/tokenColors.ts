@@ -33,9 +33,22 @@ export const DEFAULT_TOKEN_COLORS: TokenPalette = {
 };
 
 /**
+ * The ink half of a style: what a run of text carries. A band is the layout's
+ * and never rides on a `CodeSeg`.
+ */
+export function inkOf(style: TokenStyle): Omit<CodeSeg, 'text'> {
+  const seg: Omit<CodeSeg, 'text'> = {};
+  if (style.color !== undefined) seg.color = style.color;
+  if (style.dim !== undefined) seg.dim = style.dim;
+  if (style.bold !== undefined) seg.bold = style.bold;
+  return seg;
+}
+
+/**
  * The defaults with the caller's overrides laid over them, token by token. A
- * partial style keeps the fields it does not name; a bare Color is that token's
- * ink. Resolved BEFORE the builder merges neighbouring runs, so two tokens that
+ * partial style keeps the fields it does not name — a field explicitly
+ * `undefined` is that field left out; a bare Color is that token's ink.
+ * Resolved BEFORE the builder merges neighbouring runs, so two tokens that
  * look alike by default stay apart once only one of them is recoloured.
  *
  * A token the table does not know, and a token mapped to `undefined`, are both
@@ -47,9 +60,16 @@ export function resolvePalette(overrides?: TokenColors): TokenPalette {
   for (const token of Object.keys(DEFAULT_TOKEN_COLORS) as TokenType[]) {
     const o = overrides[token];
     if (o === undefined) continue;
+    const base = DEFAULT_TOKEN_COLORS[token];
     out[token] = typeof o === 'string'
-      ? { ...DEFAULT_TOKEN_COLORS[token], color: o }
-      : { ...DEFAULT_TOKEN_COLORS[token], ...o };
+      ? { ...base, color: o }
+      : {
+          ...base,
+          ...(o.color === undefined ? {} : { color: o.color }),
+          ...(o.dim === undefined ? {} : { dim: o.dim }),
+          ...(o.bold === undefined ? {} : { bold: o.bold }),
+          ...(o.background === undefined ? {} : { background: o.background }),
+        };
   }
   return out;
 }
@@ -68,14 +88,7 @@ export function createBuilder(palette: TokenPalette = DEFAULT_TOKEN_COLORS): Seg
       const style = palette[token];
       const last = segs[segs.length - 1];
       if (last && sameStyle(last, style)) last.text += text;
-      else {
-        // The band is the layout's, not a run's: only the ink goes on the seg.
-        const seg: CodeSeg = { text };
-        if (style.color !== undefined) seg.color = style.color;
-        if (style.dim !== undefined) seg.dim = style.dim;
-        if (style.bold !== undefined) seg.bold = style.bold;
-        segs.push(seg);
-      }
+      else segs.push({ text, ...inkOf(style) });
     },
   };
 }

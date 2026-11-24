@@ -2,7 +2,7 @@
 // leading character of each row, and the row `kind` lets the layout decorate
 // the whole row rather than just the glyph.
 
-import { DEFAULT_TOKEN_COLORS } from './tokenColors.js';
+import { DEFAULT_TOKEN_COLORS, inkOf } from './tokenColors.js';
 import type { CodeLine, CodeLineKind, TokenPalette, TokenType } from './types.js';
 
 const HUNK_RE = /^@@+ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
@@ -24,7 +24,7 @@ const FILE_HEADER_RE =
   /^(?:diff --git |diff --cc |index |mode |old mode |new mode |new file mode|deleted file mode|similarity index |dissimilarity index |rename |copy |Binary files |GIT binary patch|From |Subject: |Index: |={5,}$)/;
 
 function row(line: string, token: TokenType, kind: CodeLineKind, palette: TokenPalette): CodeLine {
-  const seg = { text: line, ...palette[token] };
+  const seg = { text: line, ...inkOf(palette[token]) };
   return kind === undefined ? { segs: [seg] } : { segs: [seg], kind };
 }
 
