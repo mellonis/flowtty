@@ -81,3 +81,18 @@ describe('highlightMarkdownSource', () => {
     expect(highlightMarkdownSource('日本語文', 5, true).map(text)).toEqual(['日本', '語文']);
   });
 });
+
+describe('the same palette as the layout', () => {
+  test('the source view takes the palette', () => {
+    const rows = highlightMarkdownSource('```diff\n+new\n```', 20, false, { tokenColors: { added: 'blue' } });
+    const row = rows.find((r) => r.spans.some((s) => s.text === '+new'))!;
+    expect(row.spans.find((s) => s.text === '+new')?.color).toBe('blue');
+  });
+
+  test('a palette changes no character of the source', () => {
+    const src = '# T\n\n```diff\n+new\n```';
+    const plain = highlightMarkdownSource(src, 40, true);
+    const painted = highlightMarkdownSource(src, 40, true, { tokenColors: { added: 'blue' } });
+    expect(painted.map((r) => r.spans.map((s) => s.text).join(''))).toEqual(plain.map((r) => r.spans.map((s) => s.text).join('')));
+  });
+});

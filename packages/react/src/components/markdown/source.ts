@@ -10,6 +10,8 @@ import { clusterWidth, graphemes } from '@flowtty/core';
 
 import { parseFenceInfo } from './parse.js';
 import { highlightBlock, type CodeLine } from './highlight/index.js';
+import { resolvePalette } from './highlight/tokenColors.js';
+import type { TokenColors, TokenPalette } from './highlight/types.js';
 import { charsToSpans, type SpanStyle, type StyledChar, type StyledSpan } from './layout.js';
 
 /** One visual row of highlighted source. `lineNum` is the 1-based source line
@@ -89,7 +91,7 @@ function inlineSourceChars(text: string, base: SpanStyle): StyledChar[] {
 // itself walks the file one line at a time. A line outside any block is absent
 // from the result. The block boundaries follow this view's simpler rule: any
 // fence toggles, so a fence line is never inside a block.
-function fencedCodeLines(lines: string[]): (CodeLine | undefined)[] {
+function fencedCodeLines(lines: string[], palette: TokenPalette): (CodeLine | undefined)[] {
   const out: (CodeLine | undefined)[] = new Array(lines.length).fill(undefined);
   let i = 0;
   while (i < lines.length) {
@@ -99,7 +101,7 @@ function fencedCodeLines(lines: string[]): (CodeLine | undefined)[] {
     const start = i + 1;
     let end = start;
     while (end < lines.length && !FENCE_RE.test(lines[end]!)) end++;
-    highlightBlock(lines.slice(start, end), lang).forEach((cl, k) => { out[start + k] = cl; });
+    highlightBlock(lines.slice(start, end), lang, palette).forEach((cl, k) => { out[start + k] = cl; });
     i = end + 1; // past the closing fence, which styles as a fence in its own right
   }
   return out;
@@ -172,10 +174,18 @@ function hardWrap(chars: StyledChar[], width: number): StyledChar[][] {
  * false emits one row per source line (host clips the overflow). Blank source
  * lines become rows with empty spans. The result paginates by row slicing, same
  * as layoutMarkdown / splitVisualLines.
+ *
+ * `opts.tokenColors` is the same palette `layoutMarkdown` takes, applied to the
+ * fenced blocks; a source view laid out without one is drawn with the defaults.
  */
-export function highlightMarkdownSource(src: string, width: number, wrap: boolean): SourceLine[] {
+export function highlightMarkdownSource(
+  src: string,
+  width: number,
+  wrap: boolean,
+  opts?: { tokenColors?: TokenColors },
+): SourceLine[] {
   const lines = src.replace(/\r\n?/g, '\n').split('\n');
-  const code = fencedCodeLines(lines);
+  const code = fencedCodeLines(lines, resolvePalette(opts?.tokenColors));
   const out: SourceLine[] = [];
 
   lines.forEach((line, idx) => {
