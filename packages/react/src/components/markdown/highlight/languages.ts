@@ -7,22 +7,22 @@ import { highlightDiff } from './diff.js';
 import { highlightJs } from './js.js';
 import { createMarkupState, markupLine } from './markup.js';
 import { createBuilder } from './tokenColors.js';
-import type { CodeLine, EngineState, LangSpec, SegBuilder, StringRule } from './types.js';
+import type { CodeLine, EngineState, LangSpec, SegBuilder, StringRule, TokenPalette } from './types.js';
 
 export interface LangDef {
   name: string;
   aliases: readonly string[];
   colors: string;
-  highlight: (lines: readonly string[]) => CodeLine[];
+  highlight: (lines: readonly string[], palette: TokenPalette) => CodeLine[];
 }
 
 const words = (list: string): ReadonlySet<string> => new Set(list.split(/\s+/).filter(Boolean));
 
 /** One highlighter from one spec, threading a block's cross-line state. */
-function fromSpec(spec: LangSpec): (lines: readonly string[]) => CodeLine[] {
-  return (lines) => {
+function fromSpec(spec: LangSpec): (lines: readonly string[], palette: TokenPalette) => CodeLine[] {
+  return (lines, palette) => {
     const state = createState();
-    return lines.map((line) => ({ segs: tokenizeLine(line, spec, state).segs }));
+    return lines.map((line) => ({ segs: tokenizeLine(line, spec, state, palette).segs }));
   };
 }
 
@@ -50,10 +50,10 @@ function hashLike(keywords: ReadonlySet<string>, extra: Partial<LangSpec> = {}):
 
 // ─── markup ─────────────────────────────────────────────────────────────────
 
-function highlightMarkup(lines: readonly string[]): CodeLine[] {
+function highlightMarkup(lines: readonly string[], palette: TokenPalette): CodeLine[] {
   const state = createMarkupState();
   return lines.map((line) => {
-    const b = createBuilder();
+    const b = createBuilder(palette);
     markupLine(line, state, b);
     return { segs: b.segs };
   });
@@ -121,11 +121,11 @@ const SHELL_SPEC: LangSpec = {
 // Everything that is not a prompt line is output, and output is dim.
 const PROMPT_RE = /^([ \t]*[\w.@~:/\\+-]*[$#])([ \t].*|)$/;
 
-function highlightConsole(lines: readonly string[]): CodeLine[] {
+function highlightConsole(lines: readonly string[], palette: TokenPalette): CodeLine[] {
   return lines.map((line) => {
     const m = PROMPT_RE.exec(line);
     if (!m) return { segs: line === '' ? [] : [{ text: line, dim: true }] };
-    const b = createBuilder();
+    const b = createBuilder(palette);
     b.push(m[1]!, 'muted');
     // Each command stands alone — nothing carries into the output below it.
     tokenize(m[2]!, SHELL_SPEC, createState(), b, 0);

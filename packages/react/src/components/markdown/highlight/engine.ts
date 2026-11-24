@@ -8,7 +8,7 @@
 // `EngineState` the caller threads through a whole fenced block.
 
 import { createBuilder } from './tokenColors.js';
-import type { EngineState, LangSpec, SegBuilder, StringRule, TokenType } from './types.js';
+import type { EngineState, LangSpec, SegBuilder, StringRule, TokenPalette, TokenType } from './types.js';
 
 export function createState(): EngineState {
   return { depth: 0 };
@@ -160,8 +160,8 @@ export function resumeOpen(line: string, state: EngineState, b: SegBuilder): num
 }
 
 /** One line of `spec`, continuing whatever `state` left open. */
-export function tokenizeLine(line: string, spec: LangSpec, state: EngineState): SegBuilder {
-  const b = createBuilder();
+export function tokenizeLine(line: string, spec: LangSpec, state: EngineState, palette?: TokenPalette): SegBuilder {
+  const b = createBuilder(palette);
   let i = resumeOpen(line, state, b);
   if (i === 0 && spec.lineStart) i = spec.lineStart(line, state, b);
   if (i < line.length) tokenize(line, spec, state, b, i);

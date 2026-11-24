@@ -23,8 +23,8 @@ export interface CodeLine {
 
 /**
  * What a run of characters *is*. The token names are the only vocabulary a
- * language spec uses; `TOKEN_COLORS` turns them into styles, so the palette
- * lives in exactly one place.
+ * language spec uses; `DEFAULT_TOKEN_COLORS` (or the caller's palette) turns
+ * them into styles, so the palette lives in exactly one place.
  */
 export type TokenType =
   | 'plain'
@@ -49,8 +49,21 @@ export type TokenType =
   | 'hunk'
   | 'header';
 
-/** The style half of a `CodeSeg`. */
-export type TokenStyle = Omit<CodeSeg, 'text'>;
+/**
+ * The style half of a `CodeSeg`, plus the `background` a diff row's band is
+ * drawn with — a palette entry names both the ink and (for `added`/`removed`)
+ * the ground. Only the ink fields reach a `CodeSeg`.
+ */
+export type TokenStyle = Omit<CodeSeg, 'text'> & { background?: Color };
+
+/** The styles a block is drawn with, one per token. */
+export type TokenPalette = Readonly<Record<TokenType, TokenStyle>>;
+
+/** One token's override: a whole style, or just the ink. */
+export type TokenColorOverride = TokenStyle | Color;
+
+/** What a caller may override; every token left out keeps its default. */
+export type TokenColors = Partial<Record<TokenType, TokenColorOverride>>;
 
 /** Collects styled runs, merging neighbours that would look identical. */
 export interface SegBuilder {

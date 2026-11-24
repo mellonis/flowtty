@@ -7,9 +7,14 @@
 
 import { detectLanguage, hunkNumbers } from './diff.js';
 import { findLanguage, HIGHLIGHTED_LANGUAGES, type HighlightedLanguage } from './languages.js';
-import type { CodeLine, CodeLineKind, CodeSeg } from './types.js';
+import { DEFAULT_TOKEN_COLORS } from './tokenColors.js';
+import type { CodeLine, CodeLineKind, CodeSeg, TokenPalette } from './types.js';
 
-export type { CodeLine, CodeLineKind, CodeSeg, HighlightedLanguage };
+export type {
+  CodeLine, CodeLineKind, CodeSeg,
+  TokenColors, TokenColorOverride, TokenPalette, TokenStyle, TokenType,
+} from './types.js';
+export type { HighlightedLanguage } from './languages.js';
 export { detectLanguage, hunkNumbers, HIGHLIGHTED_LANGUAGES };
 
 /**
@@ -17,12 +22,19 @@ export { detectLanguage, hunkNumbers, HIGHLIGHTED_LANGUAGES };
  * constructs carry state. The concatenated seg texts of line i equal lines[i]
  * exactly. An unknown or missing language — and `text` / `log` / `plain` — is
  * one plain segment per line: no color, not dim.
+ *
+ * `palette` is the resolved table to draw with (`resolvePalette`); a block
+ * highlighted without one is drawn with the defaults.
  */
-export function highlightBlock(lines: readonly string[], lang: string): CodeLine[] {
+export function highlightBlock(
+  lines: readonly string[],
+  lang: string,
+  palette: TokenPalette = DEFAULT_TOKEN_COLORS,
+): CodeLine[] {
   const name = lang.trim() === '' ? detectLanguage(lines) : lang;
   const def = name === undefined ? undefined : findLanguage(name);
   const out = def
-    ? def.highlight(lines)
+    ? def.highlight(lines, palette)
     : lines.map((line): CodeLine => ({ segs: [{ text: line }] }));
   // A line always has at least one segment, so a caller can style a whole row
   // without special-casing the empty line.

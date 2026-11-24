@@ -5,7 +5,7 @@
 import { createState, resumeOpen, tokenize } from './engine.js';
 import { createMarkupState, markupTag, type MarkupOptions } from './markup.js';
 import { createBuilder } from './tokenColors.js';
-import type { CodeLine, EngineState, LangSpec, SegBuilder } from './types.js';
+import type { CodeLine, EngineState, LangSpec, SegBuilder, TokenPalette } from './types.js';
 
 const JS_KEYWORDS = new Set([
   'const', 'let', 'var', 'function', 'return', 'if', 'else', 'for', 'while', 'do',
@@ -85,12 +85,12 @@ const JS_SPEC: LangSpec = {
 };
 
 /** JS / TS (and their JSX) for a whole fenced block. */
-export function highlightJs(lines: readonly string[]): CodeLine[] {
+export function highlightJs(lines: readonly string[], palette: TokenPalette): CodeLine[] {
   const state = createState();
   state.markup = createMarkupState();
   const opts = markupOptions(state);
   return lines.map((line) => {
-    const b = createBuilder();
+    const b = createBuilder(palette);
     const markup = state.markup!;
     let i = resumeOpen(line, state, b);
     if (i === 0 && !state.open) {

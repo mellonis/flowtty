@@ -2,8 +2,8 @@
 // leading character of each row, and the row `kind` lets the layout decorate
 // the whole row rather than just the glyph.
 
-import { TOKEN_COLORS } from './tokenColors.js';
-import type { CodeLine, CodeLineKind, TokenType } from './types.js';
+import { DEFAULT_TOKEN_COLORS } from './tokenColors.js';
+import type { CodeLine, CodeLineKind, TokenPalette, TokenType } from './types.js';
 
 const HUNK_RE = /^@@+ -(\d+)(?:,\d+)? \+(\d+)(?:,\d+)? @@/;
 
@@ -23,19 +23,19 @@ export function hunkNumbers(line: string): { removed: number; added: number } | 
 const FILE_HEADER_RE =
   /^(?:diff --git |diff --cc |index |mode |old mode |new mode |new file mode|deleted file mode|similarity index |dissimilarity index |rename |copy |Binary files |GIT binary patch|From |Subject: |Index: |={5,}$)/;
 
-function row(line: string, token: TokenType, kind: CodeLineKind): CodeLine {
-  const seg = { text: line, ...TOKEN_COLORS[token] };
+function row(line: string, token: TokenType, kind: CodeLineKind, palette: TokenPalette): CodeLine {
+  const seg = { text: line, ...palette[token] };
   return kind === undefined ? { segs: [seg] } : { segs: [seg], kind };
 }
 
-export function highlightDiff(lines: readonly string[]): CodeLine[] {
+export function highlightDiff(lines: readonly string[], palette: TokenPalette = DEFAULT_TOKEN_COLORS): CodeLine[] {
   return lines.map((line) => {
-    if (line.startsWith('+++') || line.startsWith('---')) return row(line, 'header', 'header');
-    if (HUNK_RE.test(line)) return row(line, 'hunk', 'hunk');
-    if (FILE_HEADER_RE.test(line)) return row(line, 'header', 'header');
-    if (line.startsWith('+')) return row(line, 'added', 'added');
-    if (line.startsWith('-')) return row(line, 'removed', 'removed');
-    return row(line, 'plain', undefined);
+    if (line.startsWith('+++') || line.startsWith('---')) return row(line, 'header', 'header', palette);
+    if (HUNK_RE.test(line)) return row(line, 'hunk', 'hunk', palette);
+    if (FILE_HEADER_RE.test(line)) return row(line, 'header', 'header', palette);
+    if (line.startsWith('+')) return row(line, 'added', 'added', palette);
+    if (line.startsWith('-')) return row(line, 'removed', 'removed', palette);
+    return row(line, 'plain', undefined, palette);
   });
 }
 
