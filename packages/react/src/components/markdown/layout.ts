@@ -11,6 +11,7 @@ import {
   type CodeLine, type CodeLineKind,
 } from './highlight/index.js';
 import { resolvePalette } from './highlight/tokenColors.js';
+import { DEFAULT_PROSE_COLORS, headingRole, proseInk, resolveProse, type ProseColors, type ProsePalette } from './prose.js';
 import type { TokenColors, TokenPalette } from './highlight/types.js';
 import { clusterWidth, graphemes, stringWidth } from '@flowtty/core';
 import type { Color, WrapContinuation } from '@flowtty/core';
@@ -42,6 +43,12 @@ export interface MarkdownOptions {
    *  `removed`, `background`) — the one thing besides `diffBackground` that
    *  decides what a changed row looks like. */
   tokenColors?: TokenColors;
+  /** Per-role styles for the prose around the fenced blocks — heading levels,
+   *  inline `code`, link labels, list markers and the blockquote bar — merged
+   *  over the defaults the same way as `tokenColors`. The defaults are named
+   *  palette colours, which the terminal's own palette decides; a caller that
+   *  knows its ground names its own. A heading stays bold whatever its style. */
+  proseColors?: ProseColors;
 }
 
 /** One fenced block of a laid-out document, reported by
@@ -114,11 +121,11 @@ export interface StyledLine {
 export type SpanStyle = Omit<StyledSpan, 'text'>;
 export interface StyledChar { ch: string; style: SpanStyle }
 
-function styleForSeg(s: InlineSeg): SpanStyle {
+function styleForSeg(s: InlineSeg, prose: ProsePalette): SpanStyle {
   const st: SpanStyle = {};
-  if (s.code) st.color = 'cyan';
+  if (s.code) Object.assign(st, proseInk(prose.code));
   else if (s.image) st.dim = true;
-  else if (s.link) st.color = 'blue'; // plain-text link label
+  else if (s.link) Object.assign(st, proseInk(prose.link)); // plain-text link label
   if (s.bold) st.bold = true;
   if (s.emphasis) st.underline = true;
   // A link can wrap any inner kind (code/bold/plain). Keep the inner color but
@@ -137,10 +144,10 @@ function sameStyle(a: SpanStyle, b: SpanStyle): boolean {
     && (a.link ?? '') === (b.link ?? '');
 }
 
-function segsToChars(segs: InlineSeg[], base: SpanStyle = {}): StyledChar[] {
+function segsToChars(segs: InlineSeg[], base: SpanStyle = {}, prose: ProsePalette = DEFAULT_PROSE_COLORS): StyledChar[] {
   const out: StyledChar[] = [];
   for (const s of segs) {
-    const style = { ...base, ...styleForSeg(s) };
+    const style = { ...base, ...styleForSeg(s, prose) };
     for (const ch of graphemes(s.text)) out.push({ ch, style });
   }
   return out;
@@ -276,11 +283,12 @@ function wrapBlock(
     /** The prefix is frame, not content — a blockquote's bar. It is marked
      *  `chrome` and left out of the span a copy reads. */
     chromePrefix?: boolean;
+    prose?: ProsePalette;
   } = {},
 ): StyledLine[] {
   const indent = Math.max(prefixWidth(opts.first), prefixWidth(opts.cont));
   const contentWidth = Math.max(1, width - indent);
-  const charLines = wrapCharsDetailed(segsToChars(segs, opts.base), contentWidth);
+  const charLines = wrapCharsDetailed(segsToChars(segs, opts.base, opts.prose), contentWidth);
   const chrome = opts.chromePrefix === true;
   // A blank prefix is painted as part of the line (a hanging indent goes with
   // the space the wrap dropped); a chrome one is taken out of the copy, so the
@@ -305,7 +313,7 @@ function wrapBlock(
 // Render a list and, recursively, its sub-lists. `pad` is the column the list
 // starts in: a sub-list starts under its parent item's text, i.e. past the
 // parent's marker.
-function layoutList(list: MdList, width: number, pad: number, out: StyledLine[]): void {
+function layoutList(list: MdList, width: number, pad: number, out: StyledLine[], prose: ProsePalette): void {
   // Source numbers are printed as written, so `3.` stays `3.`. The one exception
   // is lazy numbering — every item carrying the same number (`1.` `1.` `1.`) —
   // which counts up from that number the way markdown renderers show it.
@@ -318,11 +326,11 @@ function layoutList(list: MdList, width: number, pad: number, out: StyledLine[])
     const num = list.ordered ? `${lazy ? start + idx : item.num ?? idx + 1}. ` : '';
     const marker: StyledSpan[] = [];
     if (item.checked === undefined) {
-      marker.push({ text: list.ordered ? num : '• ', color: 'yellow' });
+      marker.push({ text: list.ordered ? num : '• ', ...proseInk(prose.listMarker) });
     } else {
       // GFM task item: `☑ ` (checked, green) / `☐ ` (unchecked). For an
       // ordered list keep the number, then the box.
-      if (num) marker.push({ text: num, color: 'yellow' });
+      if (num) marker.push({ text: num, ...proseInk(prose.listMarker) });
       const box = checkboxMarker(item.checked, 'none');
       marker.push({ text: `${box.text} `, color: box.color });
     }
@@ -330,8 +338,9 @@ function layoutList(list: MdList, width: number, pad: number, out: StyledLine[])
     out.push(...wrapBlock(item.segs, width, {
       first: [...padSpan, ...marker],
       cont: [{ text: ' '.repeat(indent) }],
+      prose,
     }));
-    for (const child of item.children ?? []) layoutList(child, width, indent, out);
+    for (const child of item.children ?? []) layoutList(child, width, indent, out, prose);
   });
 }
 
@@ -347,11 +356,12 @@ function layoutTable(
   rows: InlineSeg[][][],
   width: number,
   out: StyledLine[],
+  prose: ProsePalette,
 ): void {
   const cols = header.length;
   const cells: StyledChar[][][] = [
-    header.map((c) => segsToChars(c, { bold: true })),
-    ...rows.map((r) => r.map((c) => segsToChars(c))),
+    header.map((c) => segsToChars(c, { bold: true }, prose)),
+    ...rows.map((r) => r.map((c) => segsToChars(c, {}, prose))),
   ];
 
   const widths = Array.from({ length: cols }, (_, c) => Math.max(1, ...cells.map((r) => charsWidth(r[c]!))));
@@ -398,10 +408,6 @@ function layoutTable(
   });
   out.push({ spans: rule });
   for (const r of wrapped.slice(1)) emitRow(r);
-}
-
-function headingColor(level: number): string {
-  return level <= 1 ? 'magenta' : level === 2 ? 'cyan' : 'blue';
 }
 
 // ─── fenced code blocks ─────────────────────────────────────────────────────
@@ -625,7 +631,8 @@ function layoutCode(b: CodeBlockSrc, width: number, opts: MarkdownOptions, out: 
  * Lay out markdown `src` into styled visual lines fitting `width` cells. The
  * result is paginatable by simple row slicing. Style mapping (no italic in the
  * terminal cell model): **bold**→bold, *emphasis*→underline, `code`→cyan,
- * [links]→blue underline, images→dim alt text, headings→bold + level color,
+ * [links]→blue underline, images→dim alt text, headings→bold + level color
+ * (the prose colours are `options.proseColors`' to change),
  * blockquotes→`│ ` gutter + dim, fenced code→a dim label row over a dim `│ `
  * gutter with per-language token colors, nested lists→indented under the parent
  * item's text, tables→padded columns with a bold header over a dim rule.
@@ -659,6 +666,7 @@ export function layoutMarkdownDetailed(
   const out: StyledLine[] = [];
   const codeBlocks: MarkdownCodeBlock[] = [];
   const blank = () => { if (out.length) out.push({ spans: [] }); };
+  const prose = resolveProse(options.proseColors);
 
   for (const b of blocks) {
     blank();
@@ -668,27 +676,28 @@ export function layoutMarkdownDetailed(
         out.push(...wrapBlock(b.segs, width, {
           first: [{ text: hashes, dim: true }],
           cont: [{ text: ' '.repeat(hashes.length) }],
-          base: { bold: true, color: headingColor(b.level) },
+          base: { ...proseInk(prose[headingRole(b.level)]), bold: true },
+          prose,
         }));
         break;
       }
       case 'paragraph':
-        out.push(...wrapBlock(b.segs, width));
+        out.push(...wrapBlock(b.segs, width, { prose }));
         break;
       case 'blockquote': {
-        const bar: StyledSpan[] = [{ text: '│ ', dim: true, color: 'cyan' }];
+        const bar: StyledSpan[] = [{ text: '│ ', ...proseInk(prose.quote) }];
         // The bar says "quoted"; the author wrote `> `. It is frame, so a copy
         // of a quoted paragraph comes back as the paragraph.
         out.push(...wrapBlock(b.segs, width, {
-          first: bar, cont: bar, base: { dim: true }, chromePrefix: true,
+          first: bar, cont: bar, base: { dim: true }, chromePrefix: true, prose,
         }));
         break;
       }
       case 'list':
-        layoutList(b, width, 0, out);
+        layoutList(b, width, 0, out, prose);
         break;
       case 'table':
-        layoutTable(b.align, b.header, b.rows, width, out);
+        layoutTable(b.align, b.header, b.rows, width, out, prose);
         break;
       case 'code': {
         // The spacer above belongs to neither neighbour: the block starts here.

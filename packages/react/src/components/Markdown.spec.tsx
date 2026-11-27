@@ -148,4 +148,23 @@ describe('Markdown', () => {
     expect(rows.some((l) => l.includes('本'))).toBe(true);
     r.unmount();
   });
+  test('passes proseColors and diffBackground through to the layout', async () => {
+    const backend = new TestBackend(30, 6);
+    const md = '## Head\n\n```diff\n+new\n```';
+    const r = await render(<Markdown width={30} proseColors={{ heading2: '#020202' }} diffBackground={false}>{md}</Markdown>, backend);
+    await flushAsync(backend);
+    const buf = backend.lastBuffer!;
+    const cellOf = (needle: string) => {
+      for (let y = 0; y < buf.height; y++) {
+        let row = '';
+        for (let x = 0; x < buf.width; x++) row += buf.get(x, y).char;
+        const at = row.indexOf(needle);
+        if (at >= 0) return buf.get(at, y);
+      }
+      return undefined;
+    };
+    expect(cellOf('Head')?.style.fg).toBe('#020202');
+    expect(cellOf('+new')?.style.bg).toBeUndefined();
+    r.unmount();
+  });
 });

@@ -96,3 +96,29 @@ describe('the same palette as the layout', () => {
     expect(painted.map((r) => r.spans.map((s) => s.text).join(''))).toEqual(plain.map((r) => r.spans.map((s) => s.text).join('')));
   });
 });
+
+describe('the source view takes the prose palette', () => {
+  const src = '# One\n\n`code` [docs](http://x)\n\n- item\n\n> quoted';
+  const find = (lines: SourceLine[], needle: string) =>
+    lines.flatMap((l) => l.spans).find((s) => s.text.includes(needle));
+
+  test('defaults unchanged', () => {
+    const lines = highlightMarkdownSource(src, 40, false);
+    expect(find(lines, 'One')?.color).toBe('magenta');
+    expect(find(lines, '`code`')?.color).toBe('cyan');
+    expect(find(lines, 'docs')?.color).toBe('blue');
+    expect(find(lines, '- ')?.color).toBe('yellow');
+    expect(find(lines, '> ')).toMatchObject({ color: 'cyan', dim: true });
+  });
+
+  test('every role recolours, the bytes stay', () => {
+    const proseColors = { heading1: '#010101', code: '#040404', link: '#050505', listMarker: '#060606', quote: '#070707' };
+    const lines = highlightMarkdownSource(src, 40, false, { proseColors });
+    expect(find(lines, 'One')).toMatchObject({ color: '#010101', bold: true });
+    expect(find(lines, '`code`')?.color).toBe('#040404');
+    expect(find(lines, 'docs')?.color).toBe('#050505');
+    expect(find(lines, '- ')?.color).toBe('#060606');
+    expect(find(lines, '> ')?.color).toBe('#070707');
+    expect(allText(lines)).toBe(src);
+  });
+});

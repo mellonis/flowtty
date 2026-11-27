@@ -51,4 +51,18 @@ describe('ProgressBar', () => {
     expect(backend.lastFrame.trim()).toBe('██████████');
     r.unmount();
   });
+  test('emptyColor inks the empty cells; without it they carry no colour of their own', async () => {
+    const backend = new TestBackend(20, 1);
+    const r = await render(<ProgressBar value={0.5} width={4} color="green" emptyColor="#777777" />, backend);
+    await flushAsync(backend);
+    const buf = backend.lastBuffer!;
+    expect(buf.get(0, 0).style.fg).toBe('green');
+    expect(buf.get(3, 0).style).toMatchObject({ fg: '#777777', dim: true });
+    r.unmount();
+    const plain = new TestBackend(20, 1);
+    const r2 = await render(<ProgressBar value={0.5} width={4} color="green" />, plain);
+    await flushAsync(plain);
+    expect(plain.lastBuffer!.get(3, 0).style.fg).toBeUndefined();
+    r2.unmount();
+  });
 });

@@ -625,3 +625,60 @@ describe('a fenced block drawn with a caller\'s palette', () => {
     expect(lines.every((l) => l.spans.every((s) => s.background === undefined))).toBe(true);
   });
 });
+
+describe('prose drawn with a caller\'s palette', () => {
+  const src = '# One\n\n## Two\n\n### Three\n\nsee `code` and [docs](http://x)\n\n- item\n2. num\n\n> quoted';
+  const find = (lines: StyledLine[], needle: string) =>
+    lines.flatMap((l) => l.spans).find((s) => s.text.includes(needle));
+
+  test('the defaults are unchanged when no proseColors is given', () => {
+    const lines = layoutMarkdown(src, 40);
+    expect(find(lines, 'One')?.color).toBe('magenta');
+    expect(find(lines, 'Two')?.color).toBe('cyan');
+    expect(find(lines, 'Three')?.color).toBe('blue');
+    expect(find(lines, 'code')?.color).toBe('cyan');
+    expect(find(lines, 'docs')?.color).toBe('blue');
+    expect(find(lines, '•')?.color).toBe('yellow');
+    expect(find(lines, '│')).toMatchObject({ color: 'cyan', dim: true });
+  });
+
+  test('every prose role takes the caller\'s ink', () => {
+    const lines = layoutMarkdown(src, 40, {
+      proseColors: {
+        heading1: '#010101', heading2: '#020202', heading3: { color: '#030303' },
+        code: '#040404', link: '#050505', listMarker: '#060606', quote: { color: '#070707' },
+      },
+    });
+    expect(find(lines, 'One')).toMatchObject({ color: '#010101', bold: true });
+    expect(find(lines, 'Two')?.color).toBe('#020202');
+    expect(find(lines, 'Three')?.color).toBe('#030303');
+    expect(find(lines, 'code')?.color).toBe('#040404');
+    expect(find(lines, 'docs')).toMatchObject({ color: '#050505', underline: true, link: 'http://x' });
+    expect(find(lines, '•')?.color).toBe('#060606');
+    expect(find(lines, '2.')?.color).toBe('#060606');
+    // a partial quote style keeps the default `dim`
+    expect(find(lines, '│')).toMatchObject({ color: '#070707', dim: true });
+  });
+
+  test('a heading past level 3 uses heading3, and stays bold whatever its style says', () => {
+    const [line] = layoutMarkdown('#### Deep', 40, { proseColors: { heading3: { color: '#030303', bold: false } } });
+    expect(find([line!], 'Deep')).toMatchObject({ color: '#030303', bold: true });
+  });
+
+  test('a role mapped to undefined, or a field left undefined, keeps the default', () => {
+    const lines = layoutMarkdown(src, 40, { proseColors: { heading1: undefined, code: { color: undefined } } });
+    expect(find(lines, 'One')?.color).toBe('magenta');
+    expect(find(lines, 'code')?.color).toBe('cyan');
+  });
+
+  test('table cells carry the prose palette too', () => {
+    const lines = layoutMarkdown('| a |\n|---|\n| `x` |', 20, { proseColors: { code: '#040404' } });
+    expect(find(lines, 'x')?.color).toBe('#040404');
+  });
+
+  test('a palette changes no character of the document', () => {
+    const plain = layoutMarkdown(src, 40).map(text);
+    const painted = layoutMarkdown(src, 40, { proseColors: { heading1: 'red', quote: 'red' } }).map(text);
+    expect(painted).toEqual(plain);
+  });
+});

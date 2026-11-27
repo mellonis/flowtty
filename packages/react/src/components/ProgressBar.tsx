@@ -17,6 +17,10 @@ export interface ProgressBarProps {
   emptyChar?: string;
   /** Color of the filled portion (named / #rrggbb / rgb(...)). */
   color?: Color;
+  /** Color of the empty portion. Default: none — the cells are drawn dim in the
+   *  surrounding ink, which is the terminal's own foreground when nothing above
+   *  sets one; on a ground of the app's own that can vanish, so name it there. */
+  emptyColor?: Color;
   /** Append a ` NN%` readout after the bar. Default false. */
   showPercent?: boolean;
 }
@@ -30,7 +34,7 @@ const clamp01 = (x: number): number => (x < 0 ? 0 : x > 1 ? 1 : x);
  * so the bar measures the remainder.
  */
 export function ProgressBar({
-  value, total, width, char = '█', emptyChar = '░', color, showPercent = false,
+  value, total, width, char = '█', emptyChar = '░', color, emptyColor, showPercent = false,
 }: ProgressBarProps): ReactNode {
   const fraction = clamp01(total !== undefined ? (total <= 0 ? 0 : value / total) : value);
   const [measured, setMeasured] = useState(0);
@@ -42,7 +46,7 @@ export function ProgressBar({
   const inner = (
     <>
       <Text color={color}>{char.repeat(filled)}</Text>
-      <Text dim>{emptyChar.repeat(empty)}</Text>
+      <Text dim color={emptyColor}>{emptyChar.repeat(empty)}</Text>
     </>
   );
   const percent = showPercent

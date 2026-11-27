@@ -12,6 +12,7 @@ import { parseFenceInfo } from './parse.js';
 import { highlightBlock, type CodeLine } from './highlight/index.js';
 import { resolvePalette } from './highlight/tokenColors.js';
 import type { TokenColors, TokenPalette } from './highlight/types.js';
+import { headingRole, proseInk, resolveProse, type ProseColors, type ProsePalette } from './prose.js';
 import { charsToSpans, type SpanStyle, type StyledChar, type StyledSpan } from './layout.js';
 
 /** One visual row of highlighted source. `lineNum` is the 1-based source line
@@ -40,10 +41,6 @@ const LIST_RE = /^(\s*(?:[-*+]|\d+\.)\s+)(.*)$/;
 const INLINE_RE = /(`[^`]+`)|(!\[[^\]]*\]\([^)]*\))|(\*\*[\s\S]+?\*\*)|(\*[\s\S]+?\*)|(\[[^\]]+\]\([^)]*\))/g;
 const LINK_RE = /^\[([^\]]+)\]\(([^)]*)\)$/;
 
-function headingColor(level: number): string {
-  return level <= 1 ? 'magenta' : level === 2 ? 'cyan' : 'blue';
-}
-
 function pushText(out: StyledChar[], text: string, style: SpanStyle): void {
   for (const ch of graphemes(text)) out.push({ ch, style });
 }
@@ -51,14 +48,14 @@ function pushText(out: StyledChar[], text: string, style: SpanStyle): void {
 // Inline highlighter that KEEPS the markdown markers, dimming them so the
 // structure is visible while the content carries its emphasis style. `base` is
 // the surrounding style (e.g. a heading's bold+color) applied to plain runs.
-function inlineSourceChars(text: string, base: SpanStyle): StyledChar[] {
+function inlineSourceChars(text: string, base: SpanStyle, prose: ProsePalette): StyledChar[] {
   const out: StyledChar[] = [];
   let last = 0;
   for (const m of text.matchAll(INLINE_RE)) {
     const idx = m.index ?? 0;
     if (idx > last) pushText(out, text.slice(last, idx), base);
     const tok = m[0];
-    if (m[1]) pushText(out, tok, { color: 'cyan' });                       // `code`
+    if (m[1]) pushText(out, tok, proseInk(prose.code));                    // `code`
     else if (m[2]) pushText(out, tok, { dim: true });                      // ![img]()
     else if (m[3]) {                                                       // **bold**
       pushText(out, '**', { dim: true });
@@ -72,7 +69,7 @@ function inlineSourceChars(text: string, base: SpanStyle): StyledChar[] {
       const lm = LINK_RE.exec(tok);
       if (lm) {
         pushText(out, '[', { dim: true });
-        pushText(out, lm[1]!, { color: 'blue', underline: true, link: lm[2]! });
+        pushText(out, lm[1]!, { ...proseInk(prose.link), underline: true, link: lm[2]! });
         pushText(out, '](', { dim: true });
         pushText(out, lm[2]!, { dim: true });
         pushText(out, ')', { dim: true });
@@ -109,7 +106,7 @@ function fencedCodeLines(lines: string[], palette: TokenPalette): (CodeLine | un
 
 // Style one full source line into chars. `code` is the line's highlighting when
 // it sits inside a fenced block.
-function lineToChars(line: string, code: CodeLine | undefined): StyledChar[] {
+function lineToChars(line: string, code: CodeLine | undefined, prose: ProsePalette): StyledChar[] {
   if (code) {
     const out: StyledChar[] = [];
     for (const cs of code.segs) pushText(out, cs.text, { color: cs.color, dim: cs.dim, bold: cs.bold });
@@ -125,7 +122,7 @@ function lineToChars(line: string, code: CodeLine | undefined): StyledChar[] {
     const level = heading[1]!.length;
     const out: StyledChar[] = [];
     pushText(out, heading[1]!, { dim: true });
-    if (heading[2]) out.push(...inlineSourceChars(heading[2], { bold: true, color: headingColor(level) }));
+    if (heading[2]) out.push(...inlineSourceChars(heading[2], { ...proseInk(prose[headingRole(level)]), bold: true }, prose));
     return out;
   }
   if (HR_RE.test(line)) {
@@ -136,18 +133,18 @@ function lineToChars(line: string, code: CodeLine | undefined): StyledChar[] {
   const quote = QUOTE_RE.exec(line);
   if (quote) {
     const out: StyledChar[] = [];
-    pushText(out, quote[1]!, { dim: true, color: 'cyan' });
-    out.push(...inlineSourceChars(quote[2]!, { dim: true }));
+    pushText(out, quote[1]!, proseInk(prose.quote));
+    out.push(...inlineSourceChars(quote[2]!, { dim: true }, prose));
     return out;
   }
   const list = LIST_RE.exec(line);
   if (list) {
     const out: StyledChar[] = [];
-    pushText(out, list[1]!, { color: 'yellow' });
-    out.push(...inlineSourceChars(list[2]!, {}));
+    pushText(out, list[1]!, proseInk(prose.listMarker));
+    out.push(...inlineSourceChars(list[2]!, {}, prose));
     return out;
   }
-  return inlineSourceChars(line, {});
+  return inlineSourceChars(line, {}, prose);
 }
 
 // Hard wrap by display column, preserving every cluster and never splitting a
@@ -176,20 +173,23 @@ function hardWrap(chars: StyledChar[], width: number): StyledChar[][] {
  * as layoutMarkdown / splitVisualLines.
  *
  * `opts.tokenColors` is the same palette `layoutMarkdown` takes, applied to the
- * fenced blocks; a source view laid out without one is drawn with the defaults.
+ * fenced blocks, and `opts.proseColors` its prose palette, applied to headings,
+ * inline code, links, list markers and quote markers; a source view laid out
+ * without them is drawn with the defaults.
  */
 export function highlightMarkdownSource(
   src: string,
   width: number,
   wrap: boolean,
-  opts?: { tokenColors?: TokenColors },
+  opts?: { tokenColors?: TokenColors; proseColors?: ProseColors },
 ): SourceLine[] {
   const lines = src.replace(/\r\n?/g, '\n').split('\n');
   const code = fencedCodeLines(lines, resolvePalette(opts?.tokenColors));
+  const prose = resolveProse(opts?.proseColors);
   const out: SourceLine[] = [];
 
   lines.forEach((line, idx) => {
-    const chars = lineToChars(line, code[idx]);
+    const chars = lineToChars(line, code[idx], prose);
     const visual = wrap ? hardWrap(chars, width) : [chars];
     visual.forEach((vc, i) => {
       out.push({ lineNum: i === 0 ? idx + 1 : null, spans: charsToSpans(vc) });

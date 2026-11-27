@@ -91,6 +91,11 @@ export type {
   TokenStyle as MarkdownTokenStyle,
   TokenType as MarkdownToken,
 } from './components/markdown/highlight/types.js';
+export type {
+  ProseColors as MarkdownProseColors,
+  ProseStyle as MarkdownProseStyle,
+  ProseRole as MarkdownProseRole,
+} from './components/markdown/prose.js';
 export { highlightMarkdownSource, type SourceLine } from './components/markdown/source.js';
 export { parseMarkdown, parseInline } from './components/markdown/parse.js';
 export type { MdBlock, MdList, MdListItem, MdAlign, InlineSeg } from './components/markdown/parse.js';

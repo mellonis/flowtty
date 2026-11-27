@@ -397,6 +397,9 @@ Style mapping (the terminal cell model has no italic):
 | ` ```lang ` fences  | a dim label row over a dim `│ ` gutter, with per-language token colors — see [Fenced code blocks](#fenced-code-blocks) |
 | `---`               | a dim horizontal rule                        |
 
+The colors in this table are the defaults: see [Markdown colours](#markdown-colours)
+to set your own.
+
 > Wrapping and table columns are measured in **display columns**, the same as
 > `<Table>`, so columns stay aligned on rows with CJK / emoji (see
 > [Display width](terminal.md#display-width)).
@@ -580,6 +583,7 @@ closes a block only when it uses the same character and is at least as long.
 | `lineNumbers` | `boolean`               | `false`  | Dim, right-aligned source line numbers between the gutter and the code (`│  7 code`). The gutter sizes itself from the largest number and takes that width off the code; a wrapped continuation row keeps the bar and leaves the number blank. A diff is numbered from its hunk headers — see [Diff blocks](#diff-blocks) |
 | `diffBackground` | `boolean`            | `true`   | Faint green / red bands behind a diff's added / removed rows. Off, those rows are exactly as they would be with no bands — see [Diff blocks](#diff-blocks) |
 | `tokenColors` | `MarkdownTokenColors`  | unset    | Per-token styles for a fenced block, merged over the defaults: a token left out keeps what it has. Names the colors above **and** a diff row's ink and band (`added` / `removed`, `color` / `background`) — see [Diff blocks](#diff-blocks) |
+| `proseColors` | `MarkdownProseColors`  | unset    | Per-role styles for the prose around the blocks — headings, inline code, links, list markers, the quote bar — merged the same way — see [Markdown colours](#markdown-colours) |
 
 ```tsx
 <Markdown codeWrap="truncate" maxCodeRows={20} lineNumbers>{reply}</Markdown>
@@ -590,6 +594,36 @@ closes a block only when it uses the same character and is at least as long.
 > of an auto-detected diff is not added — the fence is shown as written. The
 > other options apply in both modes; with `'literal'`, line numbers appear
 > without a bar.
+
+### Markdown colours
+
+Every default color of the prose is a **named** palette color (`magenta`, `cyan`,
+`blue`, `yellow`), so the terminal's own palette decides what it looks like. On the
+terminal's own ground that is usually right; on a ground the app paints itself it
+may not be — a dark `blue` heading vanishes on a dark panel. `proseColors` names
+your own, role by role, with the same shape and merge rules as `tokenColors`: a
+bare color is the role's ink, a style may also set `dim` / `bold`, and a role or a
+field left out (or `undefined`) keeps its default.
+
+| Role         | Draws                                        | Default |
+|--------------|----------------------------------------------|---------|
+| `heading1`   | a `#` heading's text                          | `magenta` |
+| `heading2`   | a `##` heading's text                         | `cyan` |
+| `heading3`   | a `###` heading's text, and every deeper one  | `blue` |
+| `code`       | inline `` `code` ``                           | `cyan` |
+| `link`       | a link's label (it stays underlined)          | `blue` |
+| `listMarker` | a list's `•` and an ordered item's number     | `yellow` |
+| `quote`      | a blockquote's `│ ` bar                       | `cyan`, dim |
+
+A heading stays bold whatever its style says, and a quote's text stays dim — the
+roles color the element, they do not change what it is. `highlightMarkdownSource`
+takes the same `proseColors` for its headings, inline code, links and markers.
+
+```tsx
+<Markdown proseColors={{ heading1: '#d77757', heading2: '#d77757', heading3: '#d77757', code: '#b1b9f9' }}>
+  {reply}
+</Markdown>
+```
 
 ### Diff blocks
 
@@ -811,6 +845,9 @@ Props:
 - `width` — fixed cell width. Omit to **fill the row** (measured via `onLayout`).
 - `char` / `emptyChar` — filled / empty glyphs (default `█` / `░`).
 - `color` — color of the filled portion.
+- `emptyColor` — color of the empty portion. Unset, the empty cells are drawn dim
+  in the surrounding ink — the terminal's own foreground when nothing above sets
+  one, which can vanish on a ground the app paints itself; name it there.
 - `showPercent` — append a ` NN%` readout; in fill mode it reserves its own space
   so the bar measures the remainder.
 
