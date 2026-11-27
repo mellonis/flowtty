@@ -7,6 +7,30 @@ All notable changes to the `@flowtty/*` packages. The four packages
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/);
 the project is still on `1.0.0-alpha`, so any release may change an API.
 
+## 1.0.0-alpha.42 — 2026-11-27
+
+### Added
+
+- **Markdown prose takes the caller's colours.** `MarkdownOptions.proseColors`
+  (and the same prop on `<Markdown>`) sets the ink of heading levels, inline
+  `code`, link labels, list markers and the blockquote bar — the colours that
+  were fixed named palette colours, so a dark `blue` heading vanished on a dark
+  ground the app paints itself. Same shape and merge rules as `tokenColors`: a
+  bare colour or a partial style per role, a role or field left out keeps the
+  default. A heading stays bold. `highlightMarkdownSource` takes it too. With no
+  overrides the output is unchanged. Types: `MarkdownProseColors`,
+  `MarkdownProseStyle`, `MarkdownProseRole`.
+
+- **`<ProgressBar emptyColor>`** inks the empty cells. Unset, they stay dim in the
+  surrounding ink as before — the terminal's own foreground when nothing above
+  sets one, which disappears on a light ground in a dark terminal.
+
+### Fixed
+
+- **`<Markdown diffBackground={false}>` is honoured.** The component accepted the
+  prop but never passed it to the layout, so the diff bands stayed on;
+  `layoutMarkdown` itself was not affected.
+
 ## 1.0.0-alpha.41 — 2026-11-24
 
 ### Fixed
